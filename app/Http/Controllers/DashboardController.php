@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\TeachingAssignment;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -22,6 +23,10 @@ class DashboardController extends Controller
             'teachers' => Teacher::count(),
             'classes' => SchoolClass::count(),
             'assignments' => TeachingAssignment::count(),
+            'announcements' => Schema::hasTable('school_posts') ? \App\Models\SchoolPost::where('type', 'announcement')->count() : 0,
+            'events' => Schema::hasTable('school_events') ? \App\Models\SchoolEvent::count() : 0,
+            'documents' => Schema::hasTable('learning_documents') ? \App\Models\LearningDocument::count() : 0,
+            'attendance' => Schema::hasTable('attendance_records') ? \App\Models\AttendanceRecord::count() : 0,
         ];
 
         $activeYear = SchoolYear::where('is_active', true)->first();

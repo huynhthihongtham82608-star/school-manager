@@ -2,10 +2,10 @@
 @section('title', 'Hộp thư đến')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">Hộp thư đến</h5>
-        <div class="text-muted">Tin nhắn nhận được</div>
+        <h5>Hộp thư đến</h5>
+        <div class="text-muted">Tin nhắn nhận được.</div>
     </div>
     <div class="d-flex gap-2">
         <a class="btn btn-outline-secondary" href="{{ route('messages.sent') }}">Đã gửi</a>
@@ -13,9 +13,9 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table mb-0">
+<div class="card">
+    <div class="table-responsive">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Trạng thái</th>
@@ -29,11 +29,13 @@
                 <tr>
                     <td>{!! $m->is_read ? '<span class="badge bg-secondary">Đã đọc</span>' : '<span class="badge bg-primary">Mới</span>' !!}</td>
                     <td>{{ $m->sender?->display_name ?? $m->sender?->username }}</td>
-                    <td><a href="{{ route('messages.show', $m) }}">{{ $m->title ?: '(Không tiêu đề)' }}</a></td>
+                    <td class="fw-semibold"><a href="{{ route('messages.show', $m) }}">{{ $m->title ?: '(Không tiêu đề)' }}</a></td>
                     <td class="text-muted">{{ $m->created_at }}</td>
                 </tr>
             @empty
-                <tr><td colspan="4" class="text-center text-muted p-4">Chưa có tin nhắn.</td></tr>
+                <tr>
+                    <td colspan="4"><div class="empty-state"><i class="bi bi-inbox"></i>Chưa có tin nhắn.</div></td>
+                </tr>
             @endforelse
             </tbody>
         </table>

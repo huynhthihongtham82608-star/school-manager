@@ -13,7 +13,13 @@ class AuthController extends Controller
             return redirect()->route('dashboard');
         }
 
-        return view('auth.login');
+        return response()
+            ->view('auth.login')
+            ->withHeaders([
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => 'Mon, 01 Jan 1990 00:00:00 GMT',
+            ]);
     }
 
     public function login(Request $request)
@@ -29,20 +35,30 @@ class AuthController extends Controller
             'is_active' => 1,
         ])) {
             $request->session()->regenerate();
+            $request->session()->forget('url.intended');
 
-            return redirect()->intended('dashboard');
+            return redirect()->route('dashboard');
         }
 
-        return back()->withErrors(['username' => 'Sai tài khoản hoặc mật khẩu'])->onlyInput('username');
+        return back()
+            ->withErrors(['username' => 'Sai tài khoản hoặc mật khẩu'])
+            ->onlyInput('username');
     }
 
     public function logout(Request $request)
     {
-        Auth::logout();
+        Auth::guard()->logout();
+        $request->session()->flush();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login');
+        return redirect()
+            ->route('home')
+            ->withHeaders([
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => 'Mon, 01 Jan 1990 00:00:00 GMT',
+                'Clear-Site-Data' => '"cache", "storage"',
+            ]);
     }
 }
-

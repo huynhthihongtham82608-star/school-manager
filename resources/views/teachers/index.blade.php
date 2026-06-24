@@ -2,16 +2,17 @@
 @section('title', 'Giáo viên')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">Giáo viên</h5>
-        <div class="text-muted">Quản lý thông tin giáo viên</div>
+        <h5>Giáo viên</h5>
+        <div class="text-muted">Quản lý thông tin giáo viên và tài khoản liên kết.</div>
     </div>
     <a class="btn btn-primary" href="{{ route('teachers.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm giáo viên</a>
 </div>
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table mb-0">
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Mã</th>
@@ -23,9 +24,9 @@
                 </tr>
             </thead>
             <tbody>
-            @foreach($teachers as $teacher)
+            @forelse($teachers as $teacher)
                 <tr>
-                    <td>{{ $teacher->teacher_code }}</td>
+                    <td class="fw-semibold">{{ $teacher->teacher_code }}</td>
                     <td>{{ $teacher->name }}<br><span class="text-muted small">{{ $teacher->phone }}</span></td>
                     <td>{{ $teacher->main_subject }}</td>
                     <td>{!! $teacher->is_homeroom ? '<span class="badge bg-info">Có</span>' : '-' !!}</td>
@@ -38,7 +39,11 @@
                         </form>
                     </td>
                 </tr>
-            @endforeach
+            @empty
+                <tr>
+                    <td colspan="6"><div class="empty-state"><i class="bi bi-person-badge"></i>Chưa có giáo viên.</div></td>
+                </tr>
+            @endforelse
             </tbody>
         </table>
     </div>

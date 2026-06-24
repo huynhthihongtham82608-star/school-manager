@@ -2,17 +2,17 @@
 @section('title', 'Phụ huynh')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">Phụ huynh</h5>
-        <div class="text-muted">Quản lý phụ huynh và liên kết học sinh</div>
+        <h5>Phụ huynh</h5>
+        <div class="text-muted">Quản lý phụ huynh và liên kết học sinh.</div>
     </div>
     <a class="btn btn-primary" href="{{ route('parents.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm phụ huynh</a>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table mb-0">
+<div class="card">
+    <div class="table-responsive">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Họ tên</th>
@@ -24,13 +24,13 @@
                 </tr>
             </thead>
             <tbody>
-            @foreach($parents as $p)
+            @forelse($parents as $p)
                 <tr>
                     <td class="fw-semibold">{{ $p->name }}</td>
                     <td class="text-muted small">{{ $p->phone }}<br>{{ $p->email }}</td>
                     <td>
                         @forelse($p->students as $st)
-                            <span class="badge bg-info text-dark">{{ $st->student_code }}</span>
+                            <span class="badge bg-info">{{ $st->student_code }}</span>
                         @empty
                             <span class="text-muted">-</span>
                         @endforelse
@@ -45,7 +45,11 @@
                         </form>
                     </td>
                 </tr>
-            @endforeach
+            @empty
+                <tr>
+                    <td colspan="6"><div class="empty-state"><i class="bi bi-people"></i>Chưa có phụ huynh.</div></td>
+                </tr>
+            @endforelse
             </tbody>
         </table>
     </div>

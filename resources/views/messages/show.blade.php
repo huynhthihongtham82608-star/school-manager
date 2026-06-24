@@ -2,9 +2,9 @@
 @section('title', 'Chi tiết tin nhắn')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">{{ $message->title ?: '(Không tiêu đề)' }}</h5>
+        <h5>{{ $message->title ?: '(Không tiêu đề)' }}</h5>
         <div class="text-muted small">
             Từ: {{ $message->sender?->display_name ?? $message->sender?->username }}
             · Đến: {{ $message->receiver?->display_name ?? $message->receiver?->username }}
@@ -17,7 +17,7 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="card">
     <div class="card-body">
         <div style="white-space: pre-wrap;">{{ $message->content }}</div>
     </div>

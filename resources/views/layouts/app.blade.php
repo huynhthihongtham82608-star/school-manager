@@ -3,225 +3,230 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>@yield('title', config('app.name')) - {{ config('app.name') }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <style>
-        :root {
-            /* Fresh, modern, not-generic: Sage + Slate on warm off-white */
-            --sm-brand: #3f7d67;
-            --sm-brand-strong: #2f5f4f;
-            --sm-brand-soft: rgba(63,125,103,0.14);
-            --sm-slate: #64748b;
-            --sm-bg: #f7f5ef;
-            --sm-surface: #fbfaf6;
-            --sm-ink: #0f172a;
-            --sm-accent: #1e3a8a;
-            --sm-wood: #b07d4f;
-
-            --sm-radius: 16px;
-            --sm-radius-sm: 12px;
-            --sm-shadow: 0 18px 46px rgba(15, 23, 42, 0.10);
-            --sm-shadow-soft: 0 10px 26px rgba(15, 23, 42, 0.06);
-
-            --sm-font-body: "Be Vietnam Pro", "Segoe UI", Arial, sans-serif;
-            --sm-font-head: "Sora", "Be Vietnam Pro", "Segoe UI", Arial, sans-serif;
-
-            /* Bootstrap 5.3 variables override */
-            --bs-primary: var(--sm-brand);
-            --bs-primary-rgb: 63, 125, 103;
-            --bs-secondary: var(--sm-slate);
-            --bs-secondary-rgb: 100, 116, 139;
-            --bs-body-bg: var(--sm-bg);
-            --bs-body-color: var(--sm-ink);
-            --bs-link-color: var(--sm-accent);
-            --bs-link-hover-color: #162f75;
-        }
-
-        * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-        body {
-            font-family: var(--sm-font-body);
-            color: var(--sm-ink);
-            background:
-                radial-gradient(900px 520px at 14% 16%, rgba(63,125,103,0.20), transparent 60%),
-                radial-gradient(780px 520px at 86% 18%, rgba(30,58,138,0.14), transparent 55%),
-                radial-gradient(680px 520px at 70% 92%, rgba(176,125,79,0.10), transparent 55%),
-                linear-gradient(180deg, var(--sm-surface) 0%, var(--sm-bg) 58%);
-        }
-        body::before {
-            content: "";
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            opacity: 0.06;
-            background-image: radial-gradient(circle at 1px 1px, rgba(15,23,42,0.95) 1px, transparent 0);
-            background-size: 22px 22px;
-            mix-blend-mode: multiply;
-        }
-
-        .sidebar {
-            height: 100vh;
-            position: sticky;
-            top: 0;
-            overflow-y: auto;
-            background:
-                radial-gradient(700px 520px at 30% -10%, rgba(255,255,255,0.18), transparent 60%),
-                radial-gradient(640px 520px at 96% 28%, rgba(176,125,79,0.18), transparent 55%),
-                linear-gradient(180deg, var(--sm-brand) 0%, var(--sm-brand-strong) 100%);
-            color: #fff;
-            width: 260px;
-            border-right: 1px solid rgba(255,255,255,0.14);
-        }
-        .brand-mark {
-            background: rgba(251, 250, 246, 0.92);
-            color: var(--sm-brand-strong);
-            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
-        }
-        .sidebar a {
-            color: rgba(255, 255, 255, 0.92);
-            text-decoration: none;
-            display: block;
-            padding: 0.6rem 1rem;
-            border-radius: 12px;
-            position: relative;
-            transition: transform 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
-        }
-        .sidebar a.active, .sidebar a:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
-        .sidebar a:hover { transform: translateY(-1px); }
-        .sidebar a.active { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10); }
-        .sidebar a.active::before {
-            content: "";
-            position: absolute;
-            left: 10px;
-            top: 50%;
-            width: 6px;
-            height: 22px;
-            transform: translateY(-50%);
-            border-radius: 999px;
-            background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.35));
-            opacity: 0.85;
-        }
-        .sidebar a i { opacity: 0.95; transition: transform 160ms ease, opacity 160ms ease; }
-        .sidebar a:hover i { transform: translateY(-1px); opacity: 1; }
-        .sidebar .menu-title { letter-spacing: .12em; }
-
-        .content { padding: 1.5rem; }
-        .topbar {
-            position: sticky;
-            top: 0;
-            z-index: 1020;
-            background: rgba(251, 250, 246, 0.86);
-            border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-            backdrop-filter: blur(8px);
-        }
-        .page-title { font-family: var(--sm-font-head); letter-spacing: -0.02em; }
-
-        .table thead { background: rgba(63, 125, 103, 0.10); }
-        .table tbody tr { transition: background-color 140ms ease; }
-        .table tbody tr:hover { background: rgba(63,125,103,0.06); }
-
-        .card {
-            border: 1px solid rgba(15, 23, 42, 0.06);
-            border-radius: var(--sm-radius);
-            background: rgba(251, 250, 246, 0.86);
-            backdrop-filter: blur(6px);
-        }
-        .shadow-sm { box-shadow: var(--sm-shadow-soft) !important; }
-
-        .badge-role { text-transform: uppercase; letter-spacing: .04em; }
-        .btn-outline-secondary { border-color: rgba(100, 116, 139, 0.55); }
-        .btn-primary {
-            border: none;
-            background: linear-gradient(135deg, rgba(63,125,103,1) 0%, rgba(46,151,121,1) 55%, rgba(30,58,138,0.92) 140%);
-            box-shadow: 0 10px 24px rgba(63,125,103,0.20);
-        }
-        .btn-primary:hover { filter: brightness(1.02); box-shadow: 0 12px 30px rgba(63,125,103,0.24); }
-        .btn-primary:active { transform: translateY(1px); }
-
-        .form-control, .form-select {
-            border-radius: 12px;
-            border-color: rgba(15, 23, 42, 0.14);
-            background: rgba(251, 250, 246, 0.92);
-        }
-        .form-control:focus, .form-select:focus {
-            border-color: rgba(63,125,103,0.55);
-            box-shadow: 0 0 0 .25rem rgba(63,125,103,0.16);
-        }
-
-        @media (prefers-reduced-motion: no-preference) {
-            .content { opacity: 0; transform: translateY(6px); }
-            body.is-loaded .content { opacity: 1; transform: translateY(0); transition: opacity 240ms ease, transform 240ms ease; }
-        }
-        @media (max-width: 992px) { .sidebar { width: 220px; } }
-    </style>
+    <link href="{{ asset('css/school-ui.css') }}?v=20260624-admin-groups" rel="stylesheet">
 </head>
-<body>
-<div class="d-flex">
-    <nav class="sidebar p-3">
-        <div class="d-flex align-items-center gap-2 mb-3">
-            <div class="brand-mark fw-bold rounded-circle d-flex align-items-center justify-content-center" style="width:40px;height:40px;">TH</div>
+@php
+    $currentUser = auth()->user();
+    $showSidebar = $currentUser && ($currentUser->isAdmin() || $currentUser->isStaff());
+    $showRoleMenu = $currentUser && ! $showSidebar;
+    $schoolTitle = 'Trường Trung học Phổ thông';
+    $aiUrl = ($currentUser->isAdmin() || $currentUser->isStaff() || $currentUser->isHomeroom()) ? route('ai.run.form') : route('ai.alerts');
+
+    $roleMenuItems = [];
+    $addRoleItem = function (string $icon, string $label, string $url, string $active = '') use (&$roleMenuItems) {
+        $roleMenuItems[] = compact('icon', 'label', 'url', 'active');
+    };
+
+    $adminMenuGroups = [];
+    $addAdminGroup = function (string $key, string $icon, string $title, array $items) use (&$adminMenuGroups) {
+        $adminMenuGroups[] = compact('key', 'icon', 'title', 'items');
+    };
+
+    if ($showSidebar) {
+        $academicItems = [
+            ['bi-calendar-event', 'Năm học', route('school-years.index'), 'school-years*'],
+            ['bi-calendar2-week', 'Học kỳ', route('semesters.index'), 'semesters*'],
+            ['bi-building', 'Lớp học', route('classes.index'), 'classes*'],
+            ['bi-book', 'Môn học', route('subjects.index'), 'subjects*'],
+            ['bi-diagram-3', 'Phân công giảng dạy', route('assignments.index'), 'assignments*'],
+            ['bi-calendar3-week', 'Thời khóa biểu', route('timetable.manage'), 'timetable/manage*'],
+        ];
+
+        if ($currentUser->role === 'admin') {
+            $academicItems[] = ['bi-table', 'Điểm số', route('scores.index'), 'scores*'];
+            $academicItems[] = ['bi-star', 'Hạnh kiểm', route('conduct.index'), 'conduct*'];
+        }
+
+        $academicItems[] = ['bi-person-check', 'Điểm danh', route('attendance.index'), 'attendance*'];
+
+        $addAdminGroup('overview', 'bi-speedometer2', 'Tổng quan', [
+            ['bi-house-door', 'Dashboard', route('dashboard'), 'dashboard'],
+        ]);
+        $addAdminGroup('academic', 'bi-building', 'Quản lý học vụ', $academicItems);
+        $addAdminGroup('users', 'bi-people', 'Quản lý người dùng', [
+            ['bi-person', 'Học sinh', route('students.index'), 'students*'],
+            ['bi-person-badge', 'Giáo viên', route('teachers.index'), 'teachers*'],
+            ['bi-people', 'Phụ huynh', route('parents.index'), 'parents*'],
+        ]);
+        $addAdminGroup('content', 'bi-megaphone', 'Nội dung hệ thống', [
+            ['bi-window-stack', 'Quản lý trang chủ', route('admin.home-page.index'), 'admin/home-page*'],
+            ['bi-megaphone', 'Thông báo', route('announcements.index'), 'announcements*'],
+            ['bi-calendar-event', 'Sự kiện', route('events.index'), 'events*'],
+            ['bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), 'documents*'],
+            ['bi-calendar2-check', 'Lịch thi', route('exam-schedules.index'), 'exam-schedules*'],
+            ['bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*'],
+        ]);
+        $addAdminGroup('ai', 'bi-cpu', 'AI hỗ trợ', [
+            ['bi-cpu', 'AI hỗ trợ học tập', $aiUrl, 'ai*'],
+            ['bi-robot', 'Chatbot hỗ trợ', route('chatbot.index'), 'chatbot*'],
+        ]);
+
+        $reportItems = [];
+        if ($currentUser->role === 'admin') {
+            $reportItems[] = ['bi-bar-chart', 'Báo cáo', route('reports.class-summary'), 'reports*'];
+        }
+        $reportItems[] = ['bi-shield-check', 'Nhật ký hoạt động', route('audit-logs.index'), 'audit-logs*'];
+        $addAdminGroup('reports', 'bi-graph-up', 'Báo cáo', $reportItems);
+
+        $addAdminGroup('settings', 'bi-gear', 'Cài đặt', [
+            ['bi-lock', 'Khóa nhập điểm', route('grade-windows.index'), 'grade-windows*'],
+            ['bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile'],
+            ['bi-key', 'Đổi mật khẩu', route('profile.change-password'), 'profile/change-password'],
+        ]);
+    }
+
+    if ($showRoleMenu) {
+        $addRoleItem('bi-house-door', 'Trang chủ', route('dashboard'), 'dashboard');
+        if ($currentUser->isStudent()) {
+            $addRoleItem('bi-bar-chart-line', 'Kết quả học tập', route('dashboard'), 'dashboard');
+            $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
+            $addRoleItem('bi-person-check', 'Điểm danh', route('attendance.index'), 'attendance*');
+            $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('dashboard'), 'dashboard');
+            $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.alerts'), 'ai*');
+            $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
+            $addRoleItem('bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile*');
+        } elseif ($currentUser->isHomeroom()) {
+            $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
+            $addRoleItem('bi-people', 'Quản lý lớp chủ nhiệm', route('dashboard'), 'dashboard');
+            $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('conduct.index'), 'conduct*');
+            $addRoleItem('bi-table', 'Nhập điểm', route('scores.index'), 'scores*');
+            $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
+            $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.run.form'), 'ai*');
+            $addRoleItem('bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile*');
+        } elseif ($currentUser->isTeacher()) {
+            $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
+            $addRoleItem('bi-table', 'Nhập điểm', route('scores.index'), 'scores*');
+            $addRoleItem('bi-people', 'Danh sách lớp', route('dashboard'), 'dashboard');
+            $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
+            $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.alerts'), 'ai*');
+            $addRoleItem('bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile*');
+        } elseif ($currentUser->isParent()) {
+            $addRoleItem('bi-bar-chart-line', 'Theo dõi kết quả học tập', route('dashboard'), 'dashboard');
+            $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
+            $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('dashboard'), 'dashboard');
+            $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.reports'), 'ai*');
+            $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
+            $addRoleItem('bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile*');
+        }
+    }
+@endphp
+<body class="role-{{ $currentUser->role }} {{ $showSidebar ? 'has-sidebar' : 'no-sidebar' }}">
+@if($showSidebar)
+<div class="sidebar-overlay" data-sidebar-close></div>
+@elseif($showRoleMenu)
+<div class="sidebar-overlay role-menu-overlay" data-role-menu-close></div>
+@endif
+
+<div class="app-shell d-flex">
+    @if($showSidebar)
+    <aside class="admin-sidebar">
+        <div class="admin-sidebar-head">
+            <div class="brand-mark fw-bold rounded-3">TH</div>
             <div>
-                <div class="fw-semibold">{{ config('app.name') }}</div>
-                <div class="small text-light">Hệ thống quản lý</div>
+                <div class="admin-sidebar-title">Trường Trung học Phổ thông</div>
+                <div class="admin-sidebar-subtitle">{{ $currentUser->display_name }}</div>
             </div>
         </div>
-        <div class="mb-2 text-uppercase small opacity-75 menu-title">Chức năng</div>
-        <div class="d-flex flex-column gap-1">
-            <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
 
-            @if(auth()->user()->isAdmin())
-                <a href="{{ route('school-years.index') }}" class="{{ request()->is('school-years*') ? 'active' : '' }}"><i class="bi bi-calendar-event me-2"></i>Năm học - Học kỳ</a>
-                <a href="{{ route('classes.index') }}" class="{{ request()->is('classes*') ? 'active' : '' }}"><i class="bi bi-building me-2"></i>Lớp học</a>
-                <a href="{{ route('students.index') }}" class="{{ request()->is('students*') ? 'active' : '' }}"><i class="bi bi-people me-2"></i>Học sinh</a>
-                <a href="{{ route('teachers.index') }}" class="{{ request()->is('teachers*') ? 'active' : '' }}"><i class="bi bi-person-badge me-2"></i>Giáo viên</a>
-                <a href="{{ route('parents.index') }}" class="{{ request()->is('parents*') ? 'active' : '' }}"><i class="bi bi-people-fill me-2"></i>Phụ huynh</a>
-                <a href="{{ route('subjects.index') }}" class="{{ request()->is('subjects*') ? 'active' : '' }}"><i class="bi bi-book me-2"></i>Môn học</a>
-                <a href="{{ route('assignments.index') }}" class="{{ request()->is('assignments*') ? 'active' : '' }}"><i class="bi bi-diagram-3 me-2"></i>Phân công</a>
-                <a href="{{ route('grade-windows.index') }}" class="{{ request()->is('grade-windows*') ? 'active' : '' }}"><i class="bi bi-lock me-2"></i>Khóa nhập điểm</a>
-                <a href="{{ route('timetable.manage') }}" class="{{ request()->is('timetable/manage*') ? 'active' : '' }}"><i class="bi bi-calendar3-week me-2"></i>Quản lý thời khóa biểu</a>
-            @endif
-
-            <a href="{{ route('timetable.index') }}" class="{{ request()->is('timetable*') && !request()->is('timetable/manage*') ? 'active' : '' }}"><i class="bi bi-grid-3x3-gap me-2"></i>Thời khóa biểu</a>
-
-            @if(auth()->user()->isTeacher())
-                <a href="{{ route('scores.index') }}" class="{{ request()->is('scores*') ? 'active' : '' }}"><i class="bi bi-table me-2"></i>Nhập điểm</a>
-            @endif
-
-            @if(auth()->user()->isHomeroom() || auth()->user()->isAdmin())
-                <a href="{{ route('conduct.index') }}" class="{{ request()->is('conduct*') ? 'active' : '' }}"><i class="bi bi-clipboard-check me-2"></i>Hạnh kiểm</a>
-            @endif
-
-            @if(auth()->user()->isAdmin() || auth()->user()->isHomeroom())
-                <a href="{{ route('ai.run.form') }}" class="{{ request()->is('ai/run*') ? 'active' : '' }}"><i class="bi bi-cpu me-2"></i>AI phân tích</a>
-            @endif
-
-            <a href="{{ route('ai.alerts') }}" class="{{ request()->is('ai/alerts*') ? 'active' : '' }}"><i class="bi bi-exclamation-triangle me-2"></i>AI cảnh báo</a>
-            <a href="{{ route('ai.reports') }}" class="{{ request()->is('ai/reports*') ? 'active' : '' }}"><i class="bi bi-file-earmark-text me-2"></i>AI nhận xét</a>
-            <a href="{{ route('messages.inbox') }}" class="{{ request()->is('messages*') ? 'active' : '' }}"><i class="bi bi-chat-dots me-2"></i>Tin nhắn</a>
-
-            @if(auth()->user()->isAdmin() || auth()->user()->isTeacher() || auth()->user()->isHomeroom())
-                <a href="{{ route('reports.class-summary') }}" class="{{ request()->is('reports*') ? 'active' : '' }}"><i class="bi bi-graph-up me-2"></i>Báo cáo</a>
-            @endif
+        <nav class="admin-menu" aria-label="Menu quản trị">
+            @foreach($adminMenuGroups as $group)
+                <div class="admin-menu-section" data-admin-menu-section data-group-key="{{ $group['key'] }}">
+                    <button type="button" class="admin-menu-heading" data-admin-accordion-toggle aria-expanded="true" aria-controls="admin-menu-{{ $group['key'] }}">
+                        <span class="admin-menu-heading-main">
+                            <i class="bi {{ $group['icon'] }}"></i>
+                            <span>{{ $group['title'] }}</span>
+                        </span>
+                        <i class="bi bi-chevron-down admin-menu-chevron"></i>
+                    </button>
+                    <div class="admin-menu-items" id="admin-menu-{{ $group['key'] }}">
+                        @foreach($group['items'] as $item)
+                            <div class="admin-menu-row">
+                                <a href="{{ $item[2] }}" class="admin-nav-link {{ request()->routeIs($item[3]) || request()->is($item[3]) ? 'active' : '' }}">
+                                    <i class="bi {{ $item[0] }}"></i>
+                                    <span>{{ $item[1] }}</span>
+                                </a>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endforeach
+        </nav>
+    </aside>
+    @elseif($showRoleMenu)
+    <nav class="role-sidebar" aria-label="Menu chức năng">
+        <div class="role-sidebar-head">
+            <div class="brand-mark fw-bold rounded-3">TH</div>
+            <div>
+                <div class="role-sidebar-title">{{ $schoolTitle }}</div>
+                <div class="role-sidebar-subtitle">{{ $currentUser->display_name }}</div>
+            </div>
+            <button type="button" class="btn btn-light role-sidebar-close" data-role-menu-close aria-label="Đóng menu">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="role-sidebar-nav">
+            @foreach($roleMenuItems as $item)
+                <a href="{{ $item['url'] }}" class="role-nav-link {{ ($loop->first && request()->routeIs('dashboard')) || (! request()->routeIs('dashboard') && (request()->is($item['active']) || request()->routeIs($item['active']))) ? 'active' : '' }}">
+                    <i class="bi {{ $item['icon'] }}"></i>
+                    <span>{{ $item['label'] }}</span>
+                </a>
+            @endforeach
+            <form method="POST" action="{{ route('logout') }}" data-logout-home>
+                @csrf
+                <button type="submit" class="role-nav-link role-nav-button">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Đăng xuất</span>
+                </button>
+            </form>
         </div>
     </nav>
-    <div class="flex-grow-1">
+    @endif
+
+    <div class="main-panel flex-grow-1">
         <header class="topbar px-4 py-3 d-flex justify-content-between align-items-center">
-            <div class="page-title fs-6">@yield('title', $title ?? 'Dashboard')</div>
+            @if($showRoleMenu)
+                <div class="role-topbar-left">
+                    <button class="btn menu-trigger" type="button" data-role-menu-toggle aria-label="Mở menu">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <div class="school-heading">{{ $schoolTitle }}</div>
+                    <form class="topbar-search" role="search" onsubmit="return false;">
+                        <i class="bi bi-search"></i>
+                        <input type="search" placeholder="Tìm kiếm chức năng..." aria-label="Tìm kiếm">
+                    </form>
+                </div>
+            @else
+                <div class="d-flex align-items-center gap-2">
+                    @if($showSidebar)
+                    <button class="btn btn-outline-secondary d-lg-none" type="button" data-sidebar-toggle aria-label="Mở menu">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    @endif
+                    <div class="page-title fs-6">@yield('title', $title ?? 'Dashboard')</div>
+                </div>
+            @endif
+
             <div class="d-flex align-items-center gap-3">
-                <span class="badge bg-secondary badge-role">{{ auth()->user()->role }}</span>
+                <span class="badge badge-role">{{ $currentUser->role }}</span>
                 <div class="dropdown">
                     <button class="btn btn-link text-dark text-decoration-none dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-person-circle me-2"></i><span class="fw-semibold">{{ auth()->user()->display_name }}</span>
+                        <i class="bi bi-person-circle me-2"></i><span class="fw-semibold">{{ $currentUser->display_name }}</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                         <li><a class="dropdown-item" href="{{ route('profile.show') }}"><i class="bi bi-person-circle me-2"></i>Thông tin cá nhân</a></li>
                         <li><a class="dropdown-item" href="{{ route('profile.change-password') }}"><i class="bi bi-key me-2"></i>Đổi mật khẩu</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li>
-                            <form method="POST" action="{{ route('logout') }}" class="d-inline">
+                            <form method="POST" action="{{ route('logout') }}" class="d-inline" data-logout-home>
                                 @csrf
                                 <button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right me-2"></i>Đăng xuất</button>
                             </form>
@@ -238,8 +243,134 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Add a class after first paint for lightweight entrance animations.
     window.requestAnimationFrame(() => document.body.classList.add('is-loaded'));
+
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            window.location.reload();
+        }
+    });
+
+    (() => {
+        const storageKey = 'school-manager:admin-sidebar-groups';
+        const sections = document.querySelectorAll('[data-admin-menu-section]');
+
+        if (!sections.length) {
+            return;
+        }
+
+        let savedStates = {};
+        try {
+            savedStates = JSON.parse(localStorage.getItem(storageKey) || '{}') || {};
+        } catch (error) {
+            savedStates = {};
+        }
+
+        const setSectionState = (section, isOpen) => {
+            const button = section.querySelector('[data-admin-accordion-toggle]');
+            const items = section.querySelector('.admin-menu-items');
+
+            section.classList.toggle('is-collapsed', !isOpen);
+            button?.setAttribute('aria-expanded', String(isOpen));
+            items?.setAttribute('aria-hidden', String(!isOpen));
+            items?.querySelectorAll('a, button').forEach((element) => {
+                if (isOpen) {
+                    element.removeAttribute('tabindex');
+                } else {
+                    element.setAttribute('tabindex', '-1');
+                }
+            });
+        };
+
+        const persistStates = () => {
+            localStorage.setItem(storageKey, JSON.stringify(savedStates));
+        };
+
+        sections.forEach((section) => {
+            const groupKey = section.dataset.groupKey;
+            const button = section.querySelector('[data-admin-accordion-toggle]');
+            const isOpen = savedStates[groupKey] ?? true;
+
+            setSectionState(section, isOpen);
+
+            button?.addEventListener('click', () => {
+                const nextState = section.classList.contains('is-collapsed');
+                savedStates[groupKey] = nextState;
+                setSectionState(section, nextState);
+                persistStates();
+            });
+        });
+    })();
+
+    (() => {
+        const scrollTargets = [
+            ['school-manager:admin-sidebar-scroll', document.querySelector('.admin-sidebar')],
+            ['school-manager:admin-menu-scroll', document.querySelector('.admin-menu')],
+        ].filter(([, element]) => element);
+
+        if (!scrollTargets.length) {
+            return;
+        }
+
+        const restoreScroll = () => {
+            scrollTargets.forEach(([key, element]) => {
+                const saved = Number.parseInt(localStorage.getItem(key) || '0', 10);
+                if (!Number.isNaN(saved)) {
+                    element.scrollTop = saved;
+                }
+            });
+        };
+
+        const saveScroll = () => {
+            scrollTargets.forEach(([key, element]) => {
+                localStorage.setItem(key, String(element.scrollTop));
+            });
+        };
+
+        window.requestAnimationFrame(restoreScroll);
+        window.addEventListener('pagehide', saveScroll);
+        window.addEventListener('beforeunload', saveScroll);
+        document.querySelectorAll('.admin-nav-link').forEach((link) => {
+            link.addEventListener('click', saveScroll, { capture: true });
+        });
+        scrollTargets.forEach(([, element]) => {
+            element.addEventListener('scroll', saveScroll, { passive: true });
+        });
+    })();
+
+    document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
+        button.addEventListener('click', () => document.body.classList.add('sidebar-open'));
+    });
+    document.querySelectorAll('[data-sidebar-close], .admin-nav-link').forEach((element) => {
+        element.addEventListener('click', () => document.body.classList.remove('sidebar-open'));
+    });
+
+    document.querySelectorAll('[data-role-menu-toggle]').forEach((button) => {
+        button.addEventListener('click', () => document.body.classList.add('role-menu-open'));
+    });
+    document.querySelectorAll('[data-role-menu-close], .role-sidebar a').forEach((element) => {
+        element.addEventListener('click', () => document.body.classList.remove('role-menu-open'));
+    });
+
+    document.querySelectorAll('form[data-logout-home]').forEach((form) => {
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const token = form.querySelector('input[name="_token"]')?.value;
+            try {
+                await fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRF-TOKEN': token || '',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+            } finally {
+                window.location.href = '{{ route('home') }}';
+            }
+        });
+    });
 </script>
 </body>
 </html>

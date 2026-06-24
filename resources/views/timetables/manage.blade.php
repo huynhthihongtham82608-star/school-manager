@@ -2,35 +2,39 @@
 @section('title', 'Quản lý thời khóa biểu')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">Quản lý thời khóa biểu</h5>
-        <div class="text-muted">Tạo/cập nhật thời khóa biểu theo lớp và học kỳ</div>
+        <h5>Quản lý thời khóa biểu</h5>
+        <div class="text-muted">Tạo/cập nhật thời khóa biểu theo lớp và học kỳ.</div>
     </div>
     <a class="btn btn-outline-secondary" href="{{ route('timetable.index') }}">Xem thời khóa biểu</a>
 </div>
 
-<form method="GET" class="row g-3 mb-3">
-    <div class="col-md-4">
-        <label class="form-label">Lớp</label>
-        <select class="form-select" name="class_id" required>
-            <option value="">-- Chọn lớp --</option>
-            @foreach($classes as $c)
-                <option value="{{ $c->id }}" @selected($selectedClass && $selectedClass->id === $c->id)>{{ $c->name }}</option>
-            @endforeach
-        </select>
-    </div>
-    <div class="col-md-4">
-        <label class="form-label">Học kỳ</label>
-        <select class="form-select" name="semester_id" required>
-            <option value="">-- Chọn học kỳ --</option>
-            @foreach($semesters as $s)
-                <option value="{{ $s->id }}" @selected($selectedSemester && $selectedSemester->id === $s->id)>{{ $s->name }} ({{ $s->schoolYear->name ?? '' }})</option>
-            @endforeach
-        </select>
-    </div>
-    <div class="col-md-2 align-self-end">
-        <button class="btn btn-primary w-100">Mở bảng</button>
+<form method="GET" class="card mb-3">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Lớp</label>
+                <select class="form-select" name="class_id" required>
+                    <option value="">-- Chọn lớp --</option>
+                    @foreach($classes as $c)
+                        <option value="{{ $c->id }}" @selected($selectedClass && $selectedClass->id === $c->id)>{{ $c->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Học kỳ</label>
+                <select class="form-select" name="semester_id" required>
+                    <option value="">-- Chọn học kỳ --</option>
+                    @foreach($semesters as $s)
+                        <option value="{{ $s->id }}" @selected($selectedSemester && $selectedSemester->id === $s->id)>{{ $s->name }} ({{ $s->schoolYear->name ?? '' }})</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100">Mở bảng</button>
+            </div>
+        </div>
     </div>
 </form>
 
@@ -43,10 +47,10 @@
     <form method="POST" action="{{ route('timetable.entries.save') }}">
         @csrf
         <input type="hidden" name="timetable_id" value="{{ $timetable->id }}">
-        <div class="card shadow-sm">
-        <div class="card-header fw-semibold">Sửa thời khóa biểu: {{ $selectedClass->name }} - {{ $selectedSemester->name }}</div>
-        <div class="card-body p-0">
-                <table class="table mb-0 align-middle">
+        <div class="card timetable-grid">
+            <div class="card-header">Sửa thời khóa biểu: {{ $selectedClass->name }} - {{ $selectedSemester->name }}</div>
+            <div class="table-responsive">
+                <table class="table align-middle">
                     <thead>
                         <tr>
                             <th style="width:100px;">Tiết</th>
@@ -61,7 +65,7 @@
                             <td class="fw-semibold">Tiết {{ $p }}</td>
                             @foreach($days as $d => $dLabel)
                                 @php($e = $entries[$d.'-'.$p] ?? null)
-                                <td>
+                                <td style="min-width: 240px;">
                                     <div class="mb-2">
                                         <select class="form-select form-select-sm" name="entries[{{ $d }}][{{ $p }}][subject_id]">
                                             <option value="">-- Môn --</option>

@@ -2,16 +2,17 @@
 @section('title', 'Phân công giảng dạy')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">Phân công giảng dạy</h5>
-        <div class="text-muted">Gán giáo viên - lớp - môn - năm học</div>
+        <h5>Phân công giảng dạy</h5>
+        <div class="text-muted">Gán giáo viên - lớp - môn - năm học.</div>
     </div>
     <a class="btn btn-primary" href="{{ route('assignments.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm phân công</a>
 </div>
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table mb-0">
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Giáo viên</th>
@@ -22,9 +23,9 @@
                 </tr>
             </thead>
             <tbody>
-            @foreach($assignments as $assignment)
+            @forelse($assignments as $assignment)
                 <tr>
-                    <td>{{ $assignment->teacher->name }}</td>
+                    <td class="fw-semibold">{{ $assignment->teacher->name }}</td>
                     <td>{{ $assignment->classRoom->name }}</td>
                     <td>{{ $assignment->subject->name }}</td>
                     <td>{{ $assignment->schoolYear->name }}</td>
@@ -36,7 +37,11 @@
                         </form>
                     </td>
                 </tr>
-            @endforeach
+            @empty
+                <tr>
+                    <td colspan="5"><div class="empty-state"><i class="bi bi-diagram-3"></i>Chưa có phân công.</div></td>
+                </tr>
+            @endforelse
             </tbody>
         </table>
     </div>

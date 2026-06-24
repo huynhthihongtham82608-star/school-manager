@@ -2,16 +2,17 @@
 @section('title', 'Lớp học')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">Lớp học</h5>
-        <div class="text-muted">Quản lý lớp 10/11/12</div>
+        <h5>Lớp học</h5>
+        <div class="text-muted">Quản lý lớp 10/11/12, GVCN và sĩ số.</div>
     </div>
     <a class="btn btn-primary" href="{{ route('classes.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm lớp</a>
 </div>
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table mb-0">
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Tên lớp</th>
@@ -23,9 +24,9 @@
                 </tr>
             </thead>
             <tbody>
-            @foreach($classes as $class)
+            @forelse($classes as $class)
                 <tr>
-                    <td>{{ $class->name }}</td>
+                    <td class="fw-semibold">{{ $class->name }}</td>
                     <td>{{ $class->grade_level }}</td>
                     <td>{{ $class->schoolYear->name ?? '' }}</td>
                     <td>{{ $class->homeroomTeacher->name ?? '-' }}</td>
@@ -38,7 +39,11 @@
                         </form>
                     </td>
                 </tr>
-            @endforeach
+            @empty
+                <tr>
+                    <td colspan="6"><div class="empty-state"><i class="bi bi-building"></i>Chưa có lớp học.</div></td>
+                </tr>
+            @endforelse
             </tbody>
         </table>
     </div>

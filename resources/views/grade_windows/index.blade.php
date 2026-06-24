@@ -2,13 +2,14 @@
 @section('title', 'Khóa nhập điểm')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">Cấu hình cửa sổ nhập điểm</h5>
-        <div class="text-muted">Mở/khóa theo lớp - môn - học kỳ</div>
+        <h5>Cấu hình cửa sổ nhập điểm</h5>
+        <div class="text-muted">Mở/khóa theo lớp - môn - học kỳ.</div>
     </div>
 </div>
-<div class="card shadow-sm mb-4">
+
+<div class="card mb-4">
     <div class="card-body">
         <form method="POST" action="{{ route('grade-windows.store') }}" class="row g-3 align-items-end">
             @csrf
@@ -56,9 +57,10 @@
         </form>
     </div>
 </div>
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table mb-0">
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Lớp</th>
@@ -70,9 +72,9 @@
                 </tr>
             </thead>
             <tbody>
-            @foreach($windows as $window)
+            @forelse($windows as $window)
                 <tr>
-                    <td>{{ $window->classRoom->name ?? '' }}</td>
+                    <td class="fw-semibold">{{ $window->classRoom->name ?? '' }}</td>
                     <td>{{ $window->subject->name ?? '' }}</td>
                     <td>{{ $window->semester->name ?? '' }}</td>
                     <td>{{ $window->schoolYear->name ?? '' }}</td>
@@ -86,7 +88,11 @@
                         </form>
                     </td>
                 </tr>
-            @endforeach
+            @empty
+                <tr>
+                    <td colspan="6"><div class="empty-state"><i class="bi bi-lock"></i>Chưa có cấu hình cửa sổ nhập điểm.</div></td>
+                </tr>
+            @endforelse
             </tbody>
         </table>
     </div>

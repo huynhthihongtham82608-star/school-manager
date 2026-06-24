@@ -2,10 +2,10 @@
 @section('title', 'Tin đã gửi')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">Tin đã gửi</h5>
-        <div class="text-muted">Tin nhắn bạn đã gửi</div>
+        <h5>Tin đã gửi</h5>
+        <div class="text-muted">Tin nhắn bạn đã gửi.</div>
     </div>
     <div class="d-flex gap-2">
         <a class="btn btn-outline-secondary" href="{{ route('messages.inbox') }}">Hộp thư đến</a>
@@ -13,9 +13,9 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table mb-0">
+<div class="card">
+    <div class="table-responsive">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Người nhận</th>
@@ -27,11 +27,13 @@
             @forelse($messages as $m)
                 <tr>
                     <td>{{ $m->receiver?->display_name ?? $m->receiver?->username }}</td>
-                    <td><a href="{{ route('messages.show', $m) }}">{{ $m->title ?: '(Không tiêu đề)' }}</a></td>
+                    <td class="fw-semibold"><a href="{{ route('messages.show', $m) }}">{{ $m->title ?: '(Không tiêu đề)' }}</a></td>
                     <td class="text-muted">{{ $m->created_at }}</td>
                 </tr>
             @empty
-                <tr><td colspan="3" class="text-center text-muted p-4">Chưa gửi tin nhắn nào.</td></tr>
+                <tr>
+                    <td colspan="3"><div class="empty-state"><i class="bi bi-send"></i>Chưa gửi tin nhắn nào.</div></td>
+                </tr>
             @endforelse
             </tbody>
         </table>

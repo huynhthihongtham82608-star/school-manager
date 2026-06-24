@@ -2,9 +2,9 @@
 @section('title', 'Nhập điểm')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">Nhập điểm - {{ $class->name }} / {{ $subject->name }} / {{ $semester->name }}</h5>
+        <h5>Nhập điểm - {{ $class->name }} / {{ $subject->name }} / {{ $semester->name }}</h5>
         <div class="text-muted">Nhập nhiều giá trị cách nhau bởi dấu phẩy. HS1: miệng + 15p, HS2: 1 tiết + giữa kỳ, HS3: cuối kỳ.</div>
     </div>
     <a href="{{ route('scores.index') }}" class="btn btn-outline-secondary">Quay lại</a>
@@ -15,9 +15,9 @@
     <input type="hidden" name="class_id" value="{{ $class->id }}">
     <input type="hidden" name="subject_id" value="{{ $subject->id }}">
     <input type="hidden" name="semester_id" value="{{ $semester->id }}">
-    <div class="card shadow-sm">
-        <div class="card-body p-0">
-            <table class="table mb-0">
+    <div class="card score-sheet">
+        <div class="table-responsive">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>Mã HS</th>
@@ -31,7 +31,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                @foreach($students as $student)
+                @forelse($students as $student)
                     @php
                         $header = $headers[$student->id] ?? null;
                         $group = [
@@ -43,7 +43,7 @@
                         ];
                     @endphp
                     <tr>
-                        <td>{{ $student->student_code }}</td>
+                        <td class="fw-semibold">{{ $student->student_code }}</td>
                         <td>{{ $student->name }}</td>
                         <td><input type="text" name="scores[{{ $student->id }}][oral]" class="form-control form-control-sm" value="{{ $group['oral'] }}"></td>
                         <td><input type="text" name="scores[{{ $student->id }}][quiz]" class="form-control form-control-sm" value="{{ $group['quiz'] }}"></td>
@@ -52,7 +52,11 @@
                         <td><input type="text" name="scores[{{ $student->id }}][final]" class="form-control form-control-sm" value="{{ $group['final'] }}"></td>
                         <td class="fw-semibold text-primary">{{ $header?->average }}</td>
                     </tr>
-                @endforeach
+                @empty
+                    <tr>
+                        <td colspan="8"><div class="empty-state"><i class="bi bi-person-dash"></i>Lớp chưa có học sinh.</div></td>
+                    </tr>
+                @endforelse
                 </tbody>
             </table>
         </div>

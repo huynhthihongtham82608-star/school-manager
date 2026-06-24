@@ -2,7 +2,13 @@
 @section('title', 'Hạnh kiểm')
 
 @section('content')
-<h5 class="mb-3">Nhập hạnh kiểm</h5>
+<div class="page-heading">
+    <div>
+        <h5>Nhập hạnh kiểm</h5>
+        <div class="text-muted">Chọn lớp và học kỳ để cập nhật hạnh kiểm.</div>
+    </div>
+</div>
+
 <form method="GET" class="row g-3 mb-3">
     <div class="col-md-4">
         <label class="form-label">Lớp</label>
@@ -23,7 +29,7 @@
         </select>
     </div>
     <div class="col-md-2 align-self-end">
-        <button class="btn btn-primary">Mở danh sách</button>
+        <button class="btn btn-primary w-100">Mở danh sách</button>
     </div>
 </form>
 
@@ -32,9 +38,9 @@
         @csrf
         <input type="hidden" name="class_id" value="{{ $selectedClass->id }}">
         <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
-        <div class="card shadow-sm">
-            <div class="card-body p-0">
-                <table class="table mb-0">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table">
                     <thead>
                         <tr>
                             <th>Mã HS</th>
@@ -44,10 +50,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                    @foreach($students as $student)
+                    @forelse($students as $student)
                         @php($record = $records[$student->id] ?? null)
                         <tr>
-                            <td>{{ $student->student_code }}</td>
+                            <td class="fw-semibold">{{ $student->student_code }}</td>
                             <td>{{ $student->name }}</td>
                             <td>
                                 <select name="conduct[{{ $student->id }}][conduct_level]" class="form-select form-select-sm">
@@ -58,7 +64,11 @@
                             </td>
                             <td><input type="text" name="conduct[{{ $student->id }}][comment]" class="form-control form-control-sm" value="{{ $record?->comment }}"></td>
                         </tr>
-                    @endforeach
+                    @empty
+                        <tr>
+                            <td colspan="4"><div class="empty-state"><i class="bi bi-person-dash"></i>Lớp chưa có học sinh.</div></td>
+                        </tr>
+                    @endforelse
                     </tbody>
                 </table>
             </div>

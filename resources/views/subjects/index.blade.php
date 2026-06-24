@@ -2,16 +2,17 @@
 @section('title', 'Môn học')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">Môn học</h5>
-        <div class="text-muted">Danh sách môn</div>
+        <h5>Môn học</h5>
+        <div class="text-muted">Danh sách môn và hệ số tính điểm.</div>
     </div>
     <a class="btn btn-primary" href="{{ route('subjects.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm môn</a>
 </div>
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table mb-0">
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Tên môn</th>
@@ -21,9 +22,9 @@
                 </tr>
             </thead>
             <tbody>
-            @foreach($subjects as $subject)
+            @forelse($subjects as $subject)
                 <tr>
-                    <td>{{ $subject->name }}</td>
+                    <td class="fw-semibold">{{ $subject->name }}</td>
                     <td>{{ $subject->credit }}</td>
                     <td>{!! $subject->is_weighted ? '<span class="badge bg-info">Có</span>' : '-' !!}</td>
                     <td class="text-end">
@@ -34,7 +35,11 @@
                         </form>
                     </td>
                 </tr>
-            @endforeach
+            @empty
+                <tr>
+                    <td colspan="4"><div class="empty-state"><i class="bi bi-book"></i>Chưa có môn học.</div></td>
+                </tr>
+            @endforelse
             </tbody>
         </table>
     </div>

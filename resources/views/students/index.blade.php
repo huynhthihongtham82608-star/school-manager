@@ -2,16 +2,17 @@
 @section('title', 'Học sinh')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-heading">
     <div>
-        <h5 class="mb-0">Học sinh</h5>
-        <div class="text-muted">Quản lý học sinh</div>
+        <h5>Học sinh</h5>
+        <div class="text-muted">Quản lý hồ sơ học sinh, lớp và tài khoản liên kết.</div>
     </div>
     <a class="btn btn-primary" href="{{ route('students.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm học sinh</a>
 </div>
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table mb-0">
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Mã HS</th>
@@ -24,9 +25,9 @@
                 </tr>
             </thead>
             <tbody>
-            @foreach($students as $student)
+            @forelse($students as $student)
                 <tr>
-                    <td>{{ $student->student_code }}</td>
+                    <td class="fw-semibold">{{ $student->student_code }}</td>
                     <td>{{ $student->name }}<br><span class="text-muted small">{{ $student->parent_phone }}</span></td>
                     <td>{{ $student->classRoom->name ?? '' }}</td>
                     <td>{{ $student->schoolYear->name ?? '' }}</td>
@@ -40,7 +41,11 @@
                         </form>
                     </td>
                 </tr>
-            @endforeach
+            @empty
+                <tr>
+                    <td colspan="7"><div class="empty-state"><i class="bi bi-person-dash"></i>Chưa có học sinh.</div></td>
+                </tr>
+            @endforelse
             </tbody>
         </table>
     </div>

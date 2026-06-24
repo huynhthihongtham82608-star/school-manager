@@ -2,10 +2,17 @@
 @section('title', 'Nhập điểm')
 
 @section('content')
+<div class="page-heading">
+    <div>
+        <h5>Nhập điểm</h5>
+        <div class="text-muted">Chọn lớp, môn và học kỳ để mở bảng nhập điểm.</div>
+    </div>
+</div>
+
 <div class="row g-3">
     <div class="col-lg-6">
-        <div class="card shadow-sm">
-            <div class="card-header fw-semibold">Chọn lớp/môn/học kỳ</div>
+        <div class="card h-100">
+            <div class="card-header">Chọn lớp/môn/học kỳ</div>
             <div class="card-body">
                 <form method="GET" action="{{ route('scores.entry') }}" class="row g-3">
                     <div class="col-md-4">
@@ -40,10 +47,10 @@
         </div>
     </div>
     <div class="col-lg-6">
-        <div class="card shadow-sm">
-            <div class="card-header fw-semibold">Phân công của bạn</div>
-            <div class="card-body p-0">
-                <table class="table mb-0">
+        <div class="card h-100">
+            <div class="card-header">Phân công của bạn</div>
+            <div class="table-responsive">
+                <table class="table">
                     <thead>
                         <tr>
                             <th>Lớp</th>
@@ -54,12 +61,14 @@
                     <tbody>
                     @forelse($assignments as $as)
                         <tr>
-                            <td>{{ $as->classRoom->name }}</td>
+                            <td class="fw-semibold">{{ $as->classRoom->name }}</td>
                             <td>{{ $as->subject->name }}</td>
                             <td>{{ $as->schoolYear->name }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="3" class="text-center text-muted">Không có phân công</td></tr>
+                        <tr>
+                            <td colspan="3"><div class="empty-state"><i class="bi bi-inbox"></i>Không có phân công.</div></td>
+                        </tr>
                     @endforelse
                     </tbody>
                 </table>
