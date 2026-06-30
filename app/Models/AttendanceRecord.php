@@ -9,6 +9,13 @@ class AttendanceRecord extends Model
 {
     use UsesUuid;
 
+    public const STATUSES = [
+        'present' => 'Có mặt',
+        'late' => 'Đi muộn',
+        'excused' => 'Có phép',
+        'absent' => 'Không phép',
+    ];
+
     protected $fillable = [
         'student_id',
         'class_id',
@@ -41,5 +48,10 @@ class AttendanceRecord extends Model
     public function recorder()
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    public function statusLabel(): string
+    {
+        return self::STATUSES[$this->status] ?? $this->status;
     }
 }

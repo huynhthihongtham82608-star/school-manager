@@ -15,25 +15,29 @@ use Illuminate\Support\Facades\Auth;
 
 class ScoreController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
+        $selectedYearId = $this->selectedSchoolYearId($request);
         $years = SchoolYear::all();
-        $semesters = Semester::all();
+        $semesters = Semester::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->get();
         $subjects = Subject::all();
-        $classes = SchoolClass::all();
+        $classes = SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->get();
 
         $assignments = collect();
         if ($user->isTeacher()) {
             $teacher = $user->teacher;
             if ($teacher) {
-                $assignments = $teacher->assignments()->with(['classRoom', 'subject', 'schoolYear'])->get();
+                $assignments = $teacher->assignments()
+                    ->with(['classRoom', 'subject', 'schoolYear'])
+                    ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                    ->get();
             }
         } else {
             $assignments = [];
         }
 
-        return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'assignments'));
+        return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'assignments', 'selectedYearId'));
     }
 
     public function entry(Request $request)

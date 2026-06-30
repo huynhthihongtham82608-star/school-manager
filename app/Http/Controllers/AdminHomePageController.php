@@ -4,10 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\HomePageContent;
 use App\Models\LearningDocument;
-use App\Models\SchoolClass;
 use App\Models\SchoolEvent;
 use App\Models\SchoolPost;
-use App\Models\Subject;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -16,31 +14,13 @@ class AdminHomePageController extends Controller
 {
     public function index()
     {
-        $tablesReady = Schema::hasTable('home_page_contents')
-            && Schema::hasTable('school_posts')
-            && Schema::hasTable('school_events')
-            && Schema::hasTable('learning_documents');
+        $tablesReady = Schema::hasTable('home_page_contents');
 
         $contents = $tablesReady
             ? HomePageContent::query()->get()->keyBy('key')
             : collect();
 
-        $posts = Schema::hasTable('school_posts')
-            ? SchoolPost::latest()->limit(12)->get()
-            : collect();
-
-        $events = Schema::hasTable('school_events')
-            ? SchoolEvent::latest('starts_at')->limit(12)->get()
-            : collect();
-
-        $documents = Schema::hasTable('learning_documents')
-            ? LearningDocument::with(['subject', 'classRoom'])->latest()->limit(12)->get()
-            : collect();
-
-        $classes = Schema::hasTable('classes') ? SchoolClass::orderBy('name')->get() : collect();
-        $subjects = Schema::hasTable('subjects') ? Subject::orderBy('name')->get() : collect();
-
-        return view('admin.home_page', compact('tablesReady', 'contents', 'posts', 'events', 'documents', 'classes', 'subjects'));
+        return view('admin.home_page', compact('tablesReady', 'contents'));
     }
 
     public function saveContent(Request $request)
@@ -108,7 +88,7 @@ class AdminHomePageController extends Controller
         $post = SchoolPost::create([
             ...$data,
             'published_at' => $data['published_at'] ?? now(),
-            'is_published' => $request->boolean('is_published', true),
+            'is_published' => $request->boolean('is_published'),
         ]);
 
         AuditLogger::log('school_post_created', SchoolPost::class, $post->id, 'Tạo tin tức/thông báo');
@@ -133,7 +113,7 @@ class AdminHomePageController extends Controller
 
         $event = SchoolEvent::create([
             ...$data,
-            'is_published' => $request->boolean('is_published', true),
+            'is_published' => $request->boolean('is_published'),
         ]);
 
         AuditLogger::log('school_event_created', SchoolEvent::class, $event->id, 'Tạo sự kiện nhà trường');

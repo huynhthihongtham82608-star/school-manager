@@ -9,12 +9,16 @@ use Illuminate\Http\Request;
 
 class SchoolClassController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $classes = SchoolClass::with(['schoolYear', 'homeroomTeacher'])->orderBy('name')->get();
+        $selectedYearId = $this->selectedSchoolYearId($request);
+        $classes = SchoolClass::with(['schoolYear', 'homeroomTeacher', 'students'])
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->orderBy('name')
+            ->get();
         $teachers = Teacher::all();
         $years = SchoolYear::all();
-        return view('classes.index', compact('classes', 'teachers', 'years'));
+        return view('classes.index', compact('classes', 'teachers', 'years', 'selectedYearId'));
     }
 
     public function create()

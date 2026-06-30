@@ -3,6 +3,8 @@
 
 @section('content')
 @php
+    $user = auth()->user();
+    $usesAdminNavigation = $user->isAdmin() || $user->isStaff();
     $canRunAnalysis = auth()->user()->isAdmin() || auth()->user()->isStaff() || auth()->user()->isHomeroom();
     $tabs = [
         'analysis' => ['label' => 'Phân tích', 'icon' => 'bi-bar-chart-line', 'url' => route('ai.run.form')],
@@ -11,18 +13,20 @@
     ];
 @endphp
 
-<div class="ai-tabs">
-    @foreach($tabs as $key => $tab)
-        @if($key !== 'analysis' || $canRunAnalysis)
-            <form method="GET" action="{{ $tab['url'] }}">
-                <button type="submit" class="ai-tab-button {{ $activeTab === $key ? 'active' : '' }}">
-                    <i class="bi {{ $tab['icon'] }}"></i>
-                    <span>{{ $tab['label'] }}</span>
-                </button>
-            </form>
-        @endif
-    @endforeach
-</div>
+@unless($usesAdminNavigation)
+    <div class="ai-tabs">
+        @foreach($tabs as $key => $tab)
+            @if($key !== 'analysis' || $canRunAnalysis)
+                <form method="GET" action="{{ $tab['url'] }}">
+                    <button type="submit" class="ai-tab-button {{ $activeTab === $key ? 'active' : '' }}">
+                        <i class="bi {{ $tab['icon'] }}"></i>
+                        <span>{{ $tab['label'] }}</span>
+                    </button>
+                </form>
+            @endif
+        @endforeach
+    </div>
+@endunless
 
 @if($activeTab === 'analysis')
     @if($canRunAnalysis)

@@ -64,9 +64,13 @@ class TimetableController extends Controller
 
     public function manage(Request $request)
     {
+        $selectedYearId = $this->selectedSchoolYearId($request);
         $years = SchoolYear::orderByDesc('start_date')->get();
-        $classes = SchoolClass::orderBy('name')->get();
-        $semesters = Semester::with('schoolYear')->orderBy('order')->get();
+        $classes = SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->orderBy('name')->get();
+        $semesters = Semester::with('schoolYear')
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->orderBy('order')
+            ->get();
         $subjects = Subject::orderBy('name')->get();
         $teachers = Teacher::orderBy('name')->get();
 
@@ -83,16 +87,23 @@ class TimetableController extends Controller
             $selectedClass = SchoolClass::find($request->input('class_id'));
             $selectedSemester = Semester::find($request->input('semester_id'));
 
-            $timetable = Timetable::firstOrCreate([
-                'class_id' => $selectedClass->id,
-                'semester_id' => $selectedSemester->id,
-            ], [
-                'school_year_id' => $selectedSemester->school_year_id,
-            ]);
+            $timetableQuery = Timetable::where('class_id', $selectedClass->id)
+                ->where('semester_id', $selectedSemester->id);
 
-            $entries = TimetableEntry::where('timetable_id', $timetable->id)
-                ->get()
-                ->keyBy(fn ($e) => $e->day_of_week . '-' . $e->period);
+            $timetable = $this->isHistoricalReadOnly()
+                ? $timetableQuery->first()
+                : Timetable::firstOrCreate([
+                    'class_id' => $selectedClass->id,
+                    'semester_id' => $selectedSemester->id,
+                ], [
+                    'school_year_id' => $selectedSemester->school_year_id,
+                ]);
+
+            if ($timetable) {
+                $entries = TimetableEntry::where('timetable_id', $timetable->id)
+                    ->get()
+                    ->keyBy(fn ($e) => $e->day_of_week . '-' . $e->period);
+            }
         }
 
         return view('timetables.manage', compact(
@@ -104,7 +115,8 @@ class TimetableController extends Controller
             'selectedClass',
             'selectedSemester',
             'timetable',
-            'entries'
+            'entries',
+            'selectedYearId'
         ));
     }
 

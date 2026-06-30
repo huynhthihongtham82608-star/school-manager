@@ -10,10 +10,18 @@ use App\Services\AdminProtectionService;
 
 class TeacherController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $teachers = Teacher::with('user')->orderBy('name')->get();
-        return view('teachers.index', compact('teachers'));
+        $selectedYearId = $this->selectedSchoolYearId($request);
+        $teachers = Teacher::with('user')
+            ->when($selectedYearId, function ($query) use ($selectedYearId) {
+                $query->whereHas('assignments', fn ($assignmentQuery) => $assignmentQuery->where('school_year_id', $selectedYearId))
+                    ->orWhereHas('homeroomClasses', fn ($classQuery) => $classQuery->where('school_year_id', $selectedYearId));
+            })
+            ->orderBy('name')
+            ->get();
+
+        return view('teachers.index', compact('teachers', 'selectedYearId'));
     }
 
     public function create()

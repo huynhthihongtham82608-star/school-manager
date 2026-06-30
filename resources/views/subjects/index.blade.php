@@ -28,11 +28,17 @@
                     <td>{{ $subject->credit }}</td>
                     <td>{!! $subject->is_weighted ? '<span class="badge bg-info">Có</span>' : '-' !!}</td>
                     <td class="text-end">
-                        <a href="{{ route('subjects.edit', $subject) }}" class="btn btn-sm btn-outline-primary">Sửa</a>
-                        <form action="{{ route('subjects.destroy', $subject) }}" method="POST" class="d-inline" onsubmit="return confirm('Xóa môn học?')">
-                            @csrf @method('DELETE')
-                            <button class="btn btn-sm btn-outline-danger">Xóa</button>
-                        </form>
+                        <div class="content-action-group justify-content-end">
+                            <a href="{{ route('subjects.edit', $subject) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
+                                <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
+                            </a>
+                            <form action="{{ route('subjects.destroy', $subject) }}" method="POST" class="d-inline">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="content-action-btn icon-only delete" title="Xóa" aria-label="Xóa" data-bs-toggle="tooltip">
+                                    <i class="bi bi-trash"></i><span class="visually-hidden">Xóa</span>
+                                </button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
             @empty

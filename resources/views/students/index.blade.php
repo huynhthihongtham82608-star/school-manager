@@ -34,11 +34,17 @@
                     <td><span class="badge bg-success">{{ $student->status }}</span></td>
                     <td>{{ $student->user?->username }}</td>
                     <td class="text-end">
-                        <a href="{{ route('students.edit', $student) }}" class="btn btn-sm btn-outline-primary">Sửa</a>
-                        <form action="{{ route('students.destroy', $student) }}" method="POST" class="d-inline" onsubmit="return confirm('Xóa học sinh?')">
-                            @csrf @method('DELETE')
-                            <button class="btn btn-sm btn-outline-danger">Xóa</button>
-                        </form>
+                        <div class="content-action-group justify-content-end">
+                            <a href="{{ route('students.edit', $student) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
+                                <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
+                            </a>
+                            <form action="{{ route('students.destroy', $student) }}" method="POST" class="d-inline">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="content-action-btn icon-only delete" title="Xóa" aria-label="Xóa" data-bs-toggle="tooltip">
+                                    <i class="bi bi-trash"></i><span class="visually-hidden">Xóa</span>
+                                </button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
             @empty

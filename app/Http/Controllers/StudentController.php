@@ -12,13 +12,17 @@ use App\Services\AdminProtectionService;
 
 class StudentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $students = Student::with(['classRoom', 'schoolYear', 'user'])->orderBy('student_code')->get();
-        $classes = SchoolClass::all();
+        $selectedYearId = $this->selectedSchoolYearId($request);
+        $students = Student::with(['classRoom', 'schoolYear', 'user'])
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->orderBy('student_code')
+            ->get();
+        $classes = SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->get();
         $years = SchoolYear::all();
 
-        return view('students.index', compact('students', 'classes', 'years'));
+        return view('students.index', compact('students', 'classes', 'years', 'selectedYearId'));
     }
 
     public function create()

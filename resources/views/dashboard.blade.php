@@ -55,48 +55,250 @@
     }
 
     $adminCards = [
-        ['title' => 'Học sinh', 'desc' => 'Quản lý thông tin học sinh.', 'icon' => 'bi-people', 'url' => route('students.index'), 'count' => $stats['students']],
-        ['title' => 'Giáo viên', 'desc' => 'Quản lý thông tin giáo viên.', 'icon' => 'bi-person-badge', 'url' => route('teachers.index'), 'count' => $stats['teachers']],
-        ['title' => 'Lớp học', 'desc' => 'Quản lý lớp học.', 'icon' => 'bi-building', 'url' => route('classes.index'), 'count' => $stats['classes']],
-        ['title' => 'Môn học', 'desc' => 'Quản lý danh mục môn học.', 'icon' => 'bi-book', 'url' => route('subjects.index'), 'count' => null],
-        ['title' => 'Phân công giảng dạy', 'desc' => 'Quản lý phân công giáo viên.', 'icon' => 'bi-diagram-3', 'url' => route('assignments.index'), 'count' => $stats['assignments']],
-        ['title' => 'Thời khóa biểu', 'desc' => 'Quản lý lịch học và lịch dạy.', 'icon' => 'bi-calendar3-week', 'url' => route('timetable.manage'), 'count' => null],
-        ['title' => 'Thông báo', 'desc' => 'Quản lý thông báo nhà trường.', 'icon' => 'bi-megaphone', 'url' => route('announcements.index'), 'count' => $stats['announcements']],
-        ['title' => 'Sự kiện', 'desc' => 'Quản lý sự kiện nhà trường.', 'icon' => 'bi-calendar-event', 'url' => route('events.index'), 'count' => $stats['events']],
-        ['title' => 'Tài liệu học tập', 'desc' => 'Quản lý thư viện tài liệu.', 'icon' => 'bi-journal-bookmark', 'url' => route('documents.index'), 'count' => $stats['documents']],
-        ['title' => 'Điểm danh', 'desc' => 'Theo dõi và quản lý điểm danh.', 'icon' => 'bi-person-check', 'url' => route('attendance.index'), 'count' => $stats['attendance']],
-        ['title' => 'AI hỗ trợ học tập', 'desc' => 'Mở công cụ AI hỗ trợ học tập.', 'icon' => 'bi-cpu', 'url' => route('ai.run.form'), 'count' => null],
-        ['title' => 'Hồ sơ cá nhân', 'desc' => 'Xem và cập nhật thông tin cá nhân.', 'icon' => 'bi-person-circle', 'url' => route('profile.show'), 'count' => null],
+        ['title' => 'Học sinh', 'desc' => 'Tổng số học sinh đang quản lý.', 'icon' => 'bi-people', 'count' => $stats['students']],
+        ['title' => 'Giáo viên', 'desc' => 'Tổng số giáo viên trong hệ thống.', 'icon' => 'bi-person-badge', 'count' => $stats['teachers']],
+        ['title' => 'Lớp học', 'desc' => 'Tổng số lớp học hiện có.', 'icon' => 'bi-building', 'count' => $stats['classes']],
+        ['title' => 'Môn học', 'desc' => 'Tổng số môn học đang sử dụng.', 'icon' => 'bi-book', 'count' => $stats['subjects']],
+    ];
+
+    $studentsChartData = [
+        'labels' => $adminOverview['studentsByGrade']->pluck('label')->values()->all(),
+        'values' => $adminOverview['studentsByGrade']->pluck('value')->values()->all(),
+    ];
+    $attendanceChartData = [
+        'labels' => $adminOverview['attendanceByStatus']->pluck('label')->values()->all(),
+        'values' => $adminOverview['attendanceByStatus']->pluck('count')->values()->all(),
+    ];
+    $scoreChartData = [
+        'labels' => $adminOverview['scoreLevels']->pluck('label')->values()->all(),
+        'values' => $adminOverview['scoreLevels']->pluck('count')->values()->all(),
     ];
 @endphp
 
+@unless($user->isAdmin() || $user->isStaff())
 <div class="page-heading">
     <div>
-        <h5>{{ $user->isAdmin() || $user->isStaff() ? 'Dashboard quản trị' : 'Chức năng chính' }}</h5>
-        <div class="text-muted">{{ $user->isAdmin() || $user->isStaff() ? 'Tổng quan vận hành và các tác vụ quản lý thường dùng.' : 'Chọn nhanh chức năng theo vai trò đang đăng nhập.' }}</div>
+        <h5>Chức năng chính</h5>
+        <div class="text-muted">Chọn nhanh chức năng theo vai trò đang đăng nhập.</div>
     </div>
-    @if($activeYear)
-        <span class="badge bg-info px-3 py-2">Năm học: {{ $activeYear->name }}</span>
-    @endif
 </div>
+@endunless
 
 @if($user->isAdmin() || $user->isStaff())
     <div class="admin-dashboard">
         <div class="admin-feature-grid">
             @foreach($adminCards as $card)
-                <a href="{{ $card['url'] }}" class="feature-card admin-feature-card">
+                <div class="feature-card admin-feature-card admin-stat-card">
                     <span class="feature-card-icon"><i class="bi {{ $card['icon'] }}"></i></span>
                     <span class="admin-feature-content">
                         <span class="feature-card-title d-block">{{ $card['title'] }}</span>
                         <span class="feature-card-desc d-block">{{ $card['desc'] }}</span>
-                        @if(! is_null($card['count']))
-                            <span class="admin-feature-count">{{ $card['count'] }}</span>
-                        @endif
+                        <span class="admin-feature-count">{{ $card['count'] }}</span>
                     </span>
-                </a>
+                </div>
             @endforeach
         </div>
+
+        <div class="row g-3">
+            <div class="col-xl-4">
+                <div class="card h-100 admin-chart-card">
+                    <div class="card-header">Học sinh theo khối</div>
+                    <div class="card-body">
+                        @if($adminOverview['studentsByGrade']->sum('value') > 0)
+                            <div class="dashboard-chart-wrap">
+                                <canvas id="studentsByGradeChart"></canvas>
+                            </div>
+                        @else
+                            <div class="dashboard-chart-empty"><i class="bi bi-bar-chart"></i>Chưa có dữ liệu</div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-4">
+                <div class="card h-100 admin-chart-card">
+                    <div class="card-header">Tình trạng điểm danh</div>
+                    <div class="card-body">
+                        @if($adminOverview['attendanceByStatus']->sum('count') > 0)
+                            <div class="dashboard-chart-wrap">
+                                <canvas id="attendanceStatusChart"></canvas>
+                            </div>
+                        @else
+                            <div class="dashboard-chart-empty"><i class="bi bi-person-check"></i>Chưa có dữ liệu</div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-4">
+                <div class="card h-100 admin-chart-card">
+                    <div class="card-header">Kết quả học tập</div>
+                    <div class="card-body">
+                        @if($adminOverview['scoreLevels']->sum('count') > 0)
+                            <div class="dashboard-chart-wrap">
+                                <canvas id="scoreLevelChart"></canvas>
+                            </div>
+                        @else
+                            <div class="dashboard-chart-empty"><i class="bi bi-clipboard-data"></i>Chưa có dữ liệu</div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-xl-5">
+                <div class="card h-100">
+                    <div class="card-header">Thông tin nhanh</div>
+                    <div class="card-body">
+                        <div class="admin-quick-grid">
+                            @foreach($adminOverview['quickInfo'] as $item)
+                                <div class="admin-quick-item">
+                                    <i class="bi {{ $item['icon'] }}"></i>
+                                    <div>
+                                        <div class="admin-quick-value">{{ $item['value'] }}</div>
+                                        <div class="admin-quick-label">{{ $item['label'] }}</div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-7">
+                <div class="card h-100">
+                    <div class="card-header">Việc cần xử lý</div>
+                    <div class="card-body">
+                        @php($actionTasks = collect($adminOverview['tasks'])->filter(fn ($task) => $task['count'] > 0))
+                        @if($actionTasks->isNotEmpty())
+                            <div class="admin-task-list">
+                                @foreach($actionTasks as $task)
+                                    <div class="admin-task-item needs-action">
+                                        <span class="admin-task-icon"><i class="bi {{ $task['icon'] ?? 'bi-exclamation-triangle' }}"></i></span>
+                                        <div class="admin-task-content">
+                                            <div class="fw-semibold">{{ $task['title'] }}</div>
+                                            <div class="text-muted small">{{ $task['detail'] ?: 'Cần kiểm tra lại dữ liệu.' }}</div>
+                                            @if($task['detail'] && str_contains($task['title'], 'lớp'))
+                                                <ul class="admin-task-sublist">
+                                                    @foreach(array_filter(array_map('trim', explode(',', $task['detail']))) as $className)
+                                                        <li>{{ $className }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            @endif
+                                        </div>
+                                        <span class="admin-task-count">{{ $task['count'] }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="admin-task-empty">
+                                <i class="bi bi-check2-circle"></i>
+                                <div>
+                                    <div class="fw-semibold">Không có công việc cần xử lý.</div>
+                                    <div class="text-muted small">Các dữ liệu quan trọng hiện không có cảnh báo.</div>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!window.Chart) {
+                return;
+            }
+
+            const palette = ['#E67E22', '#F2A65A', '#4B5563', '#FCD34D', '#9CA3AF', '#FED7AA'];
+            const gridColor = 'rgba(107, 114, 128, .16)';
+            const textColor = '#374151';
+
+            const makeBarChart = (id, labels, values) => {
+                const element = document.getElementById(id);
+                if (!element) {
+                    return;
+                }
+
+                new Chart(element, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: '#E67E22',
+                            borderRadius: 10,
+                            maxBarThickness: 42
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { displayColors: false }
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: textColor, font: { weight: 600 } }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                ticks: { precision: 0, color: textColor },
+                                grid: { color: gridColor }
+                            }
+                        }
+                    }
+                });
+            };
+
+            const makeDoughnutChart = (id, labels, values) => {
+                const element = document.getElementById(id);
+                if (!element) {
+                    return;
+                }
+
+                new Chart(element, {
+                    type: 'doughnut',
+                    data: {
+                        labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: palette,
+                            borderColor: '#FFFFFF',
+                            borderWidth: 4,
+                            hoverOffset: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '62%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 10,
+                                    boxHeight: 10,
+                                    color: textColor,
+                                    usePointStyle: true,
+                                    pointStyle: 'circle'
+                                }
+                            }
+                        }
+                    }
+                });
+            };
+
+            makeBarChart('studentsByGradeChart', @json($studentsChartData['labels']), @json($studentsChartData['values']));
+            makeDoughnutChart('attendanceStatusChart', @json($attendanceChartData['labels']), @json($attendanceChartData['values']));
+            makeBarChart('scoreLevelChart', @json($scoreChartData['labels']), @json($scoreChartData['values']));
+        });
+    </script>
 @else
     <div class="role-hero mb-3">
         <div class="d-flex flex-column flex-md-row justify-content-between gap-3">

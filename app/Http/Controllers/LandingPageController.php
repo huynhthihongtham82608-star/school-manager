@@ -67,8 +67,10 @@ class LandingPageController extends Controller
             ->where('is_published', true)
             ->latest('published_at')
             ->latest()
-            ->limit($limit)
-            ->get();
+            ->get()
+            ->filter(fn (SchoolPost $post) => $post->isVisibleToRole(null))
+            ->take($limit)
+            ->values();
     }
 
     private function events(int $limit)
@@ -77,15 +79,23 @@ class LandingPageController extends Controller
             return collect();
         }
 
-        return SchoolEvent::query()
-            ->where('is_published', true)
-            ->where(function ($query) {
-                $query->whereNull('starts_at')->orWhere('starts_at', '>=', now()->startOfDay());
-            })
-            ->orderByRaw('starts_at is null')
+        $query = SchoolEvent::query();
+
+        if (Schema::hasColumn('school_events', 'is_published')) {
+            $query->where('is_published', true);
+        }
+
+        return $query
+            ->orderByRaw(
+                'case when starts_at is null then 2 when starts_at >= ? then 0 else 1 end',
+                [now()->startOfDay()]
+            )
             ->orderBy('starts_at')
-            ->limit($limit)
-            ->get();
+            ->latest()
+            ->get()
+            ->filter(fn (SchoolEvent $event) => $event->isVisibleToRole(null))
+            ->take($limit)
+            ->values();
     }
 
     private function documents(int $limit)
@@ -97,8 +107,10 @@ class LandingPageController extends Controller
         return LearningDocument::query()
             ->where('is_published', true)
             ->latest()
-            ->limit($limit)
-            ->get();
+            ->get()
+            ->filter(fn (LearningDocument $document) => $document->isVisibleToRole(null))
+            ->take($limit)
+            ->values();
     }
 
     private function stats(): array
@@ -107,7 +119,9 @@ class LandingPageController extends Controller
             'students' => Schema::hasTable('students') ? Student::count() : 0,
             'teachers' => Schema::hasTable('teachers') ? Teacher::count() : 0,
             'classes' => Schema::hasTable('classes') ? SchoolClass::count() : 0,
-            'documents' => Schema::hasTable('learning_documents') ? LearningDocument::where('is_published', true)->count() : 0,
+            'documents' => Schema::hasTable('learning_documents')
+                ? LearningDocument::where('is_published', true)->get()->filter(fn (LearningDocument $document) => $document->isVisibleToRole(null))->count()
+                : 0,
         ];
     }
 }

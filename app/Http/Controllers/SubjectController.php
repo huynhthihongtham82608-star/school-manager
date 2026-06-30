@@ -7,10 +7,16 @@ use Illuminate\Http\Request;
 
 class SubjectController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $subjects = Subject::orderBy('name')->get();
-        return view('subjects.index', compact('subjects'));
+        $selectedYearId = $this->selectedSchoolYearId($request);
+        $subjects = Subject::when($selectedYearId, function ($query) use ($selectedYearId) {
+                $query->whereHas('assignments', fn ($assignmentQuery) => $assignmentQuery->where('school_year_id', $selectedYearId));
+            })
+            ->orderBy('name')
+            ->get();
+
+        return view('subjects.index', compact('subjects', 'selectedYearId'));
     }
 
     public function create()

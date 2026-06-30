@@ -8,11 +8,16 @@ use Illuminate\Http\Request;
 
 class SemesterController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $semesters = Semester::with('schoolYear')->orderBy('school_year_id')->orderBy('order')->get();
+        $selectedYearId = $this->selectedSchoolYearId($request);
+        $semesters = Semester::with('schoolYear')
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->orderBy('school_year_id')
+            ->orderBy('order')
+            ->get();
         $years = SchoolYear::all();
-        return view('semesters.index', compact('semesters', 'years'));
+        return view('semesters.index', compact('semesters', 'years', 'selectedYearId'));
     }
 
     public function create()

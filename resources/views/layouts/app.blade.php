@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link href="{{ asset('css/school-ui.css') }}?v=20260624-admin-groups" rel="stylesheet">
+    <link href="{{ asset('css/school-ui.css') }}?v=20260701-history-readonly" rel="stylesheet">
 </head>
 @php
     $currentUser = auth()->user();
@@ -20,6 +20,33 @@
     $showRoleMenu = $currentUser && ! $showSidebar;
     $schoolTitle = 'Trường Trung học Phổ thông';
     $aiUrl = ($currentUser->isAdmin() || $currentUser->isStaff() || $currentUser->isHomeroom()) ? route('ai.run.form') : route('ai.alerts');
+    $headerSchoolYear = null;
+    $headerSemester = null;
+    $historySchoolYear = null;
+    $historySchoolYearId = session('viewing_mode') === 'archive'
+        ? session('viewing_school_year_id', session('history_school_year_id'))
+        : session('history_school_year_id');
+
+    if ($showSidebar && \Illuminate\Support\Facades\Schema::hasTable('school_years')) {
+        $headerSchoolYear = \App\Models\SchoolYear::where('is_active', true)->first()
+            ?? \App\Models\SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->first();
+        $historySchoolYear = $historySchoolYearId
+            ? \App\Models\SchoolYear::find($historySchoolYearId)
+            : null;
+
+        if ($historySchoolYear && ! $historySchoolYear->isArchived()) {
+            $historySchoolYear = null;
+        }
+
+        if ($headerSchoolYear && \Illuminate\Support\Facades\Schema::hasTable('semesters')) {
+            $headerSemester = \App\Models\Semester::where('school_year_id', $headerSchoolYear->id)
+                ->orderByDesc('is_score_input_open')
+                ->orderBy('order')
+                ->orderBy('name')
+                ->first();
+        }
+
+    }
 
     $roleMenuItems = [];
     $addRoleItem = function (string $icon, string $label, string $url, string $active = '') use (&$roleMenuItems) {
@@ -28,60 +55,108 @@
 
     $adminMenuGroups = [];
     $addAdminGroup = function (string $key, string $icon, string $title, array $items) use (&$adminMenuGroups) {
-        $adminMenuGroups[] = compact('key', 'icon', 'title', 'items');
+        $adminMenuGroups[] = [
+            'key' => $key,
+            'icon' => $icon,
+            'title' => $title,
+            'items' => $items,
+            'url' => $items[0]['url'] ?? route('dashboard'),
+        ];
     };
 
+    $adminItem = fn (string $icon, string $label, string $url, array $active) => compact('icon', 'label', 'url', 'active');
+
+    $matchesAdminItem = function (array $item): bool {
+        if (request()->routeIs('announcements.index') && request('tab') === 'events') {
+            return $item['label'] === 'Sự kiện';
+        }
+
+        foreach ($item['active'] as $pattern) {
+            if (request()->routeIs($pattern) || request()->is($pattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    $activeAdminGroup = null;
+    $activeAdminItem = null;
+
     if ($showSidebar) {
+        $schoolYearMenuUrl = $historySchoolYear
+            ? route('school-years.detail', $historySchoolYear)
+            : route('school-years.index');
+
         $academicItems = [
-            ['bi-calendar-event', 'Năm học', route('school-years.index'), 'school-years*'],
-            ['bi-calendar2-week', 'Học kỳ', route('semesters.index'), 'semesters*'],
-            ['bi-building', 'Lớp học', route('classes.index'), 'classes*'],
-            ['bi-book', 'Môn học', route('subjects.index'), 'subjects*'],
-            ['bi-diagram-3', 'Phân công giảng dạy', route('assignments.index'), 'assignments*'],
-            ['bi-calendar3-week', 'Thời khóa biểu', route('timetable.manage'), 'timetable/manage*'],
+            $adminItem('bi-calendar-event', 'Năm học', $schoolYearMenuUrl, ['school-years.*', 'school-years*']),
+            $adminItem('bi-calendar2-week', 'Học kỳ', route('semesters.index'), ['semesters.*', 'semesters*']),
+            $adminItem('bi-building', 'Lớp học', route('classes.index'), ['classes.*', 'classes*']),
+            $adminItem('bi-book', 'Môn học', route('subjects.index'), ['subjects.*', 'subjects*']),
+            $adminItem('bi-diagram-3', 'Phân công giảng dạy', route('assignments.index'), ['assignments.*', 'assignments*']),
+            $adminItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.manage'), ['timetable.manage', 'timetable/manage*']),
+            $adminItem('bi-calendar2-check', 'Lịch thi', route('exam-schedules.index'), ['exam-schedules.*', 'exam-schedules*']),
         ];
 
         if ($currentUser->role === 'admin') {
-            $academicItems[] = ['bi-table', 'Điểm số', route('scores.index'), 'scores*'];
-            $academicItems[] = ['bi-star', 'Hạnh kiểm', route('conduct.index'), 'conduct*'];
+            $academicItems[] = $adminItem('bi-table', 'Điểm số', route('scores.index'), ['scores.*', 'scores*', 'grade-windows.*', 'grade-windows*']);
+            $academicItems[] = $adminItem('bi-star', 'Hạnh kiểm', route('conduct.index'), ['conduct.*', 'conduct*']);
         }
 
-        $academicItems[] = ['bi-person-check', 'Điểm danh', route('attendance.index'), 'attendance*'];
+        $academicItems[] = $adminItem('bi-person-check', 'Điểm danh', route('attendance.index'), ['attendance.*', 'attendance*']);
 
         $addAdminGroup('overview', 'bi-speedometer2', 'Tổng quan', [
-            ['bi-house-door', 'Dashboard', route('dashboard'), 'dashboard'],
+            $adminItem('bi-house-door', 'Dashboard', route('dashboard'), ['dashboard']),
         ]);
+
         $addAdminGroup('academic', 'bi-building', 'Quản lý học vụ', $academicItems);
+
         $addAdminGroup('users', 'bi-people', 'Quản lý người dùng', [
-            ['bi-person', 'Học sinh', route('students.index'), 'students*'],
-            ['bi-person-badge', 'Giáo viên', route('teachers.index'), 'teachers*'],
-            ['bi-people', 'Phụ huynh', route('parents.index'), 'parents*'],
+            $adminItem('bi-person', 'Học sinh', route('students.index'), ['students.*', 'students*']),
+            $adminItem('bi-person-badge', 'Giáo viên', route('teachers.index'), ['teachers.*', 'teachers*']),
+            $adminItem('bi-people', 'Phụ huynh', route('parents.index'), ['parents.*', 'parents*']),
         ]);
+
         $addAdminGroup('content', 'bi-megaphone', 'Nội dung hệ thống', [
-            ['bi-window-stack', 'Quản lý trang chủ', route('admin.home-page.index'), 'admin/home-page*'],
-            ['bi-megaphone', 'Thông báo', route('announcements.index'), 'announcements*'],
-            ['bi-calendar-event', 'Sự kiện', route('events.index'), 'events*'],
-            ['bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), 'documents*'],
-            ['bi-calendar2-check', 'Lịch thi', route('exam-schedules.index'), 'exam-schedules*'],
-            ['bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*'],
+            $adminItem('bi-window-stack', 'Trang chủ', route('admin.home-page.index'), ['admin.home-page.*', 'admin/home-page*']),
+            $adminItem('bi-megaphone', 'Thông báo', route('announcements.index'), ['announcements.*', 'announcements*']),
+            $adminItem('bi-calendar-event', 'Sự kiện', route('events.index'), ['events.*', 'events*']),
+            $adminItem('bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), ['documents.*', 'documents*']),
         ]);
+
+        $addAdminGroup('communication', 'bi-chat-dots', 'Giao tiếp', [
+            $adminItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), ['messages.*', 'messages*']),
+        ]);
+
         $addAdminGroup('ai', 'bi-cpu', 'AI hỗ trợ', [
-            ['bi-cpu', 'AI hỗ trợ học tập', $aiUrl, 'ai*'],
-            ['bi-robot', 'Chatbot hỗ trợ', route('chatbot.index'), 'chatbot*'],
+            $adminItem('bi-bar-chart-line', 'Phân tích', route('ai.run.form'), ['ai.run.form', 'ai/run']),
+            $adminItem('bi-exclamation-triangle', 'Cảnh báo', route('ai.alerts'), ['ai.alerts', 'ai/alerts']),
+            $adminItem('bi-pencil-square', 'Nhận xét', route('ai.reports'), ['ai.reports', 'ai/reports']),
+        ]);
+
+        $addAdminGroup('chatbot', 'bi-robot', 'Chatbot', [
+            $adminItem('bi-robot', 'Chatbot hỗ trợ', route('chatbot.index'), ['chatbot.*', 'chatbot*']),
         ]);
 
         $reportItems = [];
         if ($currentUser->role === 'admin') {
-            $reportItems[] = ['bi-bar-chart', 'Báo cáo', route('reports.class-summary'), 'reports*'];
+            $reportItems[] = $adminItem('bi-bar-chart', 'Báo cáo', route('reports.class-summary'), ['reports.*', 'reports*']);
         }
-        $reportItems[] = ['bi-shield-check', 'Nhật ký hoạt động', route('audit-logs.index'), 'audit-logs*'];
+        $reportItems[] = $adminItem('bi-shield-check', 'Nhật ký hoạt động', route('audit-logs.index'), ['audit-logs.*', 'audit-logs*']);
         $addAdminGroup('reports', 'bi-graph-up', 'Báo cáo', $reportItems);
 
-        $addAdminGroup('settings', 'bi-gear', 'Cài đặt', [
-            ['bi-lock', 'Khóa nhập điểm', route('grade-windows.index'), 'grade-windows*'],
-            ['bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile'],
-            ['bi-key', 'Đổi mật khẩu', route('profile.change-password'), 'profile/change-password'],
-        ]);
+        foreach ($adminMenuGroups as $group) {
+            foreach ($group['items'] as $item) {
+                if ($matchesAdminItem($item)) {
+                    $activeAdminGroup = $group;
+                    $activeAdminItem = $item;
+                    break 2;
+                }
+            }
+        }
+
+        $activeAdminGroup ??= $adminMenuGroups[0] ?? null;
+        $activeAdminItem ??= $activeAdminGroup['items'][0] ?? null;
     }
 
     if ($showRoleMenu) {
@@ -119,7 +194,7 @@
         }
     }
 @endphp
-<body class="role-{{ $currentUser->role }} {{ $showSidebar ? 'has-sidebar' : 'no-sidebar' }}">
+<body class="role-{{ $currentUser->role }} {{ $showSidebar ? 'has-sidebar admin-hide-duplicate-heading' : 'no-sidebar' }} {{ $historySchoolYear ? 'history-readonly' : '' }}">
 @if($showSidebar)
 <div class="sidebar-overlay" data-sidebar-close></div>
 @elseif($showRoleMenu)
@@ -132,32 +207,20 @@
         <div class="admin-sidebar-head">
             <div class="brand-mark fw-bold rounded-3">TH</div>
             <div>
-                <div class="admin-sidebar-title">Trường Trung học Phổ thông</div>
+                <div class="admin-sidebar-title">{{ $schoolTitle }}</div>
                 <div class="admin-sidebar-subtitle">{{ $currentUser->display_name }}</div>
             </div>
         </div>
 
-        <nav class="admin-menu" aria-label="Menu quản trị">
+        <nav class="admin-menu admin-menu-groups" aria-label="Menu quản trị">
             @foreach($adminMenuGroups as $group)
-                <div class="admin-menu-section" data-admin-menu-section data-group-key="{{ $group['key'] }}">
-                    <button type="button" class="admin-menu-heading" data-admin-accordion-toggle aria-expanded="true" aria-controls="admin-menu-{{ $group['key'] }}">
-                        <span class="admin-menu-heading-main">
-                            <i class="bi {{ $group['icon'] }}"></i>
-                            <span>{{ $group['title'] }}</span>
-                        </span>
-                        <i class="bi bi-chevron-down admin-menu-chevron"></i>
-                    </button>
-                    <div class="admin-menu-items" id="admin-menu-{{ $group['key'] }}">
-                        @foreach($group['items'] as $item)
-                            <div class="admin-menu-row">
-                                <a href="{{ $item[2] }}" class="admin-nav-link {{ request()->routeIs($item[3]) || request()->is($item[3]) ? 'active' : '' }}">
-                                    <i class="bi {{ $item[0] }}"></i>
-                                    <span>{{ $item[1] }}</span>
-                                </a>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
+                <a href="{{ $group['url'] }}" class="admin-group-link {{ $activeAdminGroup && $activeAdminGroup['key'] === $group['key'] ? 'active' : '' }}">
+                    <span class="admin-group-link-main">
+                        <i class="bi {{ $group['icon'] }}"></i>
+                        <span>{{ $group['title'] }}</span>
+                    </span>
+                    <i class="bi bi-chevron-right admin-group-link-arrow"></i>
+                </a>
             @endforeach
         </nav>
     </aside>
@@ -205,17 +268,25 @@
                     </form>
                 </div>
             @else
-                <div class="d-flex align-items-center gap-2">
+                <div class="admin-topbar-left d-flex align-items-center gap-2">
                     @if($showSidebar)
                     <button class="btn btn-outline-secondary d-lg-none" type="button" data-sidebar-toggle aria-label="Mở menu">
                         <i class="bi bi-list"></i>
                     </button>
                     @endif
-                    <div class="page-title fs-6">@yield('title', $title ?? 'Dashboard')</div>
+                    @unless($showSidebar)
+                        <div class="page-title fs-6">@yield('title', $title ?? 'Dashboard')</div>
+                    @endunless
+                    @if($showSidebar)
+                        <div class="admin-period-meta" aria-label="Năm học và học kỳ hiện tại">
+                            <span>{{ $headerSchoolYear?->name ?? 'Chưa thiết lập' }}</span>
+                            <span>{{ $headerSemester?->name ?? 'Chưa thiết lập' }}</span>
+                        </div>
+                    @endif
                 </div>
             @endif
 
-            <div class="d-flex align-items-center gap-3">
+            <div class="topbar-actions d-flex align-items-center gap-3">
                 <span class="badge badge-role">{{ $currentUser->role }}</span>
                 <div class="dropdown">
                     <button class="btn btn-link text-dark text-decoration-none dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
@@ -236,9 +307,60 @@
             </div>
         </header>
         <main class="content">
+            @if($showSidebar && $activeAdminGroup && $activeAdminGroup['key'] !== 'overview' && count($activeAdminGroup['items']) > 1)
+                <div class="admin-context-bar">
+                    <div class="admin-section-tabs" aria-label="{{ $activeAdminGroup['title'] }}">
+                        @foreach($activeAdminGroup['items'] as $item)
+                            <a href="{{ $item['url'] }}" class="admin-section-tab {{ $matchesAdminItem($item) ? 'active' : '' }}">
+                                <i class="bi {{ $item['icon'] }}"></i>
+                                <span>{{ $item['label'] }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            @if($showSidebar && $historySchoolYear)
+                <div class="history-readonly-banner" role="status">
+                    <div class="history-readonly-banner-icon">
+                        <i class="bi bi-lock-fill"></i>
+                    </div>
+                    <div class="history-readonly-banner-content">
+                        <div class="history-readonly-banner-title">Đang xem năm học: <strong>{{ $historySchoolYear->name }}</strong></div>
+                        <div class="history-readonly-banner-subtitle">Chỉ xem dữ liệu lịch sử</div>
+                    </div>
+                    <a href="{{ route('school-years.history.clear') }}" class="btn btn-primary history-readonly-back">
+                        Quay lại
+                    </a>
+                </div>
+            @endif
+
             @include('partials.flash')
             @yield('content')
         </main>
+    </div>
+</div>
+<div class="modal fade content-modal" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-kicker">Xác nhận xóa</div>
+                    <h5 class="modal-title">Bạn có chắc chắn muốn xóa dữ liệu này không?</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0 text-muted">Hành động này không thể hoàn tác.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" data-confirm-delete-submit>
+                    <i class="bi bi-trash"></i>
+                    Xác nhận xóa
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -252,53 +374,66 @@
     });
 
     (() => {
-        const storageKey = 'school-manager:admin-sidebar-groups';
-        const sections = document.querySelectorAll('[data-admin-menu-section]');
+        const hideDropdown = (toggle) => {
+            if (!toggle) {
+                return;
+            }
 
-        if (!sections.length) {
-            return;
-        }
+            const instance = bootstrap.Dropdown.getInstance(toggle);
 
-        let savedStates = {};
-        try {
-            savedStates = JSON.parse(localStorage.getItem(storageKey) || '{}') || {};
-        } catch (error) {
-            savedStates = {};
-        }
+            if (instance) {
+                instance.hide();
+                return;
+            }
 
-        const setSectionState = (section, isOpen) => {
-            const button = section.querySelector('[data-admin-accordion-toggle]');
-            const items = section.querySelector('.admin-menu-items');
+            const wrapper = toggle.closest('.dropdown');
+            wrapper?.querySelector('.dropdown-menu.show')?.classList.remove('show');
+            toggle.setAttribute('aria-expanded', 'false');
+        };
 
-            section.classList.toggle('is-collapsed', !isOpen);
-            button?.setAttribute('aria-expanded', String(isOpen));
-            items?.setAttribute('aria-hidden', String(!isOpen));
-            items?.querySelectorAll('a, button').forEach((element) => {
-                if (isOpen) {
-                    element.removeAttribute('tabindex');
-                } else {
-                    element.setAttribute('tabindex', '-1');
+        const hideAllFloatingMenus = (exceptToggle = null) => {
+            document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach((toggle) => {
+                if (exceptToggle && toggle === exceptToggle) {
+                    return;
                 }
+
+                hideDropdown(toggle);
+            });
+
+            document.querySelectorAll('[data-bs-toggle="popover"]').forEach((toggle) => {
+                bootstrap.Popover.getInstance(toggle)?.hide();
             });
         };
 
-        const persistStates = () => {
-            localStorage.setItem(storageKey, JSON.stringify(savedStates));
-        };
+        document.addEventListener('show.bs.dropdown', (event) => {
+            hideAllFloatingMenus(event.target);
+        });
 
-        sections.forEach((section) => {
-            const groupKey = section.dataset.groupKey;
-            const button = section.querySelector('[data-admin-accordion-toggle]');
-            const isOpen = savedStates[groupKey] ?? true;
+        document.addEventListener('click', (event) => {
+            const target = event.target;
 
-            setSectionState(section, isOpen);
+            if (!(target instanceof Element)) {
+                return;
+            }
 
-            button?.addEventListener('click', () => {
-                const nextState = section.classList.contains('is-collapsed');
-                savedStates[groupKey] = nextState;
-                setSectionState(section, nextState);
-                persistStates();
-            });
+            if (target.closest('.dropdown-menu .dropdown-item')) {
+                hideAllFloatingMenus();
+                return;
+            }
+
+            if (!target.closest('.dropdown, .popover')) {
+                hideAllFloatingMenus();
+            }
+        }, true);
+
+        document.addEventListener('submit', (event) => {
+            if (event.target instanceof HTMLFormElement && event.target.closest('.dropdown-menu')) {
+                hideAllFloatingMenus();
+            }
+        }, true);
+
+        ['pagehide', 'beforeunload', 'popstate'].forEach((eventName) => {
+            window.addEventListener(eventName, () => hideAllFloatingMenus());
         });
     })();
 
@@ -330,7 +465,7 @@
         window.requestAnimationFrame(restoreScroll);
         window.addEventListener('pagehide', saveScroll);
         window.addEventListener('beforeunload', saveScroll);
-        document.querySelectorAll('.admin-nav-link').forEach((link) => {
+        document.querySelectorAll('.admin-group-link, .admin-section-tab').forEach((link) => {
             link.addEventListener('click', saveScroll, { capture: true });
         });
         scrollTargets.forEach(([, element]) => {
@@ -341,7 +476,7 @@
     document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
         button.addEventListener('click', () => document.body.classList.add('sidebar-open'));
     });
-    document.querySelectorAll('[data-sidebar-close], .admin-nav-link').forEach((element) => {
+    document.querySelectorAll('[data-sidebar-close], .admin-group-link, .admin-section-tab').forEach((element) => {
         element.addEventListener('click', () => document.body.classList.remove('sidebar-open'));
     });
 
@@ -351,6 +486,82 @@
     document.querySelectorAll('[data-role-menu-close], .role-sidebar a').forEach((element) => {
         element.addEventListener('click', () => document.body.classList.remove('role-menu-open'));
     });
+
+    document.querySelectorAll('[data-target-role-group]').forEach((group) => {
+        const allBox = group.querySelector('[data-target-role="all"]');
+        const roleBoxes = [...group.querySelectorAll('[data-target-role]')].filter((box) => box !== allBox);
+
+        if (!allBox) {
+            return;
+        }
+
+        allBox.addEventListener('change', () => {
+            if (allBox.checked) {
+                roleBoxes.forEach((box) => box.checked = false);
+            }
+        });
+
+        roleBoxes.forEach((box) => {
+            box.addEventListener('change', () => {
+                if (box.checked) {
+                    allBox.checked = false;
+                }
+                if (!roleBoxes.some((item) => item.checked)) {
+                    allBox.checked = true;
+                }
+            });
+        });
+    });
+
+    document.querySelectorAll('[data-bs-toggle="tooltip"], .content-action-btn[title]').forEach((element) => {
+        new bootstrap.Tooltip(element, { trigger: 'hover focus' });
+    });
+
+    (() => {
+        const modalElement = document.getElementById('deleteConfirmModal');
+        const confirmButton = document.querySelector('[data-confirm-delete-submit]');
+
+        if (!modalElement || !confirmButton) {
+            return;
+        }
+
+        const modal = new bootstrap.Modal(modalElement);
+        let pendingForm = null;
+
+        document.addEventListener('submit', (event) => {
+            const form = event.target;
+
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const methodInput = form.querySelector('input[name="_method"]');
+
+            if (!methodInput || methodInput.value.toUpperCase() !== 'DELETE') {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            pendingForm = form;
+            modal.show();
+        }, true);
+
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            pendingForm = null;
+        });
+
+        confirmButton.addEventListener('click', () => {
+            if (!pendingForm) {
+                return;
+            }
+
+            const form = pendingForm;
+            pendingForm = null;
+            modal.hide();
+            HTMLFormElement.prototype.submit.call(form);
+        });
+    })();
 
     document.querySelectorAll('form[data-logout-home]').forEach((form) => {
         form.addEventListener('submit', async (event) => {
@@ -371,6 +582,38 @@
             }
         });
     });
+
+    @if($historySchoolYear)
+    (() => {
+        const allowedFormNames = ['logout', 'school-years.history.clear'];
+
+        document.querySelectorAll('form').forEach((form) => {
+            const method = (form.querySelector('input[name="_method"]')?.value || form.method || 'GET').toUpperCase();
+            const isGet = method === 'GET';
+            const isLogout = form.matches('[data-logout-home]') || form.action.includes('/logout');
+            const isHistoryClear = form.action.includes('/school-years/history/clear');
+
+            if (isGet || isLogout || isHistoryClear) {
+                return;
+            }
+
+            form.querySelectorAll('input, select, textarea, button').forEach((element) => {
+                element.disabled = true;
+            });
+        });
+
+        const blockedLinkPatterns = ['/create', '/edit', '/initialize'];
+        document.querySelectorAll('a[href]').forEach((link) => {
+            if (blockedLinkPatterns.some((pattern) => link.href.includes(pattern))) {
+                link.classList.add('d-none');
+            }
+        });
+
+        document.querySelectorAll('.content-action-btn.edit, .content-action-btn.delete, [data-bs-target*="edit"], [data-activate-school-year], [data-mark-all-present]').forEach((element) => {
+            element.classList.add('d-none');
+        });
+    })();
+    @endif
 </script>
 </body>
 </html>

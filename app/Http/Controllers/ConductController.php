@@ -14,14 +14,19 @@ class ConductController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $classes = SchoolClass::with('schoolYear')->get();
+        $selectedYearId = $this->selectedSchoolYearId($request);
+        $classes = SchoolClass::with('schoolYear')
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->get();
 
         if ($user->isHomeroom()) {
             $teacherId = optional($user->teacher)->id;
             $classes = $classes->where('homeroom_teacher_id', $teacherId);
         }
 
-        $semesters = Semester::with('schoolYear')->get();
+        $semesters = Semester::with('schoolYear')
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->get();
         $selectedClass = null;
         $selectedSemester = null;
         $students = collect();
@@ -44,7 +49,7 @@ class ConductController extends Controller
                 ->keyBy('student_id');
         }
 
-        return view('conduct.index', compact('classes', 'semesters', 'selectedClass', 'selectedSemester', 'students', 'records'));
+        return view('conduct.index', compact('classes', 'semesters', 'selectedClass', 'selectedSemester', 'students', 'records', 'selectedYearId'));
     }
 
     public function store(Request $request)

@@ -38,11 +38,17 @@
                     <td>{{ $p->user?->username }}</td>
                     <td>{!! ($p->user && $p->user->is_active) ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">Inactive</span>' !!}</td>
                     <td class="text-end">
-                        <a class="btn btn-sm btn-outline-primary" href="{{ route('parents.edit', $p) }}">Sửa</a>
-                        <form method="POST" action="{{ route('parents.destroy', $p) }}" class="d-inline" onsubmit="return confirm('Xóa phụ huynh?')">
-                            @csrf @method('DELETE')
-                            <button class="btn btn-sm btn-outline-danger">Xóa</button>
-                        </form>
+                        <div class="content-action-group justify-content-end">
+                            <a class="content-action-btn icon-only edit" href="{{ route('parents.edit', $p) }}" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
+                                <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
+                            </a>
+                            <form method="POST" action="{{ route('parents.destroy', $p) }}" class="d-inline">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="content-action-btn icon-only delete" title="Xóa" aria-label="Xóa" data-bs-toggle="tooltip">
+                                    <i class="bi bi-trash"></i><span class="visually-hidden">Xóa</span>
+                                </button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
             @empty

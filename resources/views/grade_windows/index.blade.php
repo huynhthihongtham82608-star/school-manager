@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Khóa nhập điểm')
 
 @section('content')
@@ -51,8 +51,8 @@
                     <label class="form-check-label" for="is_open">Mở</label>
                 </div>
             </div>
-            <div class="col-md-1 text-end">
-                <button class="btn btn-primary w-100">Lưu</button>
+            <div class="col-12 text-end">
+                <button class="btn btn-primary">Lưu</button>
             </div>
         </form>
     </div>
@@ -84,7 +84,10 @@
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="is_open" value="{{ $window->is_open ? 0 : 1 }}">
-                            <button class="btn btn-sm btn-outline-primary">Chuyển {{ $window->is_open ? 'Khóa' : 'Mở' }}</button>
+                            <button type="submit" class="content-action-btn icon-only detail" title="Chuyển {{ $window->is_open ? 'khóa' : 'mở' }}" aria-label="Chuyển {{ $window->is_open ? 'khóa' : 'mở' }}" data-bs-toggle="tooltip">
+                                <i class="bi {{ $window->is_open ? 'bi-lock' : 'bi-unlock' }}"></i>
+                                <span class="visually-hidden">Chuyển {{ $window->is_open ? 'khóa' : 'mở' }}</span>
+                            </button>
                         </form>
                     </td>
                 </tr>

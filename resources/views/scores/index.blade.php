@@ -7,6 +7,12 @@
         <h5>Nhập điểm</h5>
         <div class="text-muted">Chọn lớp, môn và học kỳ để mở bảng nhập điểm.</div>
     </div>
+    @if(auth()->user()->isAdmin() || auth()->user()->isStaff())
+        <a href="{{ route('grade-windows.index') }}" class="btn btn-outline-primary">
+            <i class="bi bi-lock"></i>
+            Cấu hình khóa nhập điểm
+        </a>
+    @endif
 </div>
 
 <div class="row g-3">

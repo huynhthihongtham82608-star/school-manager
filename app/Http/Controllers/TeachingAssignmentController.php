@@ -11,17 +11,19 @@ use Illuminate\Http\Request;
 
 class TeachingAssignmentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $selectedYearId = $this->selectedSchoolYearId($request);
         $assignments = TeachingAssignment::with(['teacher', 'classRoom', 'subject', 'schoolYear'])
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->orderBy('school_year_id')
             ->orderBy('class_id')
             ->get();
         $teachers = Teacher::all();
-        $classes = SchoolClass::all();
+        $classes = SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->get();
         $subjects = Subject::all();
         $years = SchoolYear::all();
-        return view('assignments.index', compact('assignments', 'teachers', 'classes', 'subjects', 'years'));
+        return view('assignments.index', compact('assignments', 'teachers', 'classes', 'subjects', 'years', 'selectedYearId'));
     }
 
     public function create()

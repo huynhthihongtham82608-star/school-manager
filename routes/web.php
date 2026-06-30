@@ -35,8 +35,9 @@ Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.perform');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
-Route::middleware(['auth', 'no-cache'])->group(function () {
+Route::middleware(['auth', 'no-cache', 'history.readonly'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/school-years/history/clear', [SchoolYearController::class, 'clearHistoryMode'])->name('school-years.history.clear');
 
     // Profile routes - accessible to all authenticated users
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
@@ -51,8 +52,20 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::post('admin/home-page/posts', [AdminHomePageController::class, 'storePost'])->name('admin.home-page.posts.store');
         Route::post('admin/home-page/events', [AdminHomePageController::class, 'storeEvent'])->name('admin.home-page.events.store');
         Route::post('admin/home-page/documents', [AdminHomePageController::class, 'storeDocument'])->name('admin.home-page.documents.store');
+        Route::post('announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
+        Route::put('announcements/{post}', [AnnouncementController::class, 'update'])->name('announcements.update');
+        Route::delete('announcements/{post}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+        Route::post('events', [SchoolEventController::class, 'store'])->name('events.store');
+        Route::put('events/{event}', [SchoolEventController::class, 'update'])->name('events.update');
+        Route::delete('events/{event}', [SchoolEventController::class, 'destroy'])->name('events.destroy');
 
-        Route::resource('school-years', SchoolYearController::class)->except(['show']);
+        Route::get('school-years/initialize', [SchoolYearController::class, 'initializeForm'])->name('school-years.initialize.form');
+        Route::post('school-years/initialize/preview', [SchoolYearController::class, 'initializePreview'])->name('school-years.initialize.preview');
+        Route::post('school-years/initialize', [SchoolYearController::class, 'initializeStore'])->name('school-years.initialize.store');
+        Route::patch('school-years/{school_year}/activate', [SchoolYearController::class, 'activate'])->name('school-years.activate');
+        Route::patch('school-years/{school_year}/archive', [SchoolYearController::class, 'archive'])->name('school-years.archive');
+        Route::get('school-years/{school_year}/detail', [SchoolYearController::class, 'show'])->name('school-years.detail');
+        Route::resource('school-years', SchoolYearController::class);
         Route::resource('semesters', SemesterController::class)->except(['show']);
         Route::resource('classes', SchoolClassController::class)->except(['show']);
         Route::resource('subjects', SubjectController::class)->except(['show']);
@@ -63,7 +76,11 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::resource('grade-windows', GradeWindowController::class)->only(['index', 'store', 'update']);
 
         Route::post('documents', [LearningDocumentController::class, 'store'])->name('documents.store');
+        Route::put('documents/{document}', [LearningDocumentController::class, 'update'])->name('documents.update');
+        Route::delete('documents/{document}', [LearningDocumentController::class, 'destroy'])->name('documents.destroy');
         Route::post('exam-schedules', [ExamScheduleController::class, 'store'])->name('exam-schedules.store');
+        Route::put('exam-schedules/{examSchedule}', [ExamScheduleController::class, 'update'])->name('exam-schedules.update');
+        Route::delete('exam-schedules/{examSchedule}', [ExamScheduleController::class, 'destroy'])->name('exam-schedules.destroy');
         Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
     });
 
