@@ -10,6 +10,7 @@ use App\Models\ScoreHeader;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Subject;
+use App\Models\TeachingAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -29,8 +30,9 @@ class ScoreController extends Controller
             $teacher = $user->teacher;
             if ($teacher) {
                 $assignments = $teacher->assignments()
-                    ->with(['classRoom', 'subject', 'schoolYear'])
+                    ->with(['classRoom', 'subject', 'schoolYear', 'semester'])
                     ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                    ->where('status', TeachingAssignment::STATUS_ACTIVE)
                     ->get();
             }
         } else {
@@ -52,7 +54,7 @@ class ScoreController extends Controller
         $subject = Subject::findOrFail($data['subject_id']);
         $semester = Semester::with('schoolYear')->findOrFail($data['semester_id']);
 
-        $this->authorizeAccess($class, $subject->id);
+        $this->authorizeAccess($class, $subject->id, $semester);
         $this->ensureWindowOpen($class->id, $subject->id, $semester);
 
         $students = Student::where('class_id', $class->id)->orderBy('student_code')->get();
@@ -80,7 +82,7 @@ class ScoreController extends Controller
         $subject = Subject::findOrFail($data['subject_id']);
         $semester = Semester::with('schoolYear')->findOrFail($data['semester_id']);
 
-        $this->authorizeAccess($class, $subject->id);
+        $this->authorizeAccess($class, $subject->id, $semester);
         $this->ensureWindowOpen($class->id, $subject->id, $semester);
 
         $students = Student::where('class_id', $class->id)->get();
@@ -140,7 +142,7 @@ class ScoreController extends Controller
             ->all();
     }
 
-    protected function authorizeAccess(SchoolClass $class, string $subjectId): void
+    protected function authorizeAccess(SchoolClass $class, string $subjectId, Semester $semester): void
     {
         $user = Auth::user();
         if ($user->isAdmin()) {
@@ -152,6 +154,8 @@ class ScoreController extends Controller
             $isAssigned = $teacherId && $class->assignments()
                 ->where('teacher_id', $teacherId)
                 ->where('subject_id', $subjectId)
+                ->where('semester_id', $semester->id)
+                ->where('status', TeachingAssignment::STATUS_ACTIVE)
                 ->exists();
             $isHomeroom = $class->homeroom_teacher_id === $teacherId;
 
@@ -165,6 +169,10 @@ class ScoreController extends Controller
 
     protected function ensureWindowOpen(string $classId, string $subjectId, Semester $semester): void
     {
+        if (! $semester->isActive()) {
+            abort(403, 'Học kỳ không ở trạng thái Hoạt động nên không thể nhập hoặc chỉnh sửa điểm.');
+        }
+
         $window = GradeWindow::where('class_id', $classId)
             ->where('subject_id', $subjectId)
             ->where('semester_id', $semester->id)

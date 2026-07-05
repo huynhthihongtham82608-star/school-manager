@@ -40,8 +40,7 @@
 
         if ($headerSchoolYear && \Illuminate\Support\Facades\Schema::hasTable('semesters')) {
             $headerSemester = \App\Models\Semester::where('school_year_id', $headerSchoolYear->id)
-                ->orderByDesc('is_score_input_open')
-                ->orderBy('order')
+                ->orderByRaw("case when status = 'active' then 0 when is_score_input_open = 1 then 1 else 2 end")
                 ->orderBy('name')
                 ->first();
         }
@@ -92,6 +91,7 @@
             $adminItem('bi-calendar-event', 'Năm học', $schoolYearMenuUrl, ['school-years.*', 'school-years*']),
             $adminItem('bi-calendar2-week', 'Học kỳ', route('semesters.index'), ['semesters.*', 'semesters*']),
             $adminItem('bi-building', 'Lớp học', route('classes.index'), ['classes.*', 'classes*']),
+            $adminItem('bi-door-open', 'Phòng học', route('rooms.index'), ['rooms.*', 'rooms*']),
             $adminItem('bi-book', 'Môn học', route('subjects.index'), ['subjects.*', 'subjects*']),
             $adminItem('bi-diagram-3', 'Phân công giảng dạy', route('assignments.index'), ['assignments.*', 'assignments*']),
             $adminItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.manage'), ['timetable.manage', 'timetable/manage*']),

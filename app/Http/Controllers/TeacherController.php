@@ -2,22 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SchoolYear;
 use App\Models\Teacher;
 use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use App\Services\AdminProtectionService;
+use App\Support\AuditLogger;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class TeacherController extends Controller
 {
     public function index(Request $request)
     {
         $selectedYearId = $this->selectedSchoolYearId($request);
-        $teachers = Teacher::with('user')
-            ->when($selectedYearId, function ($query) use ($selectedYearId) {
-                $query->whereHas('assignments', fn ($assignmentQuery) => $assignmentQuery->where('school_year_id', $selectedYearId))
-                    ->orWhereHas('homeroomClasses', fn ($classQuery) => $classQuery->where('school_year_id', $selectedYearId));
-            })
+        $teachers = Teacher::with([
+            'user',
+            'assignments.classRoom',
+            'assignments.subject',
+            'assignments.schoolYear',
+            'assignments.semester',
+            'homeroomClasses.schoolYear',
+        ])
             ->orderBy('name')
             ->get();
 
@@ -31,22 +38,9 @@ class TeacherController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'teacher_code' => 'required|string|unique:teachers,teacher_code',
-            'name' => 'required|string',
-            'phone' => 'nullable|string',
-            'email' => 'nullable|email',
-            'qualification' => 'nullable|string',
-            'main_subject' => 'nullable|string',
-            'is_homeroom' => 'boolean',
-            'username' => 'required|string|unique:users,username',
-            'password' => 'required|string|min:6',
-        ]);
+        $data = $this->validatedData($request);
 
-        $teacherData = $request->only([
-            'teacher_code', 'name', 'phone', 'email', 'qualification', 'main_subject',
-        ]);
-        $teacherData['is_homeroom'] = $request->boolean('is_homeroom');
+        $teacherData = $this->teacherPayload($data, $request);
 
         $teacher = Teacher::create($teacherData);
 
@@ -55,8 +49,10 @@ class TeacherController extends Controller
             'role' => $teacher->is_homeroom ? 'homeroom' : 'teacher',
             'teacher_id' => $teacher->id,
             'password_hash' => Hash::make($data['password']),
-            'is_active' => 1,
+            'is_active' => $teacher->isWorking() ? 1 : 0,
         ]);
+
+        AuditLogger::log('teacher_created', Teacher::class, (string) $teacher->getKey(), 'Tạo giáo viên ' . $teacher->name);
 
         return redirect()->route('teachers.index')->with('success', 'Đã thêm giáo viên');
     }
@@ -68,61 +64,128 @@ class TeacherController extends Controller
 
     public function update(Request $request, Teacher $teacher)
     {
-        $data = $request->validate([
-            'teacher_code' => 'required|string|unique:teachers,teacher_code,' . $teacher->id,
-            'name' => 'required|string',
-            'phone' => 'nullable|string',
-            'email' => 'nullable|email',
-            'qualification' => 'nullable|string',
-            'main_subject' => 'nullable|string',
-            'is_homeroom' => 'boolean',
-            'password' => 'nullable|string|min:6',
-        ]);
-
-        $teacherData = $request->only([
-            'teacher_code', 'name', 'phone', 'email', 'qualification', 'main_subject',
-        ]);
-        $teacherData['is_homeroom'] = $request->boolean('is_homeroom');
+        $data = $this->validatedData($request, $teacher);
+        $teacherData = $this->teacherPayload($data, $request);
 
         $teacher->update($teacherData);
 
         if ($teacher->user) {
             $update = [
                 'role' => $teacher->is_homeroom ? 'homeroom' : 'teacher',
+                'is_active' => $teacher->isWorking() ? 1 : 0,
             ];
 
-            // Check if this is an admin account
             if ($teacher->user->role === 'admin') {
                 $validation = AdminProtectionService::validateAdminChange($teacher->user, $update);
-                if (!$validation['allowed']) {
+                if (! $validation['allowed']) {
                     return back()->withErrors(['error' => $validation['message']]);
                 }
             }
 
-            if (!empty($data['password'])) {
+            if (! empty($data['password'])) {
                 $update['password_hash'] = Hash::make($data['password']);
             }
+
             $teacher->user->update($update);
         }
+
+        AuditLogger::log('teacher_updated', Teacher::class, (string) $teacher->getKey(), 'Cập nhật giáo viên ' . $teacher->name);
 
         return redirect()->route('teachers.index')->with('success', 'Đã cập nhật giáo viên');
     }
 
+    public function resetPassword(Teacher $teacher)
+    {
+        $user = $teacher->user ?: User::create([
+            'username' => $teacher->teacher_code,
+            'role' => $teacher->is_homeroom ? 'homeroom' : 'teacher',
+            'teacher_id' => $teacher->id,
+            'password_hash' => Hash::make('12345678'),
+            'is_active' => $teacher->isWorking() ? 1 : 0,
+        ]);
+
+        $user->update([
+            'password_hash' => Hash::make('12345678'),
+            'force_change_password' => true,
+            'is_active' => $teacher->isWorking() ? 1 : 0,
+        ]);
+
+        AuditLogger::log(
+            'teacher_password_reset',
+            Teacher::class,
+            (string) $teacher->getKey(),
+            'Đặt lại mật khẩu giáo viên ' . $teacher->name . ' bởi ' . (auth()->user()?->display_name ?? auth()->user()?->username ?? 'admin') . ' lúc ' . now()->format('d/m/Y H:i:s')
+        );
+
+        return back()->with('success', 'Đã đặt lại mật khẩu giáo viên về 12345678.');
+    }
+
     public function destroy(Teacher $teacher)
     {
-        // Check if teacher's user is admin
         if ($teacher->user && $teacher->user->role === 'admin') {
             $validation = AdminProtectionService::validateAdminDeletion($teacher->user);
-            if (!$validation['allowed']) {
+            if (! $validation['allowed']) {
                 return back()->withErrors(['error' => $validation['message']]);
             }
         }
 
-        if ($teacher->user) {
-            $teacher->user->delete();
+        DB::transaction(function () use ($teacher) {
+            $teacher->user?->delete();
+            $teacher->delete();
+        });
+
+        AuditLogger::log('teacher_deleted', Teacher::class, (string) $teacher->getKey(), 'Xóa giáo viên ' . $teacher->name);
+
+        return redirect()->route('teachers.index')->with('success', 'Đã xóa giáo viên');
+    }
+
+    private function validatedData(Request $request, ?Teacher $teacher = null): array
+    {
+        return $request->validate([
+            'teacher_code' => ['required', 'string', Rule::unique('teachers', 'teacher_code')->ignore($teacher?->id)],
+            'name' => ['required', 'string', 'max:255'],
+            'dob' => ['nullable', 'date'],
+            'gender' => ['nullable', Rule::in(array_keys(Teacher::genderLabels()))],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'joined_at' => ['nullable', 'date'],
+            'work_status' => ['required', Rule::in(array_keys(Teacher::workStatuses()))],
+            'qualification' => ['nullable', 'string', 'max:255'],
+            'main_subject' => ['nullable', 'string', 'max:255'],
+            'is_homeroom' => ['nullable', 'boolean'],
+            'username' => [$teacher ? 'nullable' : 'required', 'string', Rule::unique('users', 'username')->ignore($teacher?->user?->id)],
+            'password' => [$teacher ? 'nullable' : 'required', 'string', 'min:6'],
+        ]);
+    }
+
+    private function teacherPayload(array $data, Request $request): array
+    {
+        return [
+            'teacher_code' => $data['teacher_code'],
+            'name' => $data['name'],
+            'dob' => $data['dob'] ?? null,
+            'gender' => $data['gender'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'email' => $data['email'] ?? null,
+            'address' => $data['address'] ?? null,
+            'joined_at' => $data['joined_at'] ?? null,
+            'work_status' => $data['work_status'] ?? Teacher::STATUS_WORKING,
+            'qualification' => $data['qualification'] ?? null,
+            'main_subject' => $data['main_subject'] ?? null,
+            'is_homeroom' => $request->boolean('is_homeroom'),
+        ];
+    }
+
+    protected function selectedSchoolYearId(?Request $request = null): ?string
+    {
+        $request ??= request();
+
+        if ($this->isHistoricalReadOnly()) {
+            return session('history_school_year_id');
         }
 
-        $teacher->delete();
-        return redirect()->route('teachers.index')->with('success', 'Đã xóa giáo viên');
+        return $request->query('school_year_id')
+            ?: SchoolYear::where('is_active', true)->value('id');
     }
 }

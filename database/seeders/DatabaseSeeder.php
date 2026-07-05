@@ -38,9 +38,9 @@ class DatabaseSeeder extends Seeder
         );
 
         // Subjects
-        $toan = Subject::updateOrCreate(['name' => 'Toan'], ['credit' => 1, 'is_weighted' => 0]);
-        $van = Subject::updateOrCreate(['name' => 'Ngu van'], ['credit' => 1, 'is_weighted' => 0]);
-        $anh = Subject::updateOrCreate(['name' => 'Tieng Anh'], ['credit' => 1, 'is_weighted' => 0]);
+        $toan = Subject::updateOrCreate(['code' => 'TOAN'], ['name' => 'Toan', 'credit' => 1, 'type' => Subject::TYPE_REQUIRED, 'status' => Subject::STATUS_ACTIVE, 'is_weighted' => 0]);
+        $van = Subject::updateOrCreate(['code' => 'NGU_VAN'], ['name' => 'Ngu van', 'credit' => 1, 'type' => Subject::TYPE_REQUIRED, 'status' => Subject::STATUS_ACTIVE, 'is_weighted' => 0]);
+        $anh = Subject::updateOrCreate(['code' => 'TIENG_ANH'], ['name' => 'Tieng Anh', 'credit' => 1, 'type' => Subject::TYPE_REQUIRED, 'status' => Subject::STATUS_ACTIVE, 'is_weighted' => 0]);
 
         // Teachers
         $teacherToan = Teacher::updateOrCreate(
@@ -65,11 +65,11 @@ class DatabaseSeeder extends Seeder
         // Students
         $student1 = Student::updateOrCreate(
             ['student_code' => 'HS001'],
-            ['name' => 'Le Minh Anh', 'gender' => 'male', 'dob' => '2009-09-20', 'parent_phone' => '0911222333', 'class_id' => $class10a1->id, 'school_year_id' => $year->id, 'status' => 'studying']
+            ['name' => 'Le Minh Anh', 'gender' => Student::GENDER_NAM, 'dob' => '2009-09-20', 'parent_phone' => '0911222333', 'class_id' => $class10a1->id, 'school_year_id' => $year->id, 'enrollment_date' => '2024-08-01', 'admission_type' => Student::ADMISSION_NEW, 'status' => 'studying']
         );
         $student2 = Student::updateOrCreate(
             ['student_code' => 'HS002'],
-            ['name' => 'Pham Thu Ha', 'gender' => 'female', 'dob' => '2009-06-15', 'parent_phone' => '0944555666', 'class_id' => $class10a1->id, 'school_year_id' => $year->id, 'status' => 'studying']
+            ['name' => 'Pham Thu Ha', 'gender' => Student::GENDER_NU, 'dob' => '2009-06-15', 'parent_phone' => '0944555666', 'class_id' => $class10a1->id, 'school_year_id' => $year->id, 'enrollment_date' => '2024-08-01', 'admission_type' => Student::ADMISSION_NEW, 'status' => 'studying']
         );
 
         // Users
@@ -106,12 +106,12 @@ class DatabaseSeeder extends Seeder
 
         // Teaching assignments
         TeachingAssignment::updateOrCreate(
-            ['teacher_id' => $teacherToan->id, 'class_id' => $class10a1->id, 'subject_id' => $toan->id, 'school_year_id' => $year->id],
-            []
+            ['teacher_id' => $teacherToan->id, 'class_id' => $class10a1->id, 'subject_id' => $toan->id, 'school_year_id' => $year->id, 'semester_id' => $hk1->id, 'role' => TeachingAssignment::ROLE_PRIMARY],
+            ['status' => TeachingAssignment::STATUS_ACTIVE]
         );
         TeachingAssignment::updateOrCreate(
-            ['teacher_id' => $teacherGvcn->id, 'class_id' => $class10a1->id, 'subject_id' => $van->id, 'school_year_id' => $year->id],
-            []
+            ['teacher_id' => $teacherGvcn->id, 'class_id' => $class10a1->id, 'subject_id' => $van->id, 'school_year_id' => $year->id, 'semester_id' => $hk1->id, 'role' => TeachingAssignment::ROLE_PRIMARY],
+            ['status' => TeachingAssignment::STATUS_ACTIVE]
         );
 
         // Grade window: open for 10A1-Toan-HK1

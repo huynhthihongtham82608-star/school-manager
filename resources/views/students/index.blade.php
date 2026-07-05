@@ -2,12 +2,84 @@
 @section('title', 'Học sinh')
 
 @section('content')
+@php
+    $gradeFilters = ['all' => 'Tất cả', '10' => 'Khối 10', '11' => 'Khối 11', '12' => 'Khối 12'];
+    $genderFilters = ['all' => 'Tất cả'] + \App\Models\Student::genderLabels();
+    $statusFilters = ['all' => 'Tất cả'] + \App\Models\Student::statuses();
+@endphp
+
 <div class="page-heading">
     <div>
         <h5>Học sinh</h5>
-        <div class="text-muted">Quản lý hồ sơ học sinh, lớp và tài khoản liên kết.</div>
+        <div class="text-muted">Quản lý hồ sơ học sinh, lớp học và trạng thái học tập.</div>
     </div>
-    <a class="btn btn-primary" href="{{ route('students.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm học sinh</a>
+	    <div class="d-flex align-items-center gap-2">
+	        @unless($readOnly)
+	            <a class="btn btn-secondary" href="{{ route('students.import-template') }}">
+	                <i class="bi bi-download me-1"></i>Tải file mẫu
+	            </a>
+	            <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#studentImportModal">
+	                <i class="bi bi-upload me-1"></i>Import
+	            </button>
+            <a class="btn btn-primary" href="{{ route('students.create') }}">
+                <i class="bi bi-plus-lg me-1"></i>Thêm học sinh
+            </a>
+        @endunless
+        <div class="dropdown">
+            <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Lọc học sinh" aria-label="Lọc học sinh">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 320px;">
+                <form method="GET" action="{{ route('students.index') }}" class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label small mb-1">Năm học</label>
+                        <select name="school_year_id" class="form-select">
+                            @foreach($years as $year)
+                                <option value="{{ $year->id }}" @selected($selectedYearId === $year->id)>{{ $year->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small mb-1">Khối</label>
+                        <select name="grade_level" class="form-select">
+                            @foreach($gradeFilters as $value => $label)
+                                <option value="{{ $value }}" @selected($selectedGrade === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small mb-1">Lớp</label>
+                        <select name="class_id" class="form-select">
+                            <option value="all" @selected($selectedClassId === 'all')>Tất cả</option>
+                            @foreach($classes as $class)
+                                <option value="{{ $class->id }}" @selected($selectedClassId === $class->id)>{{ $class->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small mb-1">Trạng thái</label>
+                        <select name="status" class="form-select">
+                            @foreach($statusFilters as $value => $label)
+                                <option value="{{ $value }}" @selected($selectedStatus === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small mb-1">Giới tính</label>
+                        <select name="gender" class="form-select">
+                            @foreach($genderFilters as $value => $label)
+                                <option value="{{ $value }}" @selected($selectedGender === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-12 d-flex justify-content-end gap-2">
+                        <a href="{{ route('students.index') }}" class="btn btn-secondary">Đặt lại</a>
+                        <button class="btn btn-primary">Lọc</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="card">
@@ -15,45 +87,272 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>Mã HS</th>
+                    <th>Mã học sinh</th>
                     <th>Họ tên</th>
                     <th>Lớp</th>
-                    <th>Năm học</th>
+                    <th>Phụ huynh</th>
                     <th>Trạng thái</th>
-                    <th>Tài khoản</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
             @forelse($students as $student)
+                @php($deleteCheck = $deleteChecks[(string) $student->getKey()] ?? ['allowed' => false, 'message' => null])
                 <tr>
                     <td class="fw-semibold">{{ $student->student_code }}</td>
-                    <td>{{ $student->name }}<br><span class="text-muted small">{{ $student->parent_phone }}</span></td>
-                    <td>{{ $student->classRoom->name ?? '' }}</td>
-                    <td>{{ $student->schoolYear->name ?? '' }}</td>
-                    <td><span class="badge bg-success">{{ $student->status }}</span></td>
-                    <td>{{ $student->user?->username }}</td>
-                    <td class="text-end">
-                        <div class="content-action-group justify-content-end">
-                            <a href="{{ route('students.edit', $student) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
-                                <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
-                            </a>
-                            <form action="{{ route('students.destroy', $student) }}" method="POST" class="d-inline">
-                                @csrf @method('DELETE')
-                                <button type="submit" class="content-action-btn icon-only delete" title="Xóa" aria-label="Xóa" data-bs-toggle="tooltip">
-                                    <i class="bi bi-trash"></i><span class="visually-hidden">Xóa</span>
-                                </button>
-                            </form>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center overflow-hidden" style="width: 38px; height: 38px;">
+                                @if($student->avatar)
+                                    <img src="{{ asset('storage/'.$student->avatar) }}" alt="{{ $student->name }}" class="w-100 h-100 object-fit-cover">
+                                @else
+                                    <i class="bi bi-person text-muted"></i>
+                                @endif
+                            </div>
+                            <div>
+                                <div class="fw-semibold">{{ $student->name }}</div>
+                                <div class="text-muted small">{{ $student->genderLabel() }}{{ $student->dob ? ' - '.$student->dob->format('d/m/Y') : '' }}</div>
+                            </div>
                         </div>
                     </td>
+                    <td>{{ $student->classRoom->name ?? '-' }}</td>
+                    <td>
+                        <div>{{ $student->parent_phone ?: '-' }}</div>
+                        <div class="text-muted small">{{ $student->email ?: '' }}</div>
+                    </td>
+	                    <td><span class="badge {{ $student->statusBadgeClass() }}">{{ $student->statusLabel() }}</span></td>
+	                    <td class="text-end">
+	                        <div class="content-action-group justify-content-end">
+	                            @unless($readOnly)
+	                                <a href="{{ route('students.edit', $student) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
+	                                    <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
+	                                </a>
+	                            @endunless
+	                            <div class="dropdown">
+	                                <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
+	                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end">
+	                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#studentDetail{{ $student->id }}">
+	                                        <i class="bi bi-eye me-2"></i>Xem chi tiết
+	                                    </button>
+	                                    @unless($readOnly)
+                                            <form action="{{ route('students.reset-password', $student) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn đặt lại mật khẩu cho học sinh này?');">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="bi bi-key me-2"></i>Đặt lại mật khẩu
+                                                </button>
+                                            </form>
+	                                        @if($deleteCheck['allowed'])
+	                                            <div class="dropdown-divider"></div>
+	                                            <form action="{{ route('students.destroy', $student) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa học sinh này? Hành động này không thể hoàn tác.');">
+	                                                @csrf
+	                                                @method('DELETE')
+	                                                <button type="submit" class="dropdown-item text-danger">
+	                                                    <i class="bi bi-trash me-2"></i>Xóa
+	                                                </button>
+	                                            </form>
+	                                        @endif
+	                                    @endunless
+	                                </div>
+	                            </div>
+	                        </div>
+	                    </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7"><div class="empty-state"><i class="bi bi-person-dash"></i>Chưa có học sinh.</div></td>
+                    <td colspan="6"><div class="empty-state"><i class="bi bi-person-dash"></i>Chưa có học sinh.</div></td>
                 </tr>
             @endforelse
             </tbody>
         </table>
     </div>
 </div>
+
+@foreach($students as $student)
+    <div class="modal fade content-modal student-profile-modal" id="studentDetail{{ $student->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="student-v2-shell">
+                        <div class="student-v2-card-header">
+                            <div class="student-v2-avatar">
+                                @if($student->avatar)
+                                    <img src="{{ asset('storage/'.$student->avatar) }}" alt="{{ $student->name }}">
+                                @else
+                                    <i class="bi bi-person-fill"></i>
+                                @endif
+                            </div>
+                            <div class="student-v2-identity">
+                                <div class="student-v2-kicker">Thẻ học sinh</div>
+                                <h5>{{ $student->name }}</h5>
+                                <div class="student-v2-code">{{ $student->student_code }}</div>
+                                <span class="badge {{ $student->statusBadgeClass() }}">{{ $student->statusLabel() }}</span>
+                            </div>
+                        </div>
+
+                        <div class="student-v2-main-grid">
+                            <article>
+                                <i class="bi bi-calendar3"></i>
+                                <span>Niên khóa</span>
+                                <strong>{{ $student->cohortLabel() }}</strong>
+                            </article>
+                            <article>
+                                <i class="bi bi-building"></i>
+                                <span>Lớp</span>
+                                <strong>{{ $student->classRoom->name ?? '-' }}</strong>
+                            </article>
+                            <article>
+                                <i class="bi bi-calendar-event"></i>
+                                <span>Ngày sinh</span>
+                                <strong>{{ $student->dob?->format('d/m/Y') ?? '-' }}</strong>
+                            </article>
+                            <article>
+                                <i class="bi bi-person-badge"></i>
+                                <span>Giới tính</span>
+                                <strong>{{ $student->genderLabel() }}</strong>
+                            </article>
+                        </div>
+
+                        <div class="student-v2-sections">
+                            <section class="student-v2-section">
+                                <div class="student-v2-section-title">
+                                    <i class="bi bi-mortarboard"></i>
+                                    <h6>Thông tin học tập</h6>
+                                </div>
+                                <div class="student-v2-section-grid">
+                                    <article>
+                                        <span>Loại nhập học</span>
+                                        <strong>{{ $student->admissionTypeLabel() }}</strong>
+                                    </article>
+                                    <article>
+                                        <span>Ngày nhập học</span>
+                                        <strong>{{ $student->enrollment_date?->format('d/m/Y') ?? '-' }}</strong>
+                                    </article>
+                                </div>
+                            </section>
+
+                            <section class="student-v2-section">
+                                <div class="student-v2-section-title">
+                                    <i class="bi bi-people"></i>
+                                    <h6>Thông tin gia đình</h6>
+                                </div>
+                                <div class="student-v2-section-grid">
+                                    <article>
+                                        <span>SĐT phụ huynh</span>
+                                        <strong>{{ $student->parent_phone ?: '-' }}</strong>
+                                    </article>
+                                    <article>
+                                        <span>Email phụ huynh</span>
+                                        <strong>{{ $student->email ?: '-' }}</strong>
+                                    </article>
+                                </div>
+                            </section>
+
+                            <section class="student-v2-section">
+                                <div class="student-v2-section-title">
+                                    <i class="bi bi-person-lines-fill"></i>
+                                    <h6>Thông tin cá nhân</h6>
+                                </div>
+                                <div class="student-v2-section-grid three">
+                                    <article>
+                                        <span>Nơi sinh</span>
+                                        <strong>{{ $student->place_of_birth ?: '-' }}</strong>
+                                    </article>
+                                    <article>
+                                        <span>Dân tộc</span>
+                                        <strong>{{ $student->ethnicity ?: '-' }}</strong>
+                                    </article>
+                                    <article>
+                                        <span>Tôn giáo</span>
+                                        <strong>{{ $student->religion ?: '-' }}</strong>
+                                    </article>
+                                </div>
+                            </section>
+
+                            <section class="student-v2-section">
+                                <div class="student-v2-section-title">
+                                    <i class="bi bi-journal-text"></i>
+                                    <h6>Thông tin khác</h6>
+                                </div>
+                                <div class="student-v2-section-grid">
+                                    <article class="wide">
+                                        <span>Địa chỉ</span>
+                                        <strong>{{ $student->address ?: '-' }}</strong>
+                                    </article>
+                                    <article class="wide">
+                                        <span>Ghi chú</span>
+                                        <strong>{{ $student->note ?: '-' }}</strong>
+                                    </article>
+                                </div>
+                            </section>
+
+                            @if($student->admission_type === \App\Models\Student::ADMISSION_TRANSFER)
+                                <section class="student-v2-section transfer">
+                                    <div class="student-v2-section-title">
+                                        <i class="bi bi-arrow-left-right"></i>
+                                        <h6>Thông tin chuyển trường</h6>
+                                    </div>
+                                    <div class="student-v2-section-grid">
+                                        <article>
+                                            <span>Trường cũ</span>
+                                            <strong>{{ $student->previous_school ?: '-' }}</strong>
+                                        </article>
+                                        <article>
+                                            <span>Khối hiện tại</span>
+                                            <strong>{{ $student->transfer_grade_level ? 'Khối '.$student->transfer_grade_level : '-' }}</strong>
+                                        </article>
+                                    </div>
+                                </section>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endforeach
+
+@unless($readOnly)
+    <div class="modal fade" id="studentImportModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('students.import') }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title">Import học sinh</h5>
+                            <div class="text-muted small">Template: Họ tên, Ngày sinh, Giới tính, SĐT phụ huynh, Email phụ huynh, Địa chỉ, Nơi sinh, Dân tộc, Tôn giáo, Ghi chú, Ngày nhập học, Loại nhập học, Trạng thái, Trường cũ, Khối hiện tại.</div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Lớp</label>
+                            <select name="class_id" class="form-select" required>
+                                @foreach($importClasses as $class)
+                                    <option value="{{ $class->id }}">{{ $class->name }} - {{ $class->schoolYear->name ?? '' }} ({{ $class->currentStudentCount() }}/{{ $class->maxCapacity() }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">File CSV/XLSX</label>
+                            <input type="file" name="file" class="form-control" accept=".csv,.txt,.xlsx" required>
+                        </div>
+	                    </div>
+	                    <div class="modal-footer">
+	                        <a class="btn btn-outline-primary" href="{{ route('students.import-template') }}">
+	                            <i class="bi bi-download me-1"></i>Tải file mẫu
+	                        </a>
+	                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+	                        <button class="btn btn-primary">Import</button>
+	                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endunless
 @endsection

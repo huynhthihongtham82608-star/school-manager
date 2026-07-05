@@ -33,8 +33,11 @@ return new class extends Migration
 
         Schema::create('subjects', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('name')->unique();
             $table->unsignedTinyInteger('credit')->default(1);
+            $table->string('type', 20)->default('required');
+            $table->string('status', 20)->default('active');
             $table->boolean('is_weighted')->default(false); // hệ số 2 môn
             $table->timestamps();
         });
@@ -53,11 +56,19 @@ return new class extends Migration
             $table->id();
             $table->string('student_code')->unique();
             $table->string('name');
-            $table->enum('gender', ['male', 'female', 'other'])->nullable();
+            $table->enum('gender', ['nam', 'nu']);
             $table->date('dob')->nullable();
             $table->string('address')->nullable();
+            $table->string('place_of_birth')->nullable();
+            $table->string('ethnicity', 100)->nullable();
+            $table->string('religion', 100)->nullable();
             $table->string('parent_phone')->nullable();
             $table->string('email')->nullable();
+            $table->date('enrollment_date')->nullable();
+            $table->string('admission_type', 20)->default('new');
+            $table->string('previous_school')->nullable();
+            $table->unsignedTinyInteger('transfer_grade_level')->nullable();
+            $table->string('previous_class', 50)->nullable();
             $table->foreignId('class_id')->constrained('classes')->cascadeOnDelete();
             $table->foreignId('school_year_id')->constrained('school_years')->cascadeOnDelete();
             $table->enum('status', ['studying', 'inactive'])->default('studying');
@@ -79,8 +90,14 @@ return new class extends Migration
             $table->foreignId('class_id')->constrained('classes')->cascadeOnDelete();
             $table->foreignId('subject_id')->constrained('subjects')->cascadeOnDelete();
             $table->foreignId('school_year_id')->constrained('school_years')->cascadeOnDelete();
+            $table->foreignId('semester_id')->nullable()->constrained('semesters')->nullOnDelete();
+            $table->string('role', 50)->default('primary');
+            $table->string('custom_role')->nullable();
+            $table->text('note')->nullable();
+            $table->string('status', 20)->default('active');
+            $table->timestamp('archived_at')->nullable();
             $table->timestamps();
-            $table->unique(['teacher_id', 'class_id', 'subject_id', 'school_year_id'], 'teacher_class_subject_unique');
+            $table->unique(['teacher_id', 'class_id', 'subject_id', 'school_year_id', 'semester_id', 'role', 'custom_role'], 'assignment_unique_with_role');
         });
 
         Schema::create('score_headers', function (Blueprint $table) {

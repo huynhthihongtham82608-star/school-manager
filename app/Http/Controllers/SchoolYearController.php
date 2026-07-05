@@ -190,11 +190,16 @@ class SchoolYearController extends Controller
             return back()->with('success', 'Năm học này đã được lưu trữ.');
         }
 
-        $schoolYear->update([
-            'is_active' => false,
-            'archived_at' => now(),
-        ]);
-        AuditLogger::log('school_year_archived', SchoolYear::class, (string) $schoolYear->getKey(), 'Lưu trữ năm học ' . $schoolYear->name);
+        DB::transaction(function () use ($schoolYear) {
+            $this->archiveSemestersForSchoolYear($schoolYear);
+
+            $schoolYear->update([
+                'is_active' => false,
+                'archived_at' => now(),
+            ]);
+
+            AuditLogger::log('school_year_archived', SchoolYear::class, (string) $schoolYear->getKey(), 'Lưu trữ năm học ' . $schoolYear->name);
+        });
 
         return redirect()->route('school-years.index')->with('success', 'Đã lưu trữ năm học.');
     }
@@ -757,6 +762,247 @@ class SchoolYearController extends Controller
     private function activeYear(): ?SchoolYear
     {
         return SchoolYear::where('is_active', true)->first();
+    }
+
+    private function archiveSemestersForSchoolYear(SchoolYear $schoolYear): void
+    {
+        $schoolYear->semesters()
+            ->orderBy('name')
+            ->get()
+            ->each(function (Semester $semester) use ($schoolYear) {
+                if ($semester->isArchived()) {
+                    return;
+                }
+
+                if ($semester->isActive()) {
+                    $semester->update([
+                        'status' => Semester::STATUS_LOCKED,
+                        'is_score_input_open' => false,
+                        'locked_at' => $semester->locked_at ?? now(),
+                    ]);
+
+                    AuditLogger::log(
+                        'semester_auto_locked_by_school_year_archive',
+                        Semester::class,
+                        (string) $semester->getKey(),
+                        'Tự động khóa học kỳ ' . $semester->name . ' khi lưu trữ năm học ' . $schoolYear->name
+                    );
+                }
+
+                $semester->refresh();
+                $this->archiveTimetableEntriesForSemester($semester, $schoolYear);
+                $this->archiveAssignmentsForSemester($semester, $schoolYear);
+                $this->archiveClassesForSemester($semester, $schoolYear);
+
+                $semester->update([
+                    'status' => Semester::STATUS_ARCHIVED,
+                    'is_score_input_open' => false,
+                    'archived_at' => $semester->archived_at ?? now(),
+                ]);
+
+                AuditLogger::log(
+                    'semester_auto_archived_by_school_year_archive',
+                    Semester::class,
+                    (string) $semester->getKey(),
+                    'Tự động lưu trữ học kỳ ' . $semester->name . ' khi lưu trữ năm học ' . $schoolYear->name
+                );
+            });
+
+        $this->archiveTimetableEntriesWithoutSemesterForSchoolYear($schoolYear);
+        $this->archiveAssignmentsWithoutSemesterForSchoolYear($schoolYear);
+        $this->archiveClassesWithoutSemesterForSchoolYear($schoolYear);
+
+        $hasUnarchivedSemester = $schoolYear->semesters()
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', Semester::STATUS_ARCHIVED)
+                    ->orWhereNull('archived_at');
+            })
+            ->exists();
+
+        if ($hasUnarchivedSemester) {
+            throw new \RuntimeException('Không thể lưu trữ năm học vì vẫn còn học kỳ chưa được lưu trữ.');
+        }
+
+        $hasUnarchivedClass = $schoolYear->classes()
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', SchoolClass::STATUS_ARCHIVED)
+                    ->orWhereNull('archived_at');
+            })
+            ->exists();
+
+        if ($hasUnarchivedClass) {
+            throw new \RuntimeException('Không thể lưu trữ năm học vì vẫn còn lớp học chưa được lưu trữ.');
+        }
+    }
+
+    private function archiveClassesForSemester(Semester $semester, SchoolYear $schoolYear): void
+    {
+        SchoolClass::where('semester_id', $semester->getKey())
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', SchoolClass::STATUS_ARCHIVED)
+                    ->orWhereNull('archived_at');
+            })
+            ->get()
+            ->each(function (SchoolClass $class) use ($semester, $schoolYear) {
+                $class->update([
+                    'status' => SchoolClass::STATUS_ARCHIVED,
+                    'archived_at' => $class->archived_at ?? now(),
+                ]);
+
+                AuditLogger::log(
+                    'class_auto_archived_by_school_year_archive',
+                    SchoolClass::class,
+                    (string) $class->getKey(),
+                    'Tự động lưu trữ lớp ' . $class->name . ' khi lưu trữ học kỳ ' . $semester->name . ' của năm học ' . $schoolYear->name
+                );
+            });
+    }
+
+    private function archiveTimetableEntriesForSemester(Semester $semester, SchoolYear $schoolYear): void
+    {
+        if (! Schema::hasTable('timetables') || ! Schema::hasTable('timetable_entries')) {
+            return;
+        }
+
+        $timetableIds = Timetable::where('semester_id', $semester->getKey())->pluck('id');
+
+        if ($timetableIds->isEmpty()) {
+            return;
+        }
+
+        TimetableEntry::whereIn('timetable_id', $timetableIds)
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', TimetableEntry::STATUS_ARCHIVED)
+                    ->orWhereNull('archived_at');
+            })
+            ->get()
+            ->each(function (TimetableEntry $entry) use ($semester, $schoolYear) {
+                $entry->update([
+                    'status' => TimetableEntry::STATUS_ARCHIVED,
+                    'archived_at' => $entry->archived_at ?? now(),
+                ]);
+
+                AuditLogger::log(
+                    'timetable_entry_auto_archived_by_school_year_archive',
+                    TimetableEntry::class,
+                    (string) $entry->getKey(),
+                    'Tự động lưu trữ tiết học khi lưu trữ học kỳ ' . $semester->name . ' của năm học ' . $schoolYear->name
+                );
+            });
+    }
+
+    private function archiveAssignmentsForSemester(Semester $semester, SchoolYear $schoolYear): void
+    {
+        TeachingAssignment::where('semester_id', $semester->getKey())
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', TeachingAssignment::STATUS_ARCHIVED)
+                    ->orWhereNull('archived_at');
+            })
+            ->get()
+            ->each(function (TeachingAssignment $assignment) use ($semester, $schoolYear) {
+                $assignment->update([
+                    'status' => TeachingAssignment::STATUS_ARCHIVED,
+                    'archived_at' => $assignment->archived_at ?? now(),
+                ]);
+
+                AuditLogger::log(
+                    'teaching_assignment_auto_archived_by_school_year_archive',
+                    TeachingAssignment::class,
+                    (string) $assignment->getKey(),
+                    'Tự động lưu trữ phân công khi lưu trữ học kỳ ' . $semester->name . ' của năm học ' . $schoolYear->name
+                );
+            });
+    }
+
+    private function archiveTimetableEntriesWithoutSemesterForSchoolYear(SchoolYear $schoolYear): void
+    {
+        if (! Schema::hasTable('timetables') || ! Schema::hasTable('timetable_entries')) {
+            return;
+        }
+
+        $timetableIds = Timetable::where('school_year_id', $schoolYear->getKey())
+            ->whereNull('semester_id')
+            ->pluck('id');
+
+        if ($timetableIds->isEmpty()) {
+            return;
+        }
+
+        TimetableEntry::whereIn('timetable_id', $timetableIds)
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', TimetableEntry::STATUS_ARCHIVED)
+                    ->orWhereNull('archived_at');
+            })
+            ->get()
+            ->each(function (TimetableEntry $entry) use ($schoolYear) {
+                $entry->update([
+                    'status' => TimetableEntry::STATUS_ARCHIVED,
+                    'archived_at' => $entry->archived_at ?? now(),
+                ]);
+
+                AuditLogger::log(
+                    'timetable_entry_auto_archived_by_school_year_archive',
+                    TimetableEntry::class,
+                    (string) $entry->getKey(),
+                    'Tự động lưu trữ tiết học khi lưu trữ năm học ' . $schoolYear->name
+                );
+            });
+    }
+
+    private function archiveClassesWithoutSemesterForSchoolYear(SchoolYear $schoolYear): void
+    {
+        $schoolYear->classes()
+            ->whereNull('semester_id')
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', SchoolClass::STATUS_ARCHIVED)
+                    ->orWhereNull('archived_at');
+            })
+            ->get()
+            ->each(function (SchoolClass $class) use ($schoolYear) {
+                $class->update([
+                    'status' => SchoolClass::STATUS_ARCHIVED,
+                    'archived_at' => $class->archived_at ?? now(),
+                ]);
+
+                AuditLogger::log(
+                    'class_auto_archived_by_school_year_archive',
+                    SchoolClass::class,
+                    (string) $class->getKey(),
+                    'Tự động lưu trữ lớp ' . $class->name . ' khi lưu trữ năm học ' . $schoolYear->name
+                );
+            });
+    }
+
+    private function archiveAssignmentsWithoutSemesterForSchoolYear(SchoolYear $schoolYear): void
+    {
+        TeachingAssignment::where('school_year_id', $schoolYear->getKey())
+            ->whereNull('semester_id')
+            ->where(function ($query) {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', TeachingAssignment::STATUS_ARCHIVED)
+                    ->orWhereNull('archived_at');
+            })
+            ->get()
+            ->each(function (TeachingAssignment $assignment) use ($schoolYear) {
+                $assignment->update([
+                    'status' => TeachingAssignment::STATUS_ARCHIVED,
+                    'archived_at' => $assignment->archived_at ?? now(),
+                ]);
+
+                AuditLogger::log(
+                    'teaching_assignment_auto_archived_by_school_year_archive',
+                    TeachingAssignment::class,
+                    (string) $assignment->getKey(),
+                    'Tự động lưu trữ phân công khi lưu trữ năm học ' . $schoolYear->name
+                );
+            });
     }
 
     private function deleteCheck(SchoolYear $schoolYear): array

@@ -63,7 +63,7 @@ class AiController extends Controller
 
         if ($user->isAdmin() || $user->isStaff() || $user->isHomeroom()) {
             $classes = SchoolClass::orderBy('name')->get();
-            $semesters = Semester::with('schoolYear')->orderBy('order')->get();
+            $semesters = Semester::with('schoolYear')->orderBy('name')->get();
         }
 
         return view('ai.index', compact('activeTab', 'alerts', 'reports', 'classes', 'semesters'));

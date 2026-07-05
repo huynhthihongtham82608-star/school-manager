@@ -17,6 +17,7 @@ use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ParentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RoomController;
 use App\Http\Controllers\SchoolClassController;
 use App\Http\Controllers\SchoolEventController;
 use App\Http\Controllers\SchoolYearController;
@@ -35,7 +36,7 @@ Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.perform');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
-Route::middleware(['auth', 'no-cache', 'history.readonly'])->group(function () {
+Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonly'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/school-years/history/clear', [SchoolYearController::class, 'clearHistoryMode'])->name('school-years.history.clear');
 
@@ -66,10 +67,23 @@ Route::middleware(['auth', 'no-cache', 'history.readonly'])->group(function () {
         Route::patch('school-years/{school_year}/archive', [SchoolYearController::class, 'archive'])->name('school-years.archive');
         Route::get('school-years/{school_year}/detail', [SchoolYearController::class, 'show'])->name('school-years.detail');
         Route::resource('school-years', SchoolYearController::class);
-        Route::resource('semesters', SemesterController::class)->except(['show']);
+        Route::patch('semesters/{semester}/mark-inactive', [SemesterController::class, 'markInactive'])->name('semesters.mark-inactive');
+        Route::patch('semesters/{semester}/activate', [SemesterController::class, 'activate'])->name('semesters.activate');
+        Route::patch('semesters/{semester}/lock', [SemesterController::class, 'lock'])->name('semesters.lock');
+        Route::patch('semesters/{semester}/archive', [SemesterController::class, 'archive'])->name('semesters.archive');
+        Route::resource('semesters', SemesterController::class);
+        Route::patch('classes/{class}/activate', [SchoolClassController::class, 'activate'])->name('classes.activate');
+        Route::patch('classes/{class}/lock', [SchoolClassController::class, 'lock'])->name('classes.lock');
+        Route::patch('classes/{class}/archive', [SchoolClassController::class, 'archive'])->name('classes.archive');
+        Route::post('classes/{class}/student-assignments', [SchoolClassController::class, 'updateStudentAssignments'])->name('classes.student-assignments.update');
         Route::resource('classes', SchoolClassController::class)->except(['show']);
+        Route::resource('rooms', RoomController::class)->except(['show']);
         Route::resource('subjects', SubjectController::class)->except(['show']);
+        Route::post('teachers/{teacher}/reset-password', [TeacherController::class, 'resetPassword'])->name('teachers.reset-password');
         Route::resource('teachers', TeacherController::class)->except(['show']);
+        Route::get('students/import-template', [StudentController::class, 'importTemplate'])->name('students.import-template');
+        Route::post('students/import', [StudentController::class, 'import'])->name('students.import');
+        Route::post('students/{student}/reset-password', [StudentController::class, 'resetPassword'])->name('students.reset-password');
         Route::resource('students', StudentController::class)->except(['show']);
         Route::resource('parents', ParentController::class)->except(['show']);
         Route::resource('assignments', TeachingAssignmentController::class)->except(['show']);
@@ -100,6 +114,7 @@ Route::middleware(['auth', 'no-cache', 'history.readonly'])->group(function () {
     Route::middleware('role:admin,staff')->group(function () {
         Route::get('timetable/manage', [TimetableController::class, 'manage'])->name('timetable.manage');
         Route::post('timetable/entries', [TimetableController::class, 'saveEntries'])->name('timetable.entries.save');
+        Route::post('timetable/clone', [TimetableController::class, 'clone'])->name('timetable.clone');
     });
 
     Route::get('messages/inbox', [MessageController::class, 'inbox'])->name('messages.inbox');

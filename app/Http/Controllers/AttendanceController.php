@@ -45,7 +45,6 @@ class AttendanceController extends Controller
         $semesters = Schema::hasTable('semesters')
             ? Semester::with('schoolYear')
                 ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
-                ->orderBy('order')
                 ->orderBy('name')
                 ->get()
             : collect();
@@ -164,6 +163,10 @@ class AttendanceController extends Controller
 
         $this->authorizeAttendanceClass($class);
         $this->ensureSelectionMatchesYear($data['school_year_id'], $class, $semester);
+
+        if (! $semester->isActive()) {
+            abort(403, 'Học kỳ không ở trạng thái Hoạt động nên không thể nhập hoặc chỉnh sửa điểm danh.');
+        }
 
         $students = Student::where('class_id', $class->id)->orderBy('student_code')->get();
 

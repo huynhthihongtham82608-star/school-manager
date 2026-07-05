@@ -2,29 +2,67 @@
 @section('title', 'Sửa môn học')
 
 @section('content')
-<h5 class="mb-3">Sửa môn học</h5>
 <form method="POST" action="{{ route('subjects.update', $subject) }}" class="card p-4 shadow-sm">
     @csrf
     @method('PUT')
     <div class="row g-3">
-        <div class="col-md-6">
+        <div class="col-md-3">
+            <label class="form-label">Mã môn</label>
+            <input type="text" name="code" class="form-control" value="{{ old('code', $subject->code) }}" maxlength="50" required @disabled($isUsed)>
+            @if($isUsed)
+                <input type="hidden" name="code" value="{{ $subject->code }}">
+                <div class="form-text">Môn học đã phát sinh dữ liệu nên không thể sửa mã.</div>
+            @endif
+            @error('code')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+        </div>
+        <div class="col-md-5">
             <label class="form-label">Tên môn</label>
-            <input type="text" name="name" class="form-control" value="{{ $subject->name }}" required>
+            <input type="text" name="name" class="form-control" value="{{ old('name', $subject->name) }}" required>
+            @error('name')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Hệ số môn</label>
+            <input type="number" name="credit" class="form-control" value="{{ old('credit', $subject->credit) }}" min="1" max="10" required>
+            @error('credit')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-3">
-            <label class="form-label">Tín chỉ</label>
-            <input type="number" name="credit" class="form-control" value="{{ $subject->credit }}" min="1">
+            <label class="form-label">Loại môn</label>
+            <select name="type" class="form-select" required>
+                @foreach(\App\Models\Subject::TYPES as $value => $label)
+                    <option value="{{ $value }}" @selected(old('type', $subject->type) === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+            @error('type')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-3 d-flex align-items-center">
-            <div class="form-check mt-3">
-                <input class="form-check-input" type="checkbox" name="is_weighted" value="1" id="is_weighted" {{ $subject->is_weighted ? 'checked' : '' }}>
-                <label class="form-check-label" for="is_weighted">Hệ số 2</label>
-            </div>
+        <div class="col-md-3">
+            <label class="form-label">Trạng thái</label>
+            <select name="status" class="form-select" required>
+                @foreach(\App\Models\Subject::STATUSES as $value => $label)
+                    <option value="{{ $value }}" @selected(old('status', $subject->status) === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+            @error('status')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
     </div>
-    <div class="mt-3">
-        <button class="btn btn-primary">Lưu</button>
-        <a href="{{ route('subjects.index') }}" class="btn btn-link">Hủy</a>
+
+    <div class="mt-4 pt-3 border-top">
+        <h6 class="fw-semibold mb-1">Định mức tiết học theo khối <span class="text-muted fw-normal">(không bắt buộc)</span></h6>
+        <div class="text-muted small mb-3">Nhập số tiết mỗi tuần cho từng khối. Để trống nếu môn chưa áp dụng cho khối đó.</div>
+        <div class="row g-3">
+            @foreach($gradeLevels as $gradeLevel)
+                @php($norm = $subject->periodNormForGrade($gradeLevel))
+                <div class="col-md-3">
+                    <label class="form-label">Khối {{ $gradeLevel }}</label>
+                    <input type="number" name="period_norms[{{ $gradeLevel }}]" class="form-control" value="{{ old('period_norms.' . $gradeLevel, $norm?->periods_per_week) }}" min="1" max="10" placeholder="Số tiết/tuần">
+                    @error('period_norms.' . $gradeLevel)<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                </div>
+            @endforeach
+        </div>
+    </div>
+
+    <div class="form-actions mt-4">
+        <a href="{{ route('subjects.index') }}" class="btn btn-secondary">Hủy</a>
+        <button class="btn btn-primary">Cập nhật</button>
     </div>
 </form>
 @endsection

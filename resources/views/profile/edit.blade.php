@@ -60,11 +60,10 @@
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Giới tính</label>
-                    <select name="gender" class="form-select @error('gender') is-invalid @enderror">
-                        <option value="">-- Chọn --</option>
-                        <option value="male" {{ old('gender', $student->gender) === 'male' ? 'selected' : '' }}>Nam</option>
-                        <option value="female" {{ old('gender', $student->gender) === 'female' ? 'selected' : '' }}>Nữ</option>
-                        <option value="other" {{ old('gender', $student->gender) === 'other' ? 'selected' : '' }}>Khác</option>
+                    <select name="gender" class="form-select @error('gender') is-invalid @enderror" required>
+                        @foreach(\App\Models\Student::genderLabels() as $value => $label)
+                            <option value="{{ $value }}" {{ old('gender', $student->gender ?: \App\Models\Student::GENDER_NAM) === $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
                     </select>
                     @error('gender')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                 </div>

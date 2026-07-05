@@ -5,7 +5,7 @@
 <div class="page-heading">
     <div>
         <h5>Xem thời khóa biểu</h5>
-        <div class="text-muted">Chọn lớp và học kỳ để xem.</div>
+        <div class="text-muted">Chọn lớp và học kỳ để xem lịch học.</div>
     </div>
     @if(auth()->user()->isAdmin())
         <a class="btn btn-outline-primary" href="{{ route('timetable.manage') }}"><i class="bi bi-pencil-square me-1"></i>Quản lý thời khóa biểu</a>
@@ -15,12 +15,15 @@
 <form method="GET" class="card mb-3">
     <div class="card-body">
         <div class="row g-3 align-items-end">
+            @if($selectedYearId)
+                <input type="hidden" name="school_year_id" value="{{ $selectedYearId }}">
+            @endif
             <div class="col-md-4">
                 <label class="form-label">Lớp</label>
                 <select class="form-select" name="class_id" required>
                     <option value="">-- Chọn lớp --</option>
-                    @foreach($classes as $c)
-                        <option value="{{ $c->id }}" @selected($selectedClass && $selectedClass->id === $c->id)>{{ $c->name }}</option>
+                    @foreach($classes as $class)
+                        <option value="{{ $class->id }}" @selected($selectedClass && $selectedClass->id === $class->id)>{{ $class->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -28,8 +31,8 @@
                 <label class="form-label">Học kỳ</label>
                 <select class="form-select" name="semester_id" required>
                     <option value="">-- Chọn học kỳ --</option>
-                    @foreach($semesters as $s)
-                        <option value="{{ $s->id }}" @selected($selectedSemester && $selectedSemester->id === $s->id)>{{ $s->name }} ({{ $s->schoolYear->name ?? '' }})</option>
+                    @foreach($semesters as $semester)
+                        <option value="{{ $semester->id }}" @selected($selectedSemester && $selectedSemester->id === $semester->id)>{{ $semester->normalizedName() }} ({{ $semester->schoolYear->name ?? '' }})</option>
                     @endforeach
                 </select>
             </div>
@@ -41,33 +44,34 @@
 </form>
 
 @if($selectedClass && $selectedSemester)
-    @php
-        $days = [1 => 'Thứ 2', 2 => 'Thứ 3', 3 => 'Thứ 4', 4 => 'Thứ 5', 5 => 'Thứ 6', 6 => 'Thứ 7'];
-        $periods = [1,2,3,4,5];
-    @endphp
     <div class="card timetable-grid">
-        <div class="card-header">Thời khóa biểu lớp {{ $selectedClass->name }} - {{ $selectedSemester->name }}</div>
+        <div class="card-header">Thời khóa biểu lớp {{ $selectedClass->name }} - {{ $selectedSemester->normalizedName() }}</div>
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
                         <th style="width:110px;">Tiết</th>
-                        @foreach($days as $dLabel)
-                            <th>{{ $dLabel }}</th>
+                        @foreach($days as $dayLabel)
+                            <th>{{ $dayLabel }}</th>
                         @endforeach
                     </tr>
                 </thead>
                 <tbody>
-                @foreach($periods as $p)
+                @foreach($periods as $period)
                     <tr>
-                        <td class="fw-semibold">Tiết {{ $p }}</td>
-                        @foreach($days as $d => $dLabel)
-                            @php($e = $entries[$d.'-'.$p] ?? null)
+                        <td class="fw-semibold">Tiết {{ $period }}</td>
+                        @foreach($days as $day => $dayLabel)
+                            @php($entry = $entries[$day.'-'.$period] ?? null)
                             <td>
-                                @if($e)
-                                    <div class="fw-semibold">{{ $e->subject->name ?? '' }}</div>
-                                    <div class="text-muted small">{{ $e->teacher->name ?? '' }} @if($e->room) · Phòng {{ $e->room }} @endif</div>
-                                    @if($e->note)<div class="text-muted small">{{ $e->note }}</div>@endif
+                                @if($entry)
+                                    <div class="fw-semibold">{{ $entry->assignment?->subject?->name ?? $entry->subject?->name ?? '' }}</div>
+                                    <div class="text-muted small">
+                                        {{ $entry->assignment?->teacher?->name ?? $entry->teacher?->name ?? '' }}
+                                        @if($entry->displayRoom()) · Phòng {{ $entry->displayRoom() }} @endif
+                                    </div>
+                                    @if($entry->status !== \App\Models\TimetableEntry::STATUS_ACTIVE)
+                                        <span class="badge {{ $entry->statusBadgeClass() }}">{{ $entry->statusLabel() }}</span>
+                                    @endif
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif

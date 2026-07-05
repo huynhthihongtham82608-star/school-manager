@@ -87,7 +87,7 @@ class ProfileController extends Controller
         elseif ($user->isStudent()) {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
-                'gender' => 'nullable|in:male,female,other',
+                'gender' => 'required|in:nam,nu',
                 'dob' => 'nullable|date',
                 'address' => 'nullable|string|max:500',
                 'parent_phone' => 'nullable|string|max:20',
@@ -143,6 +143,7 @@ class ProfileController extends Controller
         // Update password
         $user->update([
             'password_hash' => Hash::make($request->password),
+            'force_change_password' => false,
         ]);
 
         return redirect()->route('profile.show')

@@ -286,11 +286,19 @@ CREATE TABLE `students` (
   `id` varchar(50) NOT NULL,
   `student_code` varchar(50) NOT NULL,
   `name` varchar(255) NOT NULL,
-  `gender` enum('male','female','other') DEFAULT NULL,
+  `gender` enum('nam','nu') NOT NULL,
   `dob` date DEFAULT NULL,
   `address` varchar(255) DEFAULT NULL,
+  `place_of_birth` varchar(255) DEFAULT NULL,
+  `ethnicity` varchar(100) DEFAULT NULL,
+  `religion` varchar(100) DEFAULT NULL,
   `parent_phone` varchar(50) DEFAULT NULL,
   `email` varchar(255) DEFAULT NULL,
+  `enrollment_date` date DEFAULT NULL,
+  `admission_type` varchar(20) NOT NULL DEFAULT 'new',
+  `previous_school` varchar(255) DEFAULT NULL,
+  `transfer_grade_level` tinyint unsigned DEFAULT NULL,
+  `previous_class` varchar(50) DEFAULT NULL,
   `class_id` varchar(50) NOT NULL,
   `school_year_id` varchar(50) NOT NULL,
   `status` enum('studying','inactive','graduated') NOT NULL DEFAULT 'studying',
@@ -303,8 +311,8 @@ CREATE TABLE `students` (
 --
 
 INSERT INTO `students` (`id`, `student_code`, `name`, `gender`, `dob`, `address`, `parent_phone`, `email`, `class_id`, `school_year_id`, `status`, `created_at`, `updated_at`) VALUES
-('550e8400-e29b-41d4-a716-446655440051', 'HS001', 'Lê Minh Anh', 'male', '2009-09-20', '123 Nguyễn Trãi', '0911222333', 'leminhanh@example.com', '550e8400-e29b-41d4-a716-446655440041', '550e8400-e29b-41d4-a716-446655440001', 'studying', '2026-06-05 15:55:17', '2026-06-05 15:55:17'),
-('550e8400-e29b-41d4-a716-446655440052', 'HS002', 'Phạm Thu Hà', 'female', '2009-06-15', '456 Lê Lợi', '0944555666', 'phamthuhan@example.com', '550e8400-e29b-41d4-a716-446655440041', '550e8400-e29b-41d4-a716-446655440001', 'studying', '2026-06-05 15:55:17', '2026-06-05 15:55:17');
+('550e8400-e29b-41d4-a716-446655440051', 'HS001', 'Lê Minh Anh', 'nam', '2009-09-20', '123 Nguyễn Trãi', '0911222333', 'leminhanh@example.com', '550e8400-e29b-41d4-a716-446655440041', '550e8400-e29b-41d4-a716-446655440001', 'studying', '2026-06-05 15:55:17', '2026-06-05 15:55:17'),
+('550e8400-e29b-41d4-a716-446655440052', 'HS002', 'Phạm Thu Hà', 'nu', '2009-06-15', '456 Lê Lợi', '0944555666', 'phamthuhan@example.com', '550e8400-e29b-41d4-a716-446655440041', '550e8400-e29b-41d4-a716-446655440001', 'studying', '2026-06-05 15:55:17', '2026-06-05 15:55:17');
 
 -- --------------------------------------------------------
 

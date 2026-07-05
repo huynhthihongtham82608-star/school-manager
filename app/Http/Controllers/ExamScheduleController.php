@@ -75,6 +75,7 @@ class ExamScheduleController extends Controller
         }
 
         $data = $request->validate($this->rules());
+        $this->ensureSemesterWritable($data['semester_id']);
         $this->ensureValidScheduleWindow($data);
         $this->ensureNoConflicts($data);
 
@@ -103,6 +104,7 @@ class ExamScheduleController extends Controller
         }
 
         $data = $request->validate($this->rules());
+        $this->ensureSemesterWritable($data['semester_id']);
         $this->ensureValidScheduleWindow($data);
         $this->ensureNoConflicts($data, $examSchedule);
 
@@ -128,6 +130,10 @@ class ExamScheduleController extends Controller
 
         if (! Schema::hasTable('exam_schedules')) {
             return back()->with('error', 'Chưa có bảng exam_schedules. Vui lòng chạy migration trước.');
+        }
+
+        if ($examSchedule->semester?->isArchived()) {
+            abort(403, 'Học kỳ đã lưu trữ chỉ được xem, không thể xóa lịch thi.');
         }
 
         $scheduleId = $examSchedule->id;
@@ -212,6 +218,15 @@ class ExamScheduleController extends Controller
                     'room' => 'Phòng thi này đã có lịch thi trùng thời gian.',
                 ]);
             }
+        }
+    }
+
+    private function ensureSemesterWritable(string $semesterId): void
+    {
+        $semester = Semester::findOrFail($semesterId);
+
+        if ($semester->isArchived()) {
+            abort(403, 'Học kỳ đã lưu trữ chỉ được xem, không thể chỉnh sửa lịch thi.');
         }
     }
 

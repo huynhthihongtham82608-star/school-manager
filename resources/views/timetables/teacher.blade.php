@@ -17,21 +17,20 @@
                     <th>Thứ</th>
                     <th>Tiết</th>
                     <th>Lớp</th>
-                    <th>Môn</th>
+                    <th>Môn học</th>
                     <th>Phòng</th>
-                    <th>Ghi chú</th>
+                    <th>Vai trò</th>
                 </tr>
             </thead>
             <tbody>
-            @php($dayMap = [1=>'Thứ 2',2=>'Thứ 3',3=>'Thứ 4',4=>'Thứ 5',5=>'Thứ 6',6=>'Thứ 7',7=>'CN'])
-            @forelse($entries as $e)
+            @forelse($entries as $entry)
                 <tr>
-                    <td class="fw-semibold">{{ $dayMap[$e->day_of_week] ?? $e->day_of_week }}</td>
-                    <td>{{ $e->period }}</td>
-                    <td>{{ $e->timetable->classRoom->name ?? '' }}</td>
-                    <td>{{ $e->subject->name ?? '' }}</td>
-                    <td>{{ $e->room }}</td>
-                    <td>{{ $e->note }}</td>
+                    <td class="fw-semibold">{{ $dayMap[$entry->day_of_week] ?? $entry->day_of_week }}</td>
+                    <td>{{ $entry->period }}</td>
+                    <td>{{ $entry->timetable->classRoom->name ?? '' }}</td>
+                    <td>{{ $entry->assignment?->subject?->name ?? $entry->subject?->name ?? '' }}</td>
+                    <td>{{ $entry->displayRoom() ?? '-' }}</td>
+                    <td>{{ $entry->assignment?->roleLabel() ?? '-' }}</td>
                 </tr>
             @empty
                 <tr>

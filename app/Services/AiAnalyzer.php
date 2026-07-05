@@ -22,10 +22,11 @@ class AiAnalyzer
         $subjects = Subject::all()->keyBy('id');
 
         $students = Student::where('class_id', $class->id)->orderBy('student_code')->get();
-        $previousSemester = Semester::where('school_year_id', $semester->school_year_id)
-            ->where('order', '<', $semester->order)
-            ->orderByDesc('order')
-            ->first();
+        $previousSemester = $semester->normalizedName() === 'Học kỳ 2'
+            ? Semester::where('school_year_id', $semester->school_year_id)
+                ->whereIn('name', ['Học kỳ 1', 'Học kì 1', 'HK1', 'Hoc ky 1'])
+                ->first()
+            : null;
 
         $createdReports = 0;
         $createdAlerts = 0;
@@ -99,7 +100,7 @@ class AiAnalyzer
                 continue;
             }
             $subject = $subjects[$h->subject_id] ?? null;
-            $sw = ($subject && $subject->is_weighted) ? 2.0 : 1.0;
+            $sw = $subject ? (float) $subject->calculationWeight() : 1.0;
             $sum += ((float) $h->average) * $sw;
             $w += $sw;
         }
@@ -173,4 +174,3 @@ class AiAnalyzer
         return "[AI] {$name}: TB={$now} (truoc={$prev}), rui ro={$risk}. {$weak}";
     }
 }
-

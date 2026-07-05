@@ -74,15 +74,7 @@
                 <div class="info-item"><div class="info-label">Ngày sinh</div><div class="info-value">{{ $student->dob ? \Carbon\Carbon::parse($student->dob)->format('d/m/Y') : 'Chưa cập nhật' }}</div></div>
                 <div class="info-item">
                     <div class="info-label">Giới tính</div>
-                    <div class="info-value">
-                        @if($student->gender === 'male')
-                            Nam
-                        @elseif($student->gender === 'female')
-                            Nữ
-                        @else
-                            {{ $student->gender ?? 'Chưa cập nhật' }}
-                        @endif
-                    </div>
+                    <div class="info-value">{{ $student->genderLabel() }}</div>
                 </div>
                 <div class="info-item"><div class="info-label">Lớp</div><div class="info-value">{{ $student->classRoom?->name ?? 'Chưa cập nhật' }}</div></div>
                 <div class="info-item"><div class="info-label">Trạng thái</div><div class="info-value"><span class="badge bg-info">{{ ucfirst($student->status ?? 'studying') }}</span></div></div>

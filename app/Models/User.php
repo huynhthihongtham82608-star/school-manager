@@ -22,6 +22,7 @@ class User extends Authenticatable
         'parent_id',
         'password_hash',
         'is_active',
+        'force_change_password',
     ];
 
     protected $hidden = [
@@ -32,6 +33,7 @@ class User extends Authenticatable
     {
         return [
             'is_active' => 'boolean',
+            'force_change_password' => 'boolean',
         ];
     }
 

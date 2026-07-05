@@ -70,7 +70,7 @@ class ReportController extends Controller
 
         foreach ($headers as $header) {
             $subject = $subjects[$header->subject_id] ?? null;
-            $subjectWeight = ($subject && $subject->is_weighted) ? 2 : 1;
+            $subjectWeight = $subject ? $subject->calculationWeight() : 1;
             if ($header->average !== null) {
                 $sum += $header->average * $subjectWeight;
                 $weight += $subjectWeight;

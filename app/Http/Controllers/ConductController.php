@@ -64,6 +64,10 @@ class ConductController extends Controller
         $semester = Semester::findOrFail($data['semester_id']);
         $this->authorizeHomeroom($class);
 
+        if (! $semester->isActive()) {
+            abort(403, 'Học kỳ không ở trạng thái Hoạt động nên không thể nhập hoặc chỉnh sửa hạnh kiểm.');
+        }
+
         $students = Student::where('class_id', $class->id)->get();
 
         foreach ($students as $student) {

@@ -10,15 +10,67 @@ class Teacher extends Model
 {
     use HasFactory, UsesUuid;
 
+    public const STATUS_WORKING = 'working';
+    public const STATUS_RESIGNED = 'resigned';
+    public const GENDER_NAM = 'nam';
+    public const GENDER_NU = 'nu';
+
     protected $fillable = [
         'teacher_code',
         'name',
+        'dob',
+        'gender',
         'phone',
         'email',
+        'address',
+        'joined_at',
+        'work_status',
         'qualification',
         'main_subject',
         'is_homeroom',
     ];
+
+    protected $casts = [
+        'dob' => 'date',
+        'joined_at' => 'date',
+        'is_homeroom' => 'boolean',
+    ];
+
+    public static function genderLabels(): array
+    {
+        return [
+            self::GENDER_NAM => 'Nam',
+            self::GENDER_NU => 'Nữ',
+        ];
+    }
+
+    public static function workStatuses(): array
+    {
+        return [
+            self::STATUS_WORKING => 'Đang công tác',
+            self::STATUS_RESIGNED => 'Nghỉ việc',
+        ];
+    }
+
+    public function genderLabel(): string
+    {
+        return self::genderLabels()[$this->gender] ?? '-';
+    }
+
+    public function workStatusLabel(): string
+    {
+        return self::workStatuses()[$this->work_status ?: self::STATUS_WORKING] ?? 'Đang công tác';
+    }
+
+    public function workStatusBadgeClass(): string
+    {
+        return $this->work_status === self::STATUS_RESIGNED ? 'bg-secondary' : 'bg-success';
+    }
+
+    public function isWorking(): bool
+    {
+        return ($this->work_status ?: self::STATUS_WORKING) === self::STATUS_WORKING;
+    }
 
     public function assignments()
     {

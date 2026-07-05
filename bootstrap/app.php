@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureRole::class,
             'no-cache' => \App\Http\Middleware\NoCacheHeaders::class,
+            'force-password-change' => \App\Http\Middleware\ForcePasswordChange::class,
             'history.readonly' => \App\Http\Middleware\ReadOnlyHistoricalSchoolYear::class,
             'api.json' => \App\Http\Middleware\ForceJsonResponse::class,
             'api.role' => \App\Http\Middleware\EnsureApiRole::class,

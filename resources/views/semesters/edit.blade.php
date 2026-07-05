@@ -2,37 +2,36 @@
 @section('title', 'Sửa học kỳ')
 
 @section('content')
-<h5 class="mb-3">Sửa học kỳ</h5>
 <form method="POST" action="{{ route('semesters.update', $semester) }}" class="card p-4 shadow-sm">
     @csrf
     @method('PUT')
     <div class="row g-3">
         <div class="col-md-4">
-            <label class="form-label">Tên</label>
-            <input type="text" name="name" class="form-control" value="{{ $semester->name }}" required>
+            <label class="form-label">Tên học kỳ</label>
+            <select name="name" class="form-select" required>
+                @foreach($termOptions as $value => $label)
+                    <option value="{{ $value }}" @selected(old('name', $semester->normalizedName()) === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+            @error('name')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-2">
-            <label class="form-label">Thứ tự</label>
-            <input type="number" name="order" class="form-control" value="{{ $semester->order }}" min="1" max="4" required>
-        </div>
-        <div class="col-md-4">
+        <div class="col-md-5">
             <label class="form-label">Năm học</label>
             <select name="school_year_id" class="form-select" required>
                 @foreach($years as $year)
-                    <option value="{{ $year->id }}" @selected($year->id === $semester->school_year_id)>{{ $year->name }}</option>
+                    <option value="{{ $year->id }}" @selected(old('school_year_id', $semester->school_year_id) == $year->id)>{{ $year->name }} - {{ $year->statusLabel() }}</option>
                 @endforeach
             </select>
+            @error('school_year_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-2 d-flex align-items-center">
-            <div class="form-check mt-3">
-                <input class="form-check-input" type="checkbox" name="is_score_input_open" value="1" id="is_open" {{ $semester->is_score_input_open ? 'checked' : '' }}>
-                <label class="form-check-label" for="is_open">Mở nhập điểm</label>
-            </div>
+        <div class="col-md-3">
+            <label class="form-label">Trạng thái</label>
+            <div class="form-control bg-light">{{ $semester->statusLabel() }}</div>
         </div>
     </div>
-    <div class="mt-3">
-        <button class="btn btn-primary">Lưu</button>
-        <a href="{{ route('semesters.index') }}" class="btn btn-link">Hủy</a>
+    <div class="form-actions mt-4">
+        <a href="{{ route('semesters.index', ['school_year_id' => $semester->school_year_id]) }}" class="btn btn-secondary">Hủy</a>
+        <button class="btn btn-primary">Cập nhật</button>
     </div>
 </form>
 @endsection
