@@ -33,6 +33,14 @@ class LearningDocumentController extends Controller
                 });
             }
 
+            if ($request->user()->isStudent() && $request->user()->student) {
+                $studentClassId = $request->user()->student->class_id;
+                $query->where(function ($scope) use ($studentClassId) {
+                    $scope->whereNull('class_id')
+                        ->orWhere('class_id', $studentClassId);
+                });
+            }
+
             $documents = $query->paginate(12);
 
             if (! (request()->user()->isAdmin() || request()->user()->isStaff())) {

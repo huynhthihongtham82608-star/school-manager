@@ -25,6 +25,23 @@ class ScoreController extends Controller
         $semesters = Semester::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->get();
         $subjects = Subject::all();
         $classes = SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->get();
+        $student = null;
+        $studentScores = collect();
+
+        if ($user->isStudent()) {
+            $student = $user->student?->load('classRoom');
+            if ($student) {
+                $studentScores = ScoreHeader::with(['subject', 'semester.schoolYear', 'details'])
+                    ->where('student_id', $student->id)
+                    ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                    ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
+                    ->get()
+                    ->sortBy(fn (ScoreHeader $score) => ($score->subject->name ?? '') . ($score->semester->name ?? ''))
+                    ->values();
+            }
+
+            return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'selectedYearId', 'selectedSemesterId', 'student', 'studentScores'));
+        }
 
         $assignments = collect();
         if ($user->isTeacher()) {

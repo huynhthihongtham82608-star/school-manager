@@ -36,9 +36,18 @@ class TimetableController extends Controller
         $user = Auth::user();
         $selectedYearId = $this->effectiveSchoolYearId($request);
         $selectedSemesterId = $this->selectedSemesterId($request);
-        $classes = SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
-            ->orderBy('name')
-            ->get();
+        $classesQuery = SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->orderBy('name');
+
+        if ($user->isStudent() && $user->student?->class_id) {
+            $classesQuery->whereKey($user->student->class_id);
+        } elseif ($user->isParent() && $user->parentProfile) {
+            $children = $user->parentProfile->students()->with('classRoom')->orderBy('student_code')->get();
+            $child = $children->firstWhere('id', session('selected_parent_student_id')) ?: $children->first();
+            $classesQuery->whereKey($child?->class_id);
+        }
+
+        $classes = $classesQuery->get();
         $semesters = Semester::with('schoolYear')
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->orderBy('name')
@@ -49,26 +58,7 @@ class TimetableController extends Controller
         $timetable = null;
         $entries = collect();
 
-        if ($request->filled('class_id') && $selectedSemesterId) {
-            $request->validate([
-                'class_id' => 'required|exists:classes,id',
-            ]);
-
-            $selectedClass = SchoolClass::find($request->input('class_id'));
-            $selectedSemester = Semester::find($selectedSemesterId);
-
-            $timetable = Timetable::where('class_id', $selectedClass->id)
-                ->where('semester_id', $selectedSemester->id)
-                ->first();
-
-            if ($timetable) {
-                $entries = TimetableEntry::where('timetable_id', $timetable->id)
-                    ->where('status', '!=', TimetableEntry::STATUS_ARCHIVED)
-                    ->with(['assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo'])
-                    ->get()
-                    ->keyBy(fn ($entry) => $entry->day_of_week . '-' . $entry->period);
-            }
-        } elseif ($user->isStudent() && $user->student) {
+        if ($user->isStudent() && $user->student) {
             $selectedClass = $user->student->classRoom;
         } elseif ($user->isParent() && $user->parentProfile) {
             $children = $user->parentProfile->students()->with('classRoom')->orderBy('student_code')->get();
@@ -76,6 +66,30 @@ class TimetableController extends Controller
             $selectedClass = $child?->classRoom;
         } elseif ($user->isTeacher() && $user->teacher) {
             return $this->teacherView();
+        } elseif ($request->filled('class_id')) {
+            $request->validate([
+                'class_id' => 'required|exists:classes,id',
+            ]);
+
+            $selectedClass = SchoolClass::find($request->input('class_id'));
+        }
+
+        if ($selectedClass && $selectedSemesterId) {
+            $selectedSemester = Semester::find($selectedSemesterId);
+
+            if ($selectedSemester) {
+                $timetable = Timetable::where('class_id', $selectedClass->id)
+                    ->where('semester_id', $selectedSemester->id)
+                    ->first();
+
+                if ($timetable) {
+                    $entries = TimetableEntry::where('timetable_id', $timetable->id)
+                        ->where('status', '!=', TimetableEntry::STATUS_ARCHIVED)
+                        ->with(['assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo'])
+                        ->get()
+                        ->keyBy(fn ($entry) => $entry->day_of_week . '-' . $entry->period);
+                }
+            }
         }
 
         return view('timetables.index', [

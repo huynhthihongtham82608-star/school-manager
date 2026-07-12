@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link href="{{ asset('css/school-ui.css') }}?v=20260713-working-year-readonly" rel="stylesheet">
+    <link href="{{ asset('css/school-ui.css') }}?v=20260713-function-search-order" rel="stylesheet">
 </head>
 @php
     $currentUser = auth()->user();
@@ -160,7 +160,7 @@
 
         $reportItems = [];
         if ($currentUser->role === 'admin') {
-            $reportItems[] = $adminItem('bi-bar-chart', 'Báo cáo', route('reports.class-summary'), ['reports.*', 'reports*']);
+            $reportItems[] = $adminItem('bi-bar-chart', 'Báo cáo', route('reports.index'), ['reports.*', 'reports*']);
         }
         if ($reportItems) {
         $addAdminGroup('reports', 'bi-graph-up', 'Báo cáo', $reportItems);
@@ -183,10 +183,13 @@
     if ($showRoleMenu) {
         $addRoleItem('bi-house-door', 'Trang chủ', route('dashboard'), 'dashboard');
         if ($currentUser->isStudent()) {
-            $addRoleItem('bi-bar-chart-line', 'Kết quả học tập', route('dashboard'), 'dashboard');
+            $addRoleItem('bi-bar-chart-line', 'Điểm số', route('scores.index'), 'scores*');
             $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
             $addRoleItem('bi-person-check', 'Điểm danh', route('attendance.index'), 'attendance*');
-            $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('dashboard'), 'dashboard');
+            $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('conduct.index'), 'conduct*');
+            $addRoleItem('bi-calendar2-check', 'Lịch thi', route('exam-schedules.index'), 'exam-schedules*');
+            $addRoleItem('bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), 'documents*');
+            $addRoleItem('bi-megaphone', 'Thông báo', route('announcements.index'), 'announcements*');
             $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.alerts'), 'ai*');
             $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
             $addRoleItem('bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile*');
@@ -212,6 +215,31 @@
             $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.reports'), 'ai*');
             $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
             $addRoleItem('bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile*');
+        }
+    }
+
+    $functionSearchItems = [];
+    if ($showSidebar) {
+        foreach ($adminMenuGroups as $group) {
+            foreach ($group['items'] as $item) {
+                $functionSearchItems[] = [
+                    'label' => $item['label'],
+                    'group' => $group['title'],
+                    'url' => $item['url'],
+                    'icon' => $item['icon'],
+                    'keywords' => trim($item['label'] . ' ' . $group['title']),
+                ];
+            }
+        }
+    } elseif ($showRoleMenu) {
+        foreach ($roleMenuItems as $item) {
+            $functionSearchItems[] = [
+                'label' => $item['label'],
+                'group' => 'Chức năng',
+                'url' => $item['url'],
+                'icon' => $item['icon'],
+                'keywords' => $item['label'],
+            ];
         }
     }
 @endphp
@@ -291,7 +319,7 @@
                         <i class="bi bi-list"></i>
                     </button>
                     <div class="school-heading">{{ $schoolTitle }}</div>
-                    <form class="topbar-search" role="search" onsubmit="return false;">
+                    <form class="topbar-search function-search" role="search" onsubmit="return false;" data-function-search>
                         <i class="bi bi-search"></i>
                         <input type="search" placeholder="Tìm kiếm chức năng..." aria-label="Tìm kiếm">
                     </form>
@@ -299,6 +327,10 @@
             @else
                 <div class="admin-topbar-left d-flex align-items-center gap-2">
                     @if($showSidebar)
+                    <form class="topbar-search function-search" role="search" onsubmit="return false;" data-function-search>
+                        <i class="bi bi-search"></i>
+                        <input type="search" placeholder="Tìm kiếm chức năng..." aria-label="Tìm kiếm chức năng" autocomplete="off">
+                    </form>
                     <button class="btn btn-outline-secondary d-lg-none" type="button" data-sidebar-toggle aria-label="Mở menu">
                         <i class="bi bi-list"></i>
                     </button>
@@ -417,6 +449,7 @@
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="application/json" id="function-search-data">@json($functionSearchItems)</script>
 <script>
     window.requestAnimationFrame(() => document.body.classList.add('is-loaded'));
 
@@ -569,6 +602,217 @@
     document.querySelectorAll('[data-bs-toggle="tooltip"], .content-action-btn[title]').forEach((element) => {
         new bootstrap.Tooltip(element, { trigger: 'hover focus' });
     });
+
+    (() => {
+        const dataElement = document.getElementById('function-search-data');
+        const searchForms = document.querySelectorAll('[data-function-search]');
+
+        if (!dataElement || !searchForms.length) {
+            return;
+        }
+
+        let items = [];
+        try {
+            items = JSON.parse(dataElement.textContent || '[]');
+        } catch (error) {
+            items = [];
+        }
+
+        if (!items.length) {
+            searchForms.forEach((form) => form.hidden = true);
+            return;
+        }
+
+        const normalizeText = (value) => (value || '')
+            .toString()
+            .toLocaleLowerCase('vi')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const escapeHtml = (value) => (value || '')
+            .toString()
+            .replace(/[&<>"']/g, (character) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;',
+            }[character]));
+
+        const searchableItems = items.map((item) => ({
+            ...item,
+            searchText: normalizeText(`${item.label || ''} ${item.group || ''} ${item.keywords || ''}`),
+            labelText: normalizeText(item.label || ''),
+        }));
+
+        const closeAllPanels = (except = null) => {
+            searchForms.forEach((form) => {
+                if (except && form === except) {
+                    return;
+                }
+
+                form.querySelector('[data-function-search-panel]')?.classList.remove('show');
+                form.removeAttribute('data-active-index');
+            });
+        };
+
+        const findMatches = (keyword) => {
+            const normalizedKeyword = normalizeText(keyword);
+            const source = normalizedKeyword
+                ? searchableItems.filter((item) => item.searchText.includes(normalizedKeyword))
+                : searchableItems;
+
+            return [...source]
+                .sort((left, right) => {
+                    if (!normalizedKeyword) {
+                        return String(left.label || '').localeCompare(String(right.label || ''), 'vi');
+                    }
+
+                    const leftStarts = left.labelText.startsWith(normalizedKeyword) ? 0 : 1;
+                    const rightStarts = right.labelText.startsWith(normalizedKeyword) ? 0 : 1;
+
+                    if (leftStarts !== rightStarts) {
+                        return leftStarts - rightStarts;
+                    }
+
+                    return left.labelText.indexOf(normalizedKeyword) - right.labelText.indexOf(normalizedKeyword);
+                })
+                .slice(0, 8);
+        };
+
+        const ensurePanel = (form) => {
+            let panel = form.querySelector('[data-function-search-panel]');
+            if (panel) {
+                return panel;
+            }
+
+            panel = document.createElement('div');
+            panel.className = 'function-search-panel';
+            panel.dataset.functionSearchPanel = '';
+            form.appendChild(panel);
+
+            return panel;
+        };
+
+        const updateActiveResult = (form) => {
+            const activeIndex = Number.parseInt(form.dataset.activeIndex || '0', 10);
+            form.querySelectorAll('[data-function-search-result]').forEach((button, index) => {
+                button.classList.toggle('active', index === activeIndex);
+            });
+        };
+
+        const renderPanel = (form) => {
+            const input = form.querySelector('input[type="search"]');
+            const panel = ensurePanel(form);
+            const matches = findMatches(input.value);
+
+            if (!matches.length) {
+                panel.innerHTML = '<div class="function-search-empty"><i class="bi bi-search"></i>Không tìm thấy chức năng phù hợp.</div>';
+                panel.classList.add('show');
+                form.removeAttribute('data-active-index');
+                return;
+            }
+
+            panel.innerHTML = matches.map((item, index) => `
+                <button type="button" class="function-search-item" data-function-search-result data-index="${index}" data-url="${escapeHtml(item.url)}">
+                    <span class="function-search-icon"><i class="bi ${escapeHtml(item.icon || 'bi-grid')}"></i></span>
+                    <span class="function-search-text">
+                        <strong>${escapeHtml(item.label)}</strong>
+                        <small>${escapeHtml(item.group)}</small>
+                    </span>
+                </button>
+            `).join('');
+
+            form.dataset.activeIndex = '0';
+            panel.classList.add('show');
+            updateActiveResult(form);
+        };
+
+        const navigateActive = (form) => {
+            const activeIndex = Number.parseInt(form.dataset.activeIndex || '0', 10);
+            const target = form.querySelector(`[data-function-search-result][data-index="${activeIndex}"]`)
+                || form.querySelector('[data-function-search-result]');
+
+            if (target?.dataset.url) {
+                window.location.href = target.dataset.url;
+            }
+        };
+
+        searchForms.forEach((form) => {
+            const input = form.querySelector('input[type="search"]');
+            const panel = ensurePanel(form);
+
+            if (!input) {
+                return;
+            }
+
+            input.setAttribute('autocomplete', 'off');
+            input.setAttribute('aria-label', 'Tìm kiếm chức năng');
+            input.setAttribute('placeholder', 'Tìm kiếm chức năng...');
+
+            input.addEventListener('focus', () => {
+                closeAllPanels(form);
+                renderPanel(form);
+            });
+
+            input.addEventListener('input', () => {
+                closeAllPanels(form);
+                renderPanel(form);
+            });
+
+            input.addEventListener('keydown', (event) => {
+                const results = [...form.querySelectorAll('[data-function-search-result]')];
+
+                if (event.key === 'Escape') {
+                    panel.classList.remove('show');
+                    return;
+                }
+
+                if (!results.length) {
+                    return;
+                }
+
+                let activeIndex = Number.parseInt(form.dataset.activeIndex || '0', 10);
+
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    activeIndex = Math.min(activeIndex + 1, results.length - 1);
+                    form.dataset.activeIndex = String(activeIndex);
+                    updateActiveResult(form);
+                }
+
+                if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    activeIndex = Math.max(activeIndex - 1, 0);
+                    form.dataset.activeIndex = String(activeIndex);
+                    updateActiveResult(form);
+                }
+
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    navigateActive(form);
+                }
+            });
+
+            panel.addEventListener('mousedown', (event) => {
+                const result = event.target.closest('[data-function-search-result]');
+                if (!result) {
+                    return;
+                }
+
+                event.preventDefault();
+                window.location.href = result.dataset.url;
+            });
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!(event.target instanceof Element) || !event.target.closest('[data-function-search]')) {
+                closeAllPanels();
+            }
+        });
+    })();
 
     @if($showSidebar && (! $activeAdminGroup || $activeAdminGroup['key'] !== 'overview'))
     (() => {

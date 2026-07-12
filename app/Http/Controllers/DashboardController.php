@@ -40,7 +40,9 @@ class DashboardController extends Controller
             'attendance' => Schema::hasTable('attendance_records') ? AttendanceRecord::count() : 0,
         ];
 
-        $activeYear = SchoolYear::find($this->selectedSchoolYearId(request()));
+        $selectedYearId = $this->selectedSchoolYearId(request());
+        $selectedSemesterId = $this->selectedSemesterId(request());
+        $activeYear = SchoolYear::find($selectedYearId);
         $adminOverview = $this->adminOverviewData($activeYear?->getKey());
 
         $teacherAssignments = collect();
@@ -64,9 +66,15 @@ class DashboardController extends Controller
             $student = $user->student;
             if ($student) {
                 $studentScores = ScoreHeader::where('student_id', $student->id)
+                    ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                    ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
                     ->with(['subject', 'semester'])
                     ->get();
-                $conduct = Conduct::where('student_id', $student->id)->with(['classRoom', 'semester'])->get();
+                $conduct = Conduct::where('student_id', $student->id)
+                    ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                    ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
+                    ->with(['classRoom', 'semester'])
+                    ->get();
             }
         } elseif ($user->isParent() && $user->parentProfile) {
             $parentChildren = $user->parentProfile->students()->with('classRoom')->orderBy('student_code')->get();
@@ -74,9 +82,13 @@ class DashboardController extends Controller
 
             if ($selectedParentStudent) {
                 $parentScores = ScoreHeader::where('student_id', $selectedParentStudent->id)
+                    ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                    ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
                     ->with(['subject', 'semester'])
                     ->get();
                 $parentConduct = Conduct::where('student_id', $selectedParentStudent->id)
+                    ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                    ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
                     ->with(['classRoom', 'semester'])
                     ->get();
             }

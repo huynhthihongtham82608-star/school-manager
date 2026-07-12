@@ -2,6 +2,78 @@
 @section('title', 'Hạnh kiểm')
 
 @section('content')
+@if(auth()->user()->isStudent() || auth()->user()->isParent())
+    @php
+        $conductLabels = [
+            'excellent' => 'Tốt',
+            'good' => 'Khá',
+            'average' => 'Trung bình',
+            'weak' => 'Cần cố gắng',
+        ];
+        $conductBadges = [
+            'excellent' => 'bg-success',
+            'good' => 'bg-primary',
+            'average' => 'bg-warning text-dark',
+            'weak' => 'bg-secondary',
+        ];
+    @endphp
+    <div class="page-heading">
+        <div>
+            <h5>Hạnh kiểm</h5>
+            <div class="text-muted">Chỉ hiển thị dữ liệu hạnh kiểm của học sinh đang đăng nhập.</div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body d-flex flex-column flex-md-row gap-3 justify-content-between">
+            <div>
+                <div class="text-muted small">Học sinh</div>
+                <div class="fw-bold">{{ $viewStudent?->student_code }} - {{ $viewStudent?->name }}</div>
+            </div>
+            <div>
+                <div class="text-muted small">Lớp</div>
+                <div class="fw-bold">{{ $viewStudent?->classRoom?->name ?? 'Chưa phân lớp' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Năm học</th>
+                        <th>Học kỳ</th>
+                        <th>Lớp</th>
+                        <th>Hạnh kiểm</th>
+                        <th>Nhận xét</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @forelse($studentConductRecords as $record)
+                    <tr>
+                        <td>{{ $record->schoolYear?->name ?? $record->semester?->schoolYear?->name ?? '-' }}</td>
+                        <td class="fw-semibold">{{ $record->semester?->normalizedName() ?? '-' }}</td>
+                        <td>{{ $record->classRoom?->name ?? '-' }}</td>
+                        <td>
+                            <span class="badge {{ $conductBadges[$record->conduct_level] ?? 'bg-light text-dark border' }}">
+                                {{ $conductLabels[$record->conduct_level] ?? $record->conduct_level }}
+                            </span>
+                        </td>
+                        <td>{{ $record->comment ?: 'Không có nhận xét' }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state"><i class="bi bi-clipboard-check"></i>Chưa có dữ liệu hạnh kiểm trong học kỳ này.</div>
+                        </td>
+                    </tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+@else
 <div class="page-heading">
     <div>
         <h5>Nhập hạnh kiểm</h5>
@@ -77,5 +149,6 @@
             <button class="btn btn-primary">Lưu hạnh kiểm</button>
         </div>
     </form>
+@endif
 @endif
 @endsection

@@ -108,8 +108,11 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         });
     });
 
-    Route::middleware('role:admin,teacher')->group(function () {
+    Route::middleware('role:admin,teacher,student')->group(function () {
         Route::get('scores', [ScoreController::class, 'index'])->name('scores.index');
+    });
+
+    Route::middleware('role:admin,teacher')->group(function () {
         Route::get('scores/entry', [ScoreController::class, 'entry'])->name('scores.entry');
         Route::post('scores/entry', [ScoreController::class, 'store'])->name('scores.store');
     });
@@ -125,8 +128,11 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::get('teacher/classes/{class}/students', [TeacherPortalController::class, 'classStudents'])->name('teacher.classes.students');
     });
 
-    Route::middleware('role:admin,homeroom')->group(function () {
+    Route::middleware('role:admin,homeroom,student,parent')->group(function () {
         Route::get('conduct', [ConductController::class, 'index'])->name('conduct.index');
+    });
+
+    Route::middleware('role:admin,homeroom')->group(function () {
         Route::post('conduct', [ConductController::class, 'store'])->name('conduct.store');
     });
 
@@ -166,7 +172,10 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
     Route::post('ai/run', [AiController::class, 'run'])->name('ai.run')->middleware('role:admin,homeroom,staff');
     Route::get('ai/export', [AiController::class, 'export'])->name('ai.export')->middleware('role:admin,homeroom,staff');
 
+    Route::get('reports', [ReportController::class, 'classSummary'])
+        ->middleware('role:admin,staff,teacher')
+        ->name('reports.index');
     Route::get('reports/class-summary', [ReportController::class, 'classSummary'])
-        ->middleware('role:admin,teacher')
+        ->middleware('role:admin,staff,teacher')
         ->name('reports.class-summary');
 });

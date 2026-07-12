@@ -22,25 +22,27 @@
         $addCard('bi-calendar3-week', 'Thời khóa biểu', 'Xem lịch dạy và lịch học trong tuần.', route('timetable.index'));
         $addCard('bi-people', 'Lớp đang giảng dạy', 'Xem danh sách lớp và học sinh đang giảng dạy.', route('teacher.classes'));
         $addCard('bi-table', 'Nhập điểm', 'Mở bảng điểm theo lớp, môn và học kỳ.', route('scores.index'));
-        $addCard('bi-graph-up', 'Báo cáo lớp', 'Theo dõi tổng kết học tập của lớp.', route('reports.class-summary'));
+        $addCard('bi-graph-up', 'Báo cáo lớp', 'Theo dõi tổng kết học tập của lớp.', route('reports.index'));
         $addCard('bi-chat-dots', 'Tin nhắn', 'Trao đổi thông tin với học sinh, phụ huynh và nhà trường.', route('messages.inbox'));
     }
 
     if ($user->isHomeroom()) {
         $addCard('bi-person-lines-fill', 'Lớp chủ nhiệm', 'Xem danh sách học sinh và hồ sơ lớp chủ nhiệm.', route('teacher.classes'));
-        $addCard('bi-clipboard-data', 'Theo dõi điểm toàn lớp', 'Theo dõi kết quả học tập của lớp chủ nhiệm.', route('reports.class-summary'));
+        $addCard('bi-clipboard-data', 'Theo dõi điểm toàn lớp', 'Theo dõi kết quả học tập của lớp chủ nhiệm.', route('reports.index'));
         $addCard('bi-calendar-check', 'Theo dõi điểm danh', 'Theo dõi chuyên cần của lớp chủ nhiệm.', route('attendance.index'));
         $addCard('bi-clipboard-check', 'Hạnh kiểm', 'Cập nhật hạnh kiểm và nhận xét học sinh.', route('conduct.index'));
         $addCard('bi-person-check', 'Điểm danh', 'Ghi nhận tình trạng chuyên cần theo lớp.', route('attendance.index'));
-        $addCard('bi-journal-text', 'Sổ chủ nhiệm', 'Tổng hợp thông tin học sinh, điểm danh và hạnh kiểm.', route('reports.class-summary'));
+        $addCard('bi-journal-text', 'Sổ chủ nhiệm', 'Tổng hợp thông tin học sinh, điểm danh và hạnh kiểm.', route('reports.index'));
         $addCard('bi-send', 'Liên hệ phụ huynh', 'Gửi tin nhắn trao đổi với phụ huynh khi cần.', route('messages.create'));
         $addCard('bi-cpu', 'AI hỗ trợ học tập', 'Mở công cụ AI hỗ trợ học tập.', route('ai.run.form'));
     }
 
     if ($user->isStudent()) {
         $addCard('bi-calendar3-week', 'Thời khóa biểu', 'Xem lịch học theo lớp và học kỳ.', route('timetable.index'));
-        $addCard('bi-bar-chart-line', 'Kết quả học tập', 'Theo dõi điểm trung bình và kết quả hiện có.', route('dashboard'));
+        $addCard('bi-bar-chart-line', 'Điểm số', 'Theo dõi điểm thành phần và điểm trung bình của bản thân.', route('scores.index'));
         $addCard('bi-person-check', 'Điểm danh', 'Theo dõi tình trạng chuyên cần của bản thân.', route('attendance.index'));
+        $addCard('bi-clipboard-check', 'Hạnh kiểm', 'Xem hạnh kiểm và nhận xét theo học kỳ.', route('conduct.index'));
+        $addCard('bi-calendar2-check', 'Lịch thi', 'Xem lịch kiểm tra, lịch thi và phòng thi của lớp.', route('exam-schedules.index'));
         $addCard('bi-chat-dots', 'Tin nhắn', 'Xem thông báo và trao đổi từ nhà trường.', route('messages.inbox'));
     }
 

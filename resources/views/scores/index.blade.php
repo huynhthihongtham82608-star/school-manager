@@ -1,7 +1,89 @@
 @extends('layouts.app')
-@section('title', 'Nhập điểm')
+@section('title', auth()->user()->isStudent() ? 'Điểm số' : 'Nhập điểm')
 
 @section('content')
+@if(auth()->user()->isStudent())
+    @php
+        $detailLabels = [
+            'oral' => 'Miệng',
+            'quiz' => '15 phút',
+            'test' => 'Một tiết',
+            'midterm' => 'Giữa kỳ',
+            'final' => 'Cuối kỳ',
+        ];
+    @endphp
+    <div class="page-heading">
+        <div>
+            <h5>Điểm số của tôi</h5>
+            <div class="text-muted">Chỉ hiển thị điểm của học sinh đang đăng nhập.</div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body d-flex flex-column flex-md-row gap-3 justify-content-between">
+            <div>
+                <div class="text-muted small">Học sinh</div>
+                <div class="fw-bold">{{ $student?->student_code }} - {{ $student?->name }}</div>
+            </div>
+            <div>
+                <div class="text-muted small">Lớp</div>
+                <div class="fw-bold">{{ $student?->classRoom?->name ?? 'Chưa phân lớp' }}</div>
+            </div>
+            <div>
+                <div class="text-muted small">Học kỳ</div>
+                <div class="fw-bold">{{ $semesters->firstWhere('id', $selectedSemesterId)?->normalizedName() ?? 'Học kỳ hiện hành' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Môn học</th>
+                        <th>Học kỳ</th>
+                        <th>Điểm thành phần</th>
+                        <th>Điểm trung bình</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @forelse($studentScores as $score)
+                    <tr>
+                        <td class="fw-semibold">{{ $score->subject->name ?? '-' }}</td>
+                        <td>{{ $score->semester?->normalizedName() ?? '-' }}</td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-2">
+                                @forelse($score->details->groupBy('type') as $type => $items)
+                                    <span class="badge bg-light text-dark border">
+                                        {{ $detailLabels[$type] ?? $type }}:
+                                        {{ $items->pluck('value')->map(fn ($value) => rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.'))->implode(', ') }}
+                                    </span>
+                                @empty
+                                    <span class="text-muted">Chưa có điểm thành phần</span>
+                                @endforelse
+                            </div>
+                        </td>
+                        <td>
+                            @if($score->average !== null)
+                                <span class="badge bg-info">{{ number_format($score->average, 2) }}</span>
+                            @else
+                                <span class="text-muted">Chưa có</span>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state"><i class="bi bi-clipboard-data"></i>Chưa có dữ liệu điểm trong học kỳ này.</div>
+                        </td>
+                    </tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+@else
 <div class="page-heading">
     <div>
         <h5>Nhập điểm</h5>
@@ -82,4 +164,5 @@
         </div>
     </div>
 </div>
+@endif
 @endsection

@@ -16,6 +16,37 @@ class ConductController extends Controller
         $user = Auth::user();
         $selectedYearId = $this->selectedSchoolYearId($request);
         $selectedSemesterId = $this->selectedSemesterId($request);
+        $viewStudent = null;
+        $studentConductRecords = collect();
+
+        if ($user->isStudent() && $user->student) {
+            $viewStudent = $user->student->load('classRoom');
+        } elseif ($user->isParent() && $user->parentProfile) {
+            $children = $user->parentProfile->students()->with('classRoom')->orderBy('student_code')->get();
+            $viewStudent = $children->firstWhere('id', session('selected_parent_student_id')) ?: $children->first();
+        }
+
+        if ($viewStudent) {
+            $studentConductRecords = Conduct::with(['classRoom', 'semester.schoolYear'])
+                ->where('student_id', $viewStudent->id)
+                ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
+                ->latest()
+                ->get();
+
+            return view('conduct.index', [
+                'classes' => collect(),
+                'semesters' => Semester::with('schoolYear')->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->get(),
+                'selectedClass' => null,
+                'selectedSemester' => null,
+                'students' => collect(),
+                'records' => collect(),
+                'selectedYearId' => $selectedYearId,
+                'viewStudent' => $viewStudent,
+                'studentConductRecords' => $studentConductRecords,
+            ]);
+        }
+
         $classes = SchoolClass::with('schoolYear')
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->get();
