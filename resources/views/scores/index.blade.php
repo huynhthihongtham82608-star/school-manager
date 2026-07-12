@@ -41,7 +41,9 @@
                         <label class="form-label">Học kỳ</label>
                         <select name="semester_id" class="form-select" required>
                             @foreach($semesters as $semester)
-                                <option value="{{ $semester->id }}">{{ $semester->name }}</option>
+                                <option value="{{ $semester->id }}" @selected($selectedSemesterId === $semester->id)>
+                                    {{ $semester->normalizedName() }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
@@ -61,19 +63,17 @@
                         <tr>
                             <th>Lớp</th>
                             <th>Môn</th>
-                            <th>Năm học</th>
                         </tr>
                     </thead>
                     <tbody>
-                    @forelse($assignments as $as)
+                    @forelse($assignments as $assignment)
                         <tr>
-                            <td class="fw-semibold">{{ $as->classRoom->name }}</td>
-                            <td>{{ $as->subject->name }}</td>
-                            <td>{{ $as->schoolYear->name }}</td>
+                            <td class="fw-semibold">{{ $assignment->classRoom->name }}</td>
+                            <td>{{ $assignment->subject->name }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="3"><div class="empty-state"><i class="bi bi-inbox"></i>Không có phân công.</div></td>
+                            <td colspan="2"><div class="empty-state"><i class="bi bi-inbox"></i>Không có phân công.</div></td>
                         </tr>
                     @endforelse
                     </tbody>

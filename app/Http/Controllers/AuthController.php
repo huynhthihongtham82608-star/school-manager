@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -35,7 +36,17 @@ class AuthController extends Controller
             'is_active' => 1,
         ])) {
             $request->session()->regenerate();
-            $request->session()->forget('url.intended');
+            $request->session()->forget([
+                'url.intended',
+                'working_school_year_id',
+                'working_semester_id',
+                'history_school_year_id',
+                'viewing_mode',
+                'viewing_school_year_id',
+                'viewing_school_year_name',
+            ]);
+
+            AuditLogger::log('user_login', null, null, 'Đăng nhập hệ thống');
 
             return redirect()->route('dashboard');
         }
@@ -47,6 +58,8 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        AuditLogger::log('user_logout', null, null, 'Đăng xuất hệ thống');
+
         Auth::guard()->logout();
         $request->session()->flush();
         $request->session()->invalidate();

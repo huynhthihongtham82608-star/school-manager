@@ -7,6 +7,9 @@ use App\Models\SchoolClass;
 use App\Models\SchoolYear;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\TeachingAssignment;
+use App\Models\Timetable;
+use App\Models\TimetableEntry;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -19,7 +22,7 @@ class AttendanceController extends Controller
     {
         $user = $request->user();
         $selectedYearId = $this->selectedSchoolYearId($request);
-        $selectedSemesterId = $request->query('semester_id');
+        $selectedSemesterId = $this->selectedSemesterId($request);
         $selectedClassId = $request->query('class_id');
         $date = $request->query('date', now()->toDateString());
 
@@ -57,8 +60,8 @@ class AttendanceController extends Controller
             $classesQuery->where('school_year_id', $selectedYearId);
         }
 
-        if ($classesQuery && $user->isHomeroom()) {
-            $classesQuery->where('homeroom_teacher_id', optional($user->teacher)->id);
+        if ($classesQuery && $user->isTeacher() && ! $user->isAdmin()) {
+            $classesQuery->whereIn('id', $this->teacherAttendanceClassIds($user));
         }
 
         $classes = $classesQuery ? $classesQuery->get() : collect();
@@ -94,11 +97,10 @@ class AttendanceController extends Controller
             if ($user->isStudent() && $user->student) {
                 $recordsQuery->where('student_id', $user->student->id);
             } elseif ($user->isParent() && $user->parentProfile) {
-                $studentIds = $user->parentProfile->students()->pluck('students.id');
+                $studentIds = $this->selectedParentStudentIds($user);
                 $recordsQuery->whereIn('student_id', $studentIds);
-            } elseif ($user->isHomeroom() && ! $user->isAdmin()) {
-                $classIds = SchoolClass::where('homeroom_teacher_id', optional($user->teacher)->id)->pluck('id');
-                $recordsQuery->whereIn('class_id', $classIds);
+            } elseif ($user->isTeacher() && ! $user->isAdmin()) {
+                $recordsQuery->whereIn('class_id', $this->teacherAttendanceClassIds($user));
             }
 
             if ($selectedYearId) {
@@ -141,7 +143,7 @@ class AttendanceController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless($request->user()->isAdmin() || $request->user()->isHomeroom(), 403);
+        abort_unless($request->user()->isAdmin() || $request->user()->isTeacher(), 403);
 
         if (! Schema::hasTable('attendance_records')) {
             return back()->with('error', 'Chưa có bảng attendance_records. Vui lòng chạy migration trước.');
@@ -161,7 +163,7 @@ class AttendanceController extends Controller
         $class = SchoolClass::findOrFail($data['class_id']);
         $semester = Semester::findOrFail($data['semester_id']);
 
-        $this->authorizeAttendanceClass($class);
+        $this->authorizeAttendanceClass($class, $data['attendance_date']);
         $this->ensureSelectionMatchesYear($data['school_year_id'], $class, $semester);
 
         if (! $semester->isActive()) {
@@ -204,7 +206,7 @@ class AttendanceController extends Controller
             ->with('success', 'Đã lưu điểm danh.');
     }
 
-    private function authorizeAttendanceClass(SchoolClass $class): void
+    private function authorizeAttendanceClass(SchoolClass $class, string $attendanceDate): void
     {
         $user = request()->user();
 
@@ -216,7 +218,57 @@ class AttendanceController extends Controller
             return;
         }
 
-        abort(403, 'Chỉ Admin hoặc GVCN của lớp được cập nhật điểm danh.');
+        if ($user->isTeacher() && $user->teacher && $this->teacherHasScheduledClassOnDate($user->teacher->id, $class->id, $attendanceDate)) {
+            return;
+        }
+
+        abort(403, 'Giáo viên chỉ được điểm danh lớp mình dạy đúng ngày có tiết học.');
+    }
+
+    private function teacherAttendanceClassIds($user)
+    {
+        if (! $user->teacher) {
+            return collect();
+        }
+
+        return $user->teacher->assignments()
+            ->where('status', TeachingAssignment::STATUS_ACTIVE)
+            ->pluck('class_id')
+            ->merge(SchoolClass::where('homeroom_teacher_id', $user->teacher->id)->pluck('id'))
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
+    private function selectedParentStudentIds($user)
+    {
+        $students = $user->parentProfile->students()->orderBy('student_code')->get(['students.id']);
+
+        if ($students->isEmpty()) {
+            return collect();
+        }
+
+        $selectedId = session('selected_parent_student_id');
+        $selected = $students->firstWhere('id', $selectedId) ?: $students->first();
+
+        return collect([$selected->id]);
+    }
+
+    private function teacherHasScheduledClassOnDate(string $teacherId, string $classId, string $attendanceDate): bool
+    {
+        $dayOfWeek = \Illuminate\Support\Carbon::parse($attendanceDate)->isoWeekday();
+
+        if ($dayOfWeek < 1 || $dayOfWeek > 6) {
+            return false;
+        }
+
+        $timetableIds = Timetable::where('class_id', $classId)->pluck('id');
+
+        return TimetableEntry::whereIn('timetable_id', $timetableIds)
+            ->where('teacher_id', $teacherId)
+            ->where('day_of_week', $dayOfWeek)
+            ->where('status', TimetableEntry::STATUS_ACTIVE)
+            ->exists();
     }
 
     private function ensureSelectionMatchesYear(string $schoolYearId, SchoolClass $class, Semester $semester): void

@@ -36,7 +36,7 @@ class SchoolYear extends Model
             return 'Lưu trữ';
         }
 
-        return $this->is_active ? 'Hoạt động' : 'Chưa hoạt động';
+        return $this->is_active ? 'Hiện hành' : 'Chưa hoạt động';
     }
 
     public function statusBadgeClass(): string

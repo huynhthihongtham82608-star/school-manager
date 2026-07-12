@@ -13,12 +13,12 @@ use App\Models\SchoolYear;
 use App\Models\ScoreHeader;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\Subject;
-use App\Models\Teacher;
+use App\Models\StudentClassAssignment;
 use App\Models\TeachingAssignment;
 use App\Models\Timetable;
 use App\Models\TimetableEntry;
 use App\Support\AuditLogger;
+use App\Support\CurrentAcademicContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -27,21 +27,12 @@ use Illuminate\Validation\ValidationException;
 class SchoolYearController extends Controller
 {
     private const INITIALIZE_OPTIONS = [
-        'subjects' => 'Danh sách môn học',
-        'teachers' => 'Danh sách giáo viên',
-        'rooms' => 'Danh sách phòng học',
-        'students' => 'Hồ sơ học sinh',
-        'documents' => 'Tài liệu học tập',
         'promote_students' => 'Thăng lớp học sinh',
         'graduate_grade_12' => 'Đánh dấu học sinh lớp 12 đã tốt nghiệp',
     ];
 
     public function index(Request $request)
     {
-        if ($request->session()->get('viewing_mode') === 'archive' || $request->session()->has('history_school_year_id')) {
-            $this->clearHistoryContext($request);
-        }
-
         $years = SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->get();
         $deleteChecks = $years->mapWithKeys(fn (SchoolYear $year) => [
             (string) $year->getKey() => $this->deleteCheck($year),
@@ -59,7 +50,9 @@ class SchoolYearController extends Controller
 
     public function show(Request $request, SchoolYear $schoolYear)
     {
-        if ($schoolYear->isArchived()) {
+        $currentYear = app(CurrentAcademicContext::class)->schoolYear();
+
+        if (! $currentYear || (string) $schoolYear->getKey() !== (string) $currentYear->getKey()) {
             $this->rememberHistoryMode($request, $schoolYear);
         }
 
@@ -84,12 +77,17 @@ class SchoolYearController extends Controller
                 ->withErrors(['is_active' => 'Vui lòng xác nhận trước khi chuyển năm học hoạt động.']);
         }
 
-        DB::transaction(function () use ($data) {
+        $syncedSemester = null;
+
+        DB::transaction(function () use ($data, &$syncedSemester) {
             if ($data['is_active']) {
                 SchoolYear::where('is_active', true)->update(['is_active' => false]);
             }
 
             $schoolYear = SchoolYear::create($data);
+            if ($data['is_active']) {
+                $syncedSemester = app(CurrentAcademicContext::class)->syncSemesterForCurrentYear($schoolYear);
+            }
             AuditLogger::log('school_year_created', SchoolYear::class, (string) $schoolYear->getKey(), 'Tạo năm học ' . $schoolYear->name);
         });
 
@@ -145,12 +143,17 @@ class SchoolYearController extends Controller
                 ->withErrors(['is_active' => 'Vui lòng xác nhận trước khi chuyển năm học hoạt động.']);
         }
 
-        DB::transaction(function () use ($schoolYear, $data) {
+        $syncedSemester = null;
+
+        DB::transaction(function () use ($schoolYear, $data, &$syncedSemester) {
             if (! $schoolYear->is_active && $data['is_active']) {
                 SchoolYear::where('is_active', true)->whereKeyNot($schoolYear->getKey())->update(['is_active' => false]);
             }
 
             $schoolYear->update($data);
+            if ($schoolYear->is_active) {
+                $syncedSemester = app(CurrentAcademicContext::class)->syncSemesterForCurrentYear($schoolYear);
+            }
             AuditLogger::log('school_year_updated', SchoolYear::class, (string) $schoolYear->getKey(), 'Chỉnh sửa năm học ' . $schoolYear->name);
         });
 
@@ -171,9 +174,12 @@ class SchoolYearController extends Controller
             return back()->withErrors(['school_year' => 'Vui lòng xác nhận trước khi chuyển năm học hoạt động.']);
         }
 
-        DB::transaction(function () use ($schoolYear) {
+        $syncedSemester = null;
+
+        DB::transaction(function () use ($schoolYear, &$syncedSemester) {
             SchoolYear::where('is_active', true)->whereKeyNot($schoolYear->getKey())->update(['is_active' => false]);
             $schoolYear->update(['is_active' => true, 'archived_at' => null]);
+            $syncedSemester = app(CurrentAcademicContext::class)->syncSemesterForCurrentYear($schoolYear);
             AuditLogger::log('school_year_activated', SchoolYear::class, (string) $schoolYear->getKey(), 'Kích hoạt năm học ' . $schoolYear->name);
         });
 
@@ -234,7 +240,54 @@ class SchoolYearController extends Controller
     {
         $this->clearHistoryContext($request);
 
-        return redirect()->route('dashboard')->with('success', 'Đã quay về năm học hiện tại.');
+        return redirect()->route('dashboard')->with('success', 'Đã quay về năm học hiện hành.');
+    }
+
+    public function updateWorkingContext(Request $request)
+    {
+        $data = $request->validate([
+            'school_year_id' => ['required', 'exists:school_years,id'],
+            'semester_id' => ['nullable', 'exists:semesters,id'],
+        ]);
+
+        $schoolYear = SchoolYear::findOrFail($data['school_year_id']);
+
+        $semester = null;
+        if (! empty($data['semester_id'])) {
+            $semester = Semester::find($data['semester_id']);
+            if ($semester && (string) $semester->school_year_id !== (string) $schoolYear->getKey()) {
+                $semester = null;
+            }
+        }
+
+        $currentYear = app(CurrentAcademicContext::class)->schoolYear();
+        $isCurrentYear = $currentYear && (string) $schoolYear->getKey() === (string) $currentYear->getKey();
+
+        $semester ??= app(CurrentAcademicContext::class)->semester($schoolYear);
+        $semester ??= Semester::where('school_year_id', $schoolYear->getKey())
+            ->when($isCurrentYear, fn ($query) => $query->where('status', '!=', Semester::STATUS_ARCHIVED))
+            ->orderByRaw("case when status = 'active' then 0 when status = 'inactive' then 1 else 2 end")
+            ->orderBy('order')
+            ->orderBy('name')
+            ->first();
+
+        if ($isCurrentYear) {
+            $this->clearHistoryContext($request);
+        } else {
+            $request->session()->put('working_school_year_id', $schoolYear->getKey());
+            if ($semester) {
+                $request->session()->put('working_semester_id', $semester->getKey());
+            } else {
+                $request->session()->forget('working_semester_id');
+            }
+            $this->rememberHistoryMode($request, $schoolYear);
+        }
+
+        return redirect()
+            ->to($this->cleanPreviousUrl($request))
+            ->with('success', $isCurrentYear
+                ? 'Đã quay về năm học hiện hành.'
+                : 'Đã chuyển sang chế độ xem dữ liệu năm học ' . $schoolYear->name . '.');
     }
 
     public function initializeForm()
@@ -278,19 +331,25 @@ class SchoolYearController extends Controller
             $createdClasses = 0;
             $promotedStudents = 0;
             $graduatedStudents = 0;
-            $copiedDocuments = 0;
 
             if (in_array('promote_students', $data['options'], true)) {
-                [$classMap, $createdClasses] = $this->createPromotionClasses($sourceYear, $targetYear);
-                $promotedStudents = $this->promoteStudents($classMap, $targetYear);
+                [$classMap, $createdClasses] = $this->createPromotionClasses(
+                    $sourceYear,
+                    $targetYear,
+                    $data['promote_student_ids']
+                );
+                $promotedStudents = $this->promoteStudents(
+                    $classMap,
+                    $targetYear,
+                    $data['promote_student_ids']
+                );
             }
 
             if (in_array('graduate_grade_12', $data['options'], true)) {
-                $graduatedStudents = $this->graduateGrade12Students($sourceYear);
-            }
-
-            if (in_array('documents', $data['options'], true)) {
-                $copiedDocuments = $this->copyLearningDocuments($sourceYear, $classMap);
+                $graduatedStudents = $this->graduateGrade12Students(
+                    $sourceYear,
+                    $data['graduate_student_ids']
+                );
             }
 
             $summary = [
@@ -300,7 +359,6 @@ class SchoolYearController extends Controller
                 'created_classes' => $createdClasses,
                 'promoted_students' => $promotedStudents,
                 'graduated_students' => $graduatedStudents,
-                'copied_documents' => $copiedDocuments,
                 'counts' => $report['counts'],
             ];
 
@@ -318,7 +376,6 @@ class SchoolYearController extends Controller
                     'created_classes' => $createdClasses,
                     'promote_students' => $promotedStudents,
                     'graduate_grade_12' => $graduatedStudents,
-                    'documents_copied' => $copiedDocuments,
                 ]),
                 'selected_options' => $data['options'],
             ];
@@ -380,6 +437,10 @@ class SchoolYearController extends Controller
             'end_year' => ['required', 'integer', 'min:1901', 'max:2101'],
             'options' => ['nullable', 'array'],
             'options.*' => ['string', 'in:' . implode(',', array_keys(self::INITIALIZE_OPTIONS))],
+            'promote_student_ids' => ['nullable', 'array'],
+            'promote_student_ids.*' => ['string', 'exists:students,id'],
+            'graduate_student_ids' => ['nullable', 'array'],
+            'graduate_student_ids.*' => ['string', 'exists:students,id'],
             'confirm_initialization' => ['nullable', 'boolean'],
         ]);
 
@@ -422,19 +483,25 @@ class SchoolYearController extends Controller
             array_keys(self::INITIALIZE_OPTIONS)
         ));
 
+        $validated['promote_student_ids'] = array_values(array_unique($validated['promote_student_ids'] ?? []));
+        $validated['graduate_student_ids'] = array_values(array_unique($validated['graduate_student_ids'] ?? []));
+
+        if ($requireConfirm) {
+            $validated['promote_student_ids'] = in_array('promote_students', $validated['options'], true)
+                ? $this->validPromotionStudentIds($sourceYear, $validated['promote_student_ids'])
+                : [];
+
+            $validated['graduate_student_ids'] = in_array('graduate_grade_12', $validated['options'], true)
+                ? $this->validGraduationStudentIds($sourceYear, $validated['graduate_student_ids'])
+                : [];
+        }
+
         return [$sourceYear, $validated];
     }
 
     private function buildInitializationPreview(SchoolYear $sourceYear, string $targetName, array $selectedOptions): array
     {
         $counts = [
-            'subjects' => in_array('subjects', $selectedOptions, true) ? Subject::count() : 0,
-            'teachers' => in_array('teachers', $selectedOptions, true) ? Teacher::count() : 0,
-            'rooms' => in_array('rooms', $selectedOptions, true) ? $this->roomCount($sourceYear) : 0,
-            'students' => in_array('students', $selectedOptions, true)
-                ? Student::where('school_year_id', $sourceYear->getKey())->count()
-                : 0,
-            'documents' => in_array('documents', $selectedOptions, true) ? $this->documentCount($sourceYear) : 0,
             'promote_students' => in_array('promote_students', $selectedOptions, true) ? $this->promotableStudentCount($sourceYear) : 0,
             'graduate_grade_12' => in_array('graduate_grade_12', $selectedOptions, true) ? $this->graduatableStudentCount($sourceYear) : 0,
         ];
@@ -444,16 +511,146 @@ class SchoolYearController extends Controller
             'target_name' => $targetName,
             'selected_options' => $selectedOptions,
             'counts' => $counts,
+            'promotion_groups' => in_array('promote_students', $selectedOptions, true)
+                ? $this->promotionStudentGroups($sourceYear, $targetName)
+                : collect(),
+            'graduation_groups' => in_array('graduate_grade_12', $selectedOptions, true)
+                ? $this->graduationStudentGroups($sourceYear)
+                : collect(),
         ];
     }
 
-    private function createPromotionClasses(SchoolYear $sourceYear, SchoolYear $targetYear): array
+    private function promotionStudentGroups(SchoolYear $sourceYear, string $targetName)
+    {
+        return SchoolClass::with(['students' => function ($query) {
+            $query->where('status', Student::STATUS_STUDYING)
+                ->orderBy('student_code')
+                ->orderBy('name');
+        }])
+            ->where('school_year_id', $sourceYear->getKey())
+            ->whereIn('grade_level', [10, 11])
+            ->orderBy('grade_level')
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (SchoolClass $class) => $class->students->isNotEmpty())
+            ->map(function (SchoolClass $class) use ($targetName) {
+                $targetGrade = (int) $class->grade_level + 1;
+                $baseTargetName = $this->promotedClassName($class->name, (int) $class->grade_level, $targetGrade);
+
+                return [
+                    'source_class' => $class,
+                    'target_name' => $this->uniqueClassName($baseTargetName, $targetName),
+                    'target_grade' => $targetGrade,
+                    'students' => $class->students,
+                ];
+            })
+            ->values();
+    }
+
+    private function graduationStudentGroups(SchoolYear $sourceYear)
+    {
+        return SchoolClass::with(['students' => function ($query) {
+            $query->where('status', Student::STATUS_STUDYING)
+                ->orderBy('student_code')
+                ->orderBy('name');
+        }])
+            ->where('school_year_id', $sourceYear->getKey())
+            ->where('grade_level', 12)
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (SchoolClass $class) => $class->students->isNotEmpty())
+            ->map(fn (SchoolClass $class) => [
+                'class' => $class,
+                'students' => $class->students,
+            ])
+            ->values();
+    }
+
+    private function validPromotionStudentIds(SchoolYear $sourceYear, array $studentIds): array
+    {
+        if (empty($studentIds)) {
+            return [];
+        }
+
+        $eligibleIds = $this->promotionEligibleStudentsQuery($sourceYear)
+            ->whereIn('id', $studentIds)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        if (count($eligibleIds) !== count($studentIds)) {
+            throw ValidationException::withMessages([
+                'promote_student_ids' => 'Danh sách học sinh thăng lớp không hợp lệ hoặc có học sinh không thuộc lớp nguồn.',
+            ]);
+        }
+
+        return $eligibleIds;
+    }
+
+    private function validGraduationStudentIds(SchoolYear $sourceYear, array $studentIds): array
+    {
+        if (empty($studentIds)) {
+            return [];
+        }
+
+        $eligibleIds = $this->graduationEligibleStudentsQuery($sourceYear)
+            ->whereIn('id', $studentIds)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        if (count($eligibleIds) !== count($studentIds)) {
+            throw ValidationException::withMessages([
+                'graduate_student_ids' => 'Danh sách học sinh tốt nghiệp không hợp lệ hoặc có học sinh không thuộc lớp 12 đã chọn.',
+            ]);
+        }
+
+        return $eligibleIds;
+    }
+
+    private function promotionEligibleStudentsQuery(SchoolYear $sourceYear)
+    {
+        $classIds = SchoolClass::where('school_year_id', $sourceYear->getKey())
+            ->whereIn('grade_level', [10, 11])
+            ->pluck('id');
+
+        return Student::whereIn('class_id', $classIds)
+            ->where('status', Student::STATUS_STUDYING);
+    }
+
+    private function graduationEligibleStudentsQuery(SchoolYear $sourceYear)
+    {
+        $classIds = SchoolClass::where('school_year_id', $sourceYear->getKey())
+            ->where('grade_level', 12)
+            ->pluck('id');
+
+        return Student::whereIn('class_id', $classIds)
+            ->where('status', Student::STATUS_STUDYING);
+    }
+
+    private function createPromotionClasses(SchoolYear $sourceYear, SchoolYear $targetYear, array $studentIds): array
     {
         $classMap = [];
         $created = 0;
 
+        if (empty($studentIds)) {
+            return [$classMap, $created];
+        }
+
+        $sourceClassIds = Student::whereIn('id', $studentIds)
+            ->where('status', Student::STATUS_STUDYING)
+            ->pluck('class_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($sourceClassIds->isEmpty()) {
+            return [$classMap, $created];
+        }
+
         SchoolClass::where('school_year_id', $sourceYear->getKey())
             ->whereIn('grade_level', [10, 11])
+            ->whereIn('id', $sourceClassIds)
             ->orderBy('grade_level')
             ->orderBy('name')
             ->get()
@@ -475,29 +672,48 @@ class SchoolYearController extends Controller
         return [$classMap, $created];
     }
 
-    private function promoteStudents(array $classMap, SchoolYear $targetYear): int
+    private function promoteStudents(array $classMap, SchoolYear $targetYear, array $studentIds): int
     {
-        if (! $classMap) {
+        if (! $classMap || empty($studentIds)) {
             return 0;
         }
 
-        $students = Student::whereIn('class_id', array_keys($classMap))
-            ->where('status', 'studying')
+        $students = Student::whereIn('id', $studentIds)
+            ->whereIn('class_id', array_keys($classMap))
+            ->where('status', Student::STATUS_STUDYING)
             ->get();
 
         $students->each(function (Student $student) use ($classMap, $targetYear) {
+            $targetClassId = $classMap[$student->class_id] ?? null;
+
+            if (! $targetClassId) {
+                return;
+            }
+
             $student->update([
-                'class_id' => $classMap[$student->class_id],
+                'class_id' => $targetClassId,
                 'school_year_id' => $targetYear->getKey(),
-                'status' => 'studying',
+                'status' => Student::STATUS_STUDYING,
+            ]);
+
+            StudentClassAssignment::updateOrCreate([
+                'student_id' => $student->getKey(),
+                'class_id' => $targetClassId,
+                'academic_year_id' => $targetYear->getKey(),
+            ], [
+                'status' => StudentClassAssignment::STATUS_ACTIVE,
             ]);
         });
 
         return $students->count();
     }
 
-    private function graduateGrade12Students(SchoolYear $sourceYear): int
+    private function graduateGrade12Students(SchoolYear $sourceYear, array $studentIds): int
     {
+        if (empty($studentIds)) {
+            return 0;
+        }
+
         $classIds = SchoolClass::where('school_year_id', $sourceYear->getKey())
             ->where('grade_level', 12)
             ->pluck('id');
@@ -506,83 +722,10 @@ class SchoolYearController extends Controller
             return 0;
         }
 
-        return Student::whereIn('class_id', $classIds)
-            ->where('status', 'studying')
-            ->update(['status' => 'graduated']);
-    }
-
-    private function copyLearningDocuments(SchoolYear $sourceYear, array $classMap): int
-    {
-        if (! Schema::hasTable('learning_documents') || ! $classMap) {
-            return 0;
-        }
-
-        $copied = 0;
-
-        LearningDocument::whereIn('class_id', array_keys($classMap))
-            ->orderBy('created_at')
-            ->get()
-            ->each(function (LearningDocument $document) use ($classMap, &$copied) {
-                $targetClassId = $classMap[$document->class_id] ?? null;
-
-                if (! $targetClassId) {
-                    return;
-                }
-
-                $exists = LearningDocument::where('title', $document->title)
-                    ->where('file_url', $document->file_url)
-                    ->where('class_id', $targetClassId)
-                    ->exists();
-
-                if ($exists) {
-                    return;
-                }
-
-                LearningDocument::create([
-                    'title' => $document->title,
-                    'description' => $document->getRawOriginal('description'),
-                    'category' => $document->category,
-                    'file_url' => $document->file_url,
-                    'subject_id' => $document->subject_id,
-                    'class_id' => $targetClassId,
-                    'uploaded_by' => $document->uploaded_by,
-                    'is_published' => $document->is_published,
-                ]);
-
-                $copied++;
-            });
-
-        return $copied;
-    }
-
-    private function roomCount(SchoolYear $sourceYear): int
-    {
-        if (! Schema::hasTable('timetable_entries') || ! Schema::hasTable('timetables')) {
-            return 0;
-        }
-
-        return TimetableEntry::whereHas('timetable', function ($query) use ($sourceYear) {
-                $query->where('school_year_id', $sourceYear->getKey());
-            })
-            ->whereNotNull('room')
-            ->where('room', '!=', '')
-            ->distinct()
-            ->count('room');
-    }
-
-    private function documentCount(SchoolYear $sourceYear): int
-    {
-        if (! Schema::hasTable('learning_documents')) {
-            return 0;
-        }
-
-        $classIds = SchoolClass::where('school_year_id', $sourceYear->getKey())->pluck('id');
-
-        if ($classIds->isEmpty()) {
-            return 0;
-        }
-
-        return LearningDocument::whereIn('class_id', $classIds)->count();
+        return Student::whereIn('id', $studentIds)
+            ->whereIn('class_id', $classIds)
+            ->where('status', Student::STATUS_STUDYING)
+            ->update(['status' => Student::STATUS_GRADUATED]);
     }
 
     private function promotableStudentCount(SchoolYear $sourceYear): int
@@ -595,7 +738,7 @@ class SchoolYearController extends Controller
             return 0;
         }
 
-        return Student::whereIn('class_id', $classIds)->where('status', 'studying')->count();
+        return Student::whereIn('class_id', $classIds)->where('status', Student::STATUS_STUDYING)->count();
     }
 
     private function graduatableStudentCount(SchoolYear $sourceYear): int
@@ -608,7 +751,7 @@ class SchoolYearController extends Controller
             return 0;
         }
 
-        return Student::whereIn('class_id', $classIds)->where('status', 'studying')->count();
+        return Student::whereIn('class_id', $classIds)->where('status', Student::STATUS_STUDYING)->count();
     }
 
     private function sourceYears()
@@ -1068,10 +1211,6 @@ class SchoolYearController extends Controller
         $classIds = $this->idsFor(SchoolClass::class, 'school_year_id', $id);
         $semesterIds = $this->idsFor(Semester::class, 'school_year_id', $id);
 
-        if ($classIds->isNotEmpty() && Schema::hasTable('learning_documents')) {
-            LearningDocument::whereIn('class_id', $classIds)->delete();
-        }
-
         if (Schema::hasTable('grade_windows')) {
             GradeWindow::where('school_year_id', $id)->delete();
         }
@@ -1274,22 +1413,60 @@ class SchoolYearController extends Controller
 
     private function rememberHistoryMode(Request $request, SchoolYear $schoolYear): void
     {
+        $semesterId = $request->session()->get('working_semester_id');
+        $semester = $semesterId ? Semester::find($semesterId) : null;
+
+        if (! $semester || (string) $semester->school_year_id !== (string) $schoolYear->getKey()) {
+            $semester = Semester::where('school_year_id', $schoolYear->getKey())
+                ->orderByRaw("case when status = 'active' then 0 when status = 'inactive' then 1 else 2 end")
+                ->orderBy('order')
+                ->orderBy('name')
+                ->first();
+        }
+
         $request->session()->put([
             'history_school_year_id' => $schoolYear->id,
-            'viewing_mode' => 'archive',
+            'working_school_year_id' => $schoolYear->id,
+            'viewing_mode' => 'history',
             'viewing_school_year_id' => $schoolYear->id,
             'viewing_school_year_name' => $schoolYear->name,
         ]);
+
+        if ($semester) {
+            $request->session()->put('working_semester_id', $semester->getKey());
+        } else {
+            $request->session()->forget('working_semester_id');
+        }
     }
 
     private function clearHistoryContext(Request $request): void
     {
         $request->session()->forget([
             'history_school_year_id',
+            'working_school_year_id',
+            'working_semester_id',
             'viewing_mode',
             'viewing_school_year_id',
             'viewing_school_year_name',
         ]);
+    }
+
+    private function cleanPreviousUrl(Request $request): string
+    {
+        $previous = url()->previous() ?: route('dashboard');
+        $parts = parse_url($previous);
+
+        if (! $parts || empty($parts['path'])) {
+            return route('dashboard');
+        }
+
+        $base = ($parts['scheme'] ?? $request->getScheme()) . '://' . ($parts['host'] ?? $request->getHost());
+
+        if (! empty($parts['port'])) {
+            $base .= ':' . $parts['port'];
+        }
+
+        return $base . $parts['path'];
     }
 
     private function formatYearName(int $startYear, int $endYear): string

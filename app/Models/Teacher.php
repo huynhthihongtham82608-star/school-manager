@@ -27,6 +27,7 @@ class Teacher extends Model
         'work_status',
         'qualification',
         'main_subject',
+        'primary_subject_id',
         'is_homeroom',
     ];
 
@@ -60,6 +61,16 @@ class Teacher extends Model
     public function workStatusLabel(): string
     {
         return self::workStatuses()[$this->work_status ?: self::STATUS_WORKING] ?? 'Đang công tác';
+    }
+
+    public function primarySubject()
+    {
+        return $this->belongsTo(Subject::class, 'primary_subject_id');
+    }
+
+    public function primarySubjectName(): string
+    {
+        return $this->primarySubject?->name ?: ($this->main_subject ?: '-');
     }
 
     public function workStatusBadgeClass(): string

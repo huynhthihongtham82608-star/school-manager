@@ -37,38 +37,8 @@
         <div class="row g-3">
             <div class="col-md-3 col-sm-6">
                 <div class="border rounded-3 p-3 h-100">
-                    <div class="text-muted small">Môn học</div>
-                    <div class="fs-4 fw-bold">{{ number_format($result['counts']['subjects'] ?? 0, 0, ',', '.') }}</div>
-                </div>
-            </div>
-            <div class="col-md-3 col-sm-6">
-                <div class="border rounded-3 p-3 h-100">
-                    <div class="text-muted small">Giáo viên</div>
-                    <div class="fs-4 fw-bold">{{ number_format($result['counts']['teachers'] ?? 0, 0, ',', '.') }}</div>
-                </div>
-            </div>
-            <div class="col-md-3 col-sm-6">
-                <div class="border rounded-3 p-3 h-100">
-                    <div class="text-muted small">Phòng học</div>
-                    <div class="fs-4 fw-bold">{{ number_format($result['counts']['rooms'] ?? 0, 0, ',', '.') }}</div>
-                </div>
-            </div>
-            <div class="col-md-3 col-sm-6">
-                <div class="border rounded-3 p-3 h-100">
-                    <div class="text-muted small">Hồ sơ học sinh</div>
-                    <div class="fs-4 fw-bold">{{ number_format($result['counts']['students'] ?? 0, 0, ',', '.') }}</div>
-                </div>
-            </div>
-            <div class="col-md-3 col-sm-6">
-                <div class="border rounded-3 p-3 h-100">
                     <div class="text-muted small">Lớp mới đã tạo</div>
                     <div class="fs-4 fw-bold">{{ number_format($result['counts']['created_classes'] ?? 0, 0, ',', '.') }}</div>
-                </div>
-            </div>
-            <div class="col-md-3 col-sm-6">
-                <div class="border rounded-3 p-3 h-100">
-                    <div class="text-muted small">Tài liệu học tập</div>
-                    <div class="fs-4 fw-bold">{{ number_format($result['counts']['documents_copied'] ?? 0, 0, ',', '.') }}</div>
                 </div>
             </div>
             <div class="col-md-3 col-sm-6">
@@ -136,18 +106,10 @@
                         <input class="form-check-input mt-1" type="checkbox" name="options[]" value="{{ $key }}" @checked(in_array($key, $selectedOptions, true))>
                         <span>
                             <span class="fw-semibold d-block">{{ $label }}</span>
-                            @if($key === 'rooms')
-                                <span class="text-muted small">Ghi nhận phòng học đang có trong dữ liệu nguồn, không tạo bảng phòng học mới.</span>
-                            @elseif($key === 'students')
-                                <span class="text-muted small">Giữ nguyên hồ sơ học sinh hiện có, không tạo hồ sơ mới.</span>
-                            @elseif($key === 'documents')
-                                <span class="text-muted small">Sao chép tài liệu gắn với lớp được thăng lên năm học mới.</span>
-                            @elseif($key === 'promote_students')
+                            @if($key === 'promote_students')
                                 <span class="text-muted small">Khối 10 lên 11, khối 11 lên 12.</span>
                             @elseif($key === 'graduate_grade_12')
                                 <span class="text-muted small">Đánh dấu học sinh khối 12 là đã tốt nghiệp.</span>
-                            @else
-                                <span class="text-muted small">Sử dụng dữ liệu dùng chung hiện có của hệ thống.</span>
                             @endif
                         </span>
                     </label>
@@ -156,6 +118,7 @@
         </div>
 
         <div class="alert alert-light border mt-4 mb-0">
+            Môn học, giáo viên, phòng học và tài liệu học tập là dữ liệu dùng chung của toàn trường nên không được sao chép khi tạo năm học mới.
             Không khởi tạo lại điểm số, hạnh kiểm, điểm danh, lịch thi, thời khóa biểu, phân công giảng dạy, thông báo, sự kiện hoặc tin nhắn vì đây là dữ liệu riêng theo từng năm học.
         </div>
 
@@ -198,6 +161,111 @@
                 @foreach($preview['selected_options'] as $option)
                     <input type="hidden" name="options[]" value="{{ $option }}">
                 @endforeach
+
+                @if(in_array('promote_students', $preview['selected_options'], true))
+                    <div class="border rounded-3 p-3 mt-4">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                            <div>
+                                <h6 class="mb-1">Danh sách học sinh thăng lớp</h6>
+                                <div class="text-muted small">Chỉ các học sinh được chọn mới được chuyển sang lớp mới. Học sinh bỏ chọn sẽ giữ nguyên lớp hiện tại.</div>
+                            </div>
+                            <label class="form-check d-flex align-items-center gap-2 mb-0">
+                                <input class="form-check-input" type="checkbox" data-select-all="promote" checked>
+                                <span class="fw-semibold">Chọn tất cả</span>
+                            </label>
+                        </div>
+
+                        @forelse($preview['promotion_groups'] as $group)
+                            <div class="border rounded-3 mb-3 overflow-hidden">
+                                <div class="bg-light px-3 py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                    <div class="fw-semibold">
+                                        {{ $group['source_class']->name }}
+                                        <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                                        {{ $group['target_name'] }}
+                                    </div>
+                                    <span class="badge bg-primary-subtle text-primary border">Khối {{ $group['target_grade'] }}</span>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table align-middle mb-0" data-admin-table-skip>
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 44px;"></th>
+                                                <th>Mã học sinh</th>
+                                                <th>Họ tên</th>
+                                                <th>Lớp</th>
+                                                <th>Trạng thái hiện tại</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($group['students'] as $student)
+                                                <tr>
+                                                    <td>
+                                                        <input class="form-check-input" type="checkbox" name="promote_student_ids[]" value="{{ $student->id }}" data-select-item="promote" checked>
+                                                    </td>
+                                                    <td class="fw-semibold">{{ $student->student_code }}</td>
+                                                    <td>{{ $student->name }}</td>
+                                                    <td>{{ $group['source_class']->name }}</td>
+                                                    <td><span class="badge {{ $student->statusBadgeClass() }}">{{ $student->statusLabel() }}</span></td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="alert alert-light border mb-0">Không có học sinh khối 10 hoặc khối 11 đủ điều kiện thăng lớp.</div>
+                        @endforelse
+                    </div>
+                @endif
+
+                @if(in_array('graduate_grade_12', $preview['selected_options'], true))
+                    <div class="border rounded-3 p-3 mt-4">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                            <div>
+                                <h6 class="mb-1">Danh sách học sinh tốt nghiệp</h6>
+                                <div class="text-muted small">Chỉ các học sinh được chọn mới được cập nhật trạng thái Tốt nghiệp.</div>
+                            </div>
+                            <label class="form-check d-flex align-items-center gap-2 mb-0">
+                                <input class="form-check-input" type="checkbox" data-select-all="graduate" checked>
+                                <span class="fw-semibold">Chọn tất cả</span>
+                            </label>
+                        </div>
+
+                        @forelse($preview['graduation_groups'] as $group)
+                            <div class="border rounded-3 mb-3 overflow-hidden">
+                                <div class="bg-light px-3 py-2 fw-semibold">{{ $group['class']->name }}</div>
+                                <div class="table-responsive">
+                                    <table class="table align-middle mb-0" data-admin-table-skip>
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 44px;"></th>
+                                                <th>Mã học sinh</th>
+                                                <th>Họ tên</th>
+                                                <th>Lớp</th>
+                                                <th>Trạng thái hiện tại</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($group['students'] as $student)
+                                                <tr>
+                                                    <td>
+                                                        <input class="form-check-input" type="checkbox" name="graduate_student_ids[]" value="{{ $student->id }}" data-select-item="graduate" checked>
+                                                    </td>
+                                                    <td class="fw-semibold">{{ $student->student_code }}</td>
+                                                    <td>{{ $student->name }}</td>
+                                                    <td>{{ $group['class']->name }}</td>
+                                                    <td><span class="badge {{ $student->statusBadgeClass() }}">{{ $student->statusLabel() }}</span></td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="alert alert-light border mb-0">Không có học sinh khối 12 đủ điều kiện đánh dấu tốt nghiệp.</div>
+                        @endforelse
+                    </div>
+                @endif
 
                 <div class="initialize-loading alert alert-light border d-none mt-3" data-initialize-loading>
                     <div class="d-flex align-items-center gap-2 mb-2">
@@ -252,6 +320,34 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    const refreshSelectAll = (group) => {
+        const items = Array.from(document.querySelectorAll(`[data-select-item="${group}"]`));
+        const selectAll = document.querySelector(`[data-select-all="${group}"]`);
+
+        if (!selectAll || !items.length) {
+            return;
+        }
+
+        selectAll.checked = items.every((item) => item.checked);
+        selectAll.indeterminate = items.some((item) => item.checked) && !selectAll.checked;
+    };
+
+    document.querySelectorAll('[data-select-all]').forEach((checkbox) => {
+        checkbox.addEventListener('change', () => {
+            const group = checkbox.dataset.selectAll;
+            document.querySelectorAll(`[data-select-item="${group}"]`).forEach((item) => {
+                item.checked = checkbox.checked;
+            });
+            checkbox.indeterminate = false;
+        });
+    });
+
+    document.querySelectorAll('[data-select-item]').forEach((checkbox) => {
+        checkbox.addEventListener('change', () => refreshSelectAll(checkbox.dataset.selectItem));
+    });
+
+    ['promote', 'graduate'].forEach(refreshSelectAll);
 });
 </script>
 @endsection

@@ -29,7 +29,7 @@ class AnnouncementController extends Controller
         if (Schema::hasTable('school_posts')) {
             $posts = SchoolPost::where('is_published', true)->latest('published_at')->latest()->paginate(10);
             $posts->setCollection($posts->getCollection()
-                ->filter(fn (SchoolPost $post) => $post->isVisibleToRole($request->user()->role))
+                ->filter(fn (SchoolPost $post) => $post->isVisibleToUser($request->user()))
                 ->values());
         } else {
             $posts = collect();

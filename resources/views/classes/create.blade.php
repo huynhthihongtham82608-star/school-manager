@@ -23,7 +23,7 @@
             <label class="form-label">Năm học</label>
             <select name="school_year_id" class="form-select" required data-class-year>
                 @foreach($years as $year)
-                    <option value="{{ $year->id }}" @selected(old('school_year_id') == $year->id)>{{ $year->name }}</option>
+                    <option value="{{ $year->id }}" @selected(old('school_year_id', $selectedYearId) == $year->id)>{{ $year->name }}</option>
                 @endforeach
             </select>
             @error('school_year_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
@@ -32,7 +32,7 @@
             <label class="form-label">Học kỳ</label>
             <select name="semester_id" class="form-select" required data-class-semester>
                 @foreach($semesters as $semester)
-                    <option value="{{ $semester->id }}" data-year="{{ $semester->school_year_id }}" @selected(old('semester_id') == $semester->id)>
+                    <option value="{{ $semester->id }}" data-year="{{ $semester->school_year_id }}" @selected(old('semester_id', $selectedSemesterId) == $semester->id)>
                         {{ $semester->normalizedName() }} - {{ $semester->schoolYear->name ?? '' }}
                     </option>
                 @endforeach

@@ -117,15 +117,34 @@
             <input type="file" name="avatar" class="form-control" accept="image/*">
             @error('avatar')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-6">
+        <div class="col-12">
+            <hr class="my-2">
+            <div class="fw-semibold">Thông tin phụ huynh</div>
+            <div class="text-muted small">Nếu số điện thoại đã tồn tại, hệ thống chỉ liên kết học sinh với phụ huynh hiện có.</div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Họ tên phụ huynh</label>
+            <input type="text" name="parent_name" class="form-control" value="{{ old('parent_name') }}" required>
+            @error('parent_name')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Quan hệ</label>
+            <select name="parent_relation" class="form-select" required>
+                @foreach(\App\Models\ParentProfile::relationLabels() as $value => $label)
+                    <option value="{{ $value }}" @selected(old('parent_relation', \App\Models\ParentProfile::RELATION_GUARDIAN) === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+            @error('parent_relation')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+        </div>
+        <div class="col-md-4">
             <label class="form-label">SĐT phụ huynh</label>
-            <input type="text" name="parent_phone" class="form-control" value="{{ old('parent_phone') }}">
+            <input type="text" name="parent_phone" class="form-control" value="{{ old('parent_phone') }}" required>
             @error('parent_phone')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-6">
-            <label class="form-label">Email phụ huynh</label>
-            <input type="email" name="email" class="form-control" value="{{ old('email') }}">
-            @error('email')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+            <label class="form-label">Địa chỉ phụ huynh</label>
+            <input type="text" name="parent_address" class="form-control" value="{{ old('parent_address') }}">
+            @error('parent_address')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-12">
             <label class="form-label">Địa chỉ</label>

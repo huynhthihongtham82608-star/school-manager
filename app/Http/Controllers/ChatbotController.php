@@ -44,7 +44,7 @@ class ChatbotController extends Controller
         $text = mb_strtolower($question);
 
         return match (true) {
-            str_contains($text, 'điểm') => 'Bạn có thể xem kết quả học tập trong Dashboard hoặc mục nhập điểm nếu là giáo viên.',
+            str_contains($text, 'điểm') => 'Bạn có thể xem kết quả học tập trong Bảng điều khiển hoặc mục nhập điểm nếu là giáo viên.',
             str_contains($text, 'thời khóa biểu') || str_contains($text, 'tkb') => 'Mục Thời khóa biểu hiển thị lịch học, lịch dạy theo lớp và học kỳ hiện tại.',
             str_contains($text, 'lịch thi') => 'Bạn có thể mở mục Lịch thi để xem môn thi, ngày thi, phòng thi và ghi chú liên quan.',
             str_contains($text, 'tài liệu') => 'Mục Tài liệu học tập chứa các tài liệu do nhà trường hoặc giáo viên cung cấp.',

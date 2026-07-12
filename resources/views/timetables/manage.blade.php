@@ -26,7 +26,7 @@
                 <select class="form-select" name="semester_id" required>
                     <option value="">-- Chọn học kỳ --</option>
                     @foreach($semesters as $semester)
-                        <option value="{{ $semester->id }}" @selected($selectedSemester && $selectedSemester->id === $semester->id)>{{ $semester->normalizedName() }} ({{ $semester->schoolYear->name ?? '' }})</option>
+                        <option value="{{ $semester->id }}" @selected(($selectedSemester?->id ?? $selectedSemesterId) === $semester->id)>{{ $semester->normalizedName() }} ({{ $semester->schoolYear->name ?? '' }})</option>
                     @endforeach
                 </select>
             </div>

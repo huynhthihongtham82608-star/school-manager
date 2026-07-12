@@ -44,7 +44,6 @@
                 <tr>
                     <th>Tên lớp</th>
                     <th>Khối</th>
-                    <th>Năm học</th>
                     <th>Học kỳ</th>
                     <th>GVCN</th>
                     <th>Sĩ số</th>
@@ -60,7 +59,6 @@
                 <tr>
                     <td class="fw-semibold">{{ $class->name }}</td>
                     <td>{{ $class->grade_level }}</td>
-                    <td>{{ $class->schoolYear->name ?? '' }}</td>
                     <td>{{ $class->semester?->normalizedName() ?? '-' }}</td>
                     <td>{{ $class->homeroomTeacher->name ?? '-' }}</td>
                     <td>{{ $class->currentStudentCount() }} / {{ $class->maxCapacity() }}</td>
@@ -151,7 +149,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8"><div class="empty-state"><i class="bi bi-building"></i>Chưa có lớp học.</div></td>
+                    <td colspan="7"><div class="empty-state"><i class="bi bi-building"></i>Chưa có lớp học.</div></td>
                 </tr>
             @endforelse
             </tbody>

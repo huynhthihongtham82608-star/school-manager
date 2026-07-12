@@ -74,19 +74,24 @@
         }
     </style>
 </head>
+@php($systemSetting = \App\Models\SystemSetting::current())
 <body class="d-flex align-items-center justify-content-center p-3">
     <div class="card login-card">
         <div class="card-body p-4">
             <div class="text-center mb-4">
-                <div class="brand-mark mb-3">TH</div>
-                <div class="brand-name h5 mb-1">{{ config('app.name') }}</div>
+                @if($systemSetting->logoUrl())
+                    <img src="{{ $systemSetting->logoUrl() }}" alt="{{ $systemSetting->school_name }}" class="brand-mark mb-3 object-fit-cover">
+                @else
+                    <div class="brand-mark mb-3">{{ $systemSetting->short_name ?: 'TH' }}</div>
+                @endif
+                <div class="brand-name h5 mb-1">{{ $systemSetting->school_name ?? config('app.name') }}</div>
                 <div class="text-muted small">Quản lý trường THPT</div>
             </div>
             @include('partials.flash')
             <form method="POST" action="{{ route('login.perform') }}">
                 @csrf
                 <div class="mb-3">
-                    <label class="form-label">Tài khoản</label>
+                    <label class="form-label">Tên đăng nhập / Mã giáo viên</label>
                     <input type="text" name="username" class="form-control" value="{{ old('username') }}" required autofocus autocomplete="username">
                 </div>
                 <div class="mb-3">

@@ -16,12 +16,33 @@ class ApiAuth
             'teacher_id' => $user->teacher_id,
             'student_id' => $user->student_id,
             'parent_id' => $user->parent_id,
+            'is_homeroom_teacher' => $user->isHomeroom(),
             'is_active' => $user->is_active,
+            'force_change_password' => $user->force_change_password,
+            'must_change_password' => $user->force_change_password,
         ];
     }
 
     public static function hasRole(?User $user, array $roles): bool
     {
-        return $user !== null && in_array($user->role, $roles, true);
+        if ($user === null) {
+            return false;
+        }
+
+        foreach ($roles as $role) {
+            if ($role === 'teacher' && $user->isTeacher()) {
+                return true;
+            }
+
+            if ($role === 'homeroom' && $user->isHomeroom()) {
+                return true;
+            }
+
+            if ($user->role === $role) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

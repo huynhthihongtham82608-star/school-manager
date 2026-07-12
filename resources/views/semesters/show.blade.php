@@ -8,7 +8,7 @@
         'semester_created' => 'Tạo học kỳ',
         'semester_updated' => 'Chỉnh sửa',
         'semester_marked_inactive' => 'Chuyển sang Chưa hoạt động',
-        'semester_activated' => 'Kích hoạt',
+        'semester_activated' => 'Đặt làm hiện hành',
         'semester_locked' => 'Khóa học kỳ',
         'semester_archived' => 'Lưu trữ',
         'semester_deleted' => 'Xóa',

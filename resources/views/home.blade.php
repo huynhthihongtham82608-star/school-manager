@@ -18,11 +18,15 @@
     <header class="landing-header">
         <div class="container d-flex align-items-center justify-content-between gap-3">
             <a href="{{ route('home') }}" class="landing-brand">
-                <span class="brand-mark">TH</span>
-                <span>{{ config('app.name') }}</span>
+                @if($settings->logoUrl())
+                    <img src="{{ $settings->logoUrl() }}" alt="{{ $settings->school_name }}" class="brand-mark object-fit-cover">
+                @else
+                    <span class="brand-mark">{{ $settings->short_name ?: 'TH' }}</span>
+                @endif
+                <span>{{ $settings->school_name ?? config('app.name') }}</span>
             </a>
             @auth
-                <a href="{{ route('dashboard') }}" class="btn btn-primary"><i class="bi bi-grid me-2"></i>Dashboard</a>
+                <a href="{{ route('dashboard') }}" class="btn btn-primary"><i class="bi bi-grid me-2"></i>Bảng điều khiển</a>
             @else
                 <a href="{{ route('login') }}" class="btn btn-primary"><i class="bi bi-box-arrow-in-right me-2"></i>Đăng nhập</a>
             @endauth
@@ -39,7 +43,7 @@
                         <p>{{ $banner['content'] }}</p>
                         <div class="d-flex flex-column flex-sm-row gap-2">
                             @auth
-                                <a href="{{ route('dashboard') }}" class="btn btn-primary btn-lg"><i class="bi bi-grid me-2"></i>Dashboard</a>
+                                <a href="{{ route('dashboard') }}" class="btn btn-primary btn-lg"><i class="bi bi-grid me-2"></i>Bảng điều khiển</a>
                             @else
                                 <a href="{{ route('login') }}" class="btn btn-primary btn-lg"><i class="bi bi-box-arrow-in-right me-2"></i>Đăng nhập hệ thống</a>
                             @endauth
@@ -53,7 +57,7 @@
                             @else
                                 <div class="hero-illustration">
                                     <i class="bi bi-mortarboard"></i>
-                                    <span>School Manager</span>
+                                    <span>Quản lý trường học</span>
                                 </div>
                             @endif
                         </div>

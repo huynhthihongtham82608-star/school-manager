@@ -7,7 +7,6 @@ use App\Models\SubjectPeriodNorm;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -46,6 +45,7 @@ class SubjectController extends Controller
 
         return view('subjects.create', [
             'gradeLevels' => self::GRADE_LEVELS,
+            'nextCode' => Subject::nextCode(),
         ]);
     }
 
@@ -117,7 +117,7 @@ class SubjectController extends Controller
 
         if (! $subject->canDelete()) {
             return back()->withErrors([
-                'subject' => 'Không thể xóa môn học vì đã phát sinh phân công, thời khóa biểu hoặc điểm số.',
+                'subject' => 'Không thể xóa môn học vì đang được gán cho giáo viên hoặc đã phát sinh phân công, thời khóa biểu, điểm số.',
             ]);
         }
 
@@ -147,7 +147,7 @@ class SubjectController extends Controller
     private function validatedPayload(Request $request, ?Subject $subject = null): array
     {
         $request->merge([
-            'code' => Str::upper(trim((string) $request->input('code'))),
+            'code' => $subject?->code ?: Subject::nextCode(),
             'name' => trim((string) $request->input('name')),
         ]);
 
@@ -156,6 +156,7 @@ class SubjectController extends Controller
                 'required',
                 'string',
                 'max:50',
+                'regex:/^MH\d{3,}$/',
                 Rule::unique('subjects', 'code')->ignore($subject?->getKey()),
             ],
             'name' => [
@@ -173,6 +174,7 @@ class SubjectController extends Controller
             'period_norms.12' => ['nullable', 'integer', 'min:1', 'max:10'],
         ], [
             'code.unique' => 'Mã môn đã tồn tại.',
+            'code.regex' => 'Mã môn phải theo định dạng MH001, MH002...',
             'name.unique' => 'Tên môn đã tồn tại.',
             'type.in' => 'Loại môn không hợp lệ.',
             'status.in' => 'Trạng thái không hợp lệ.',

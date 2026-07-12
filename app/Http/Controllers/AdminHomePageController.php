@@ -36,11 +36,6 @@ class AdminHomePageController extends Controller
             'banner_image_url' => ['nullable', 'string', 'max:255'],
             'about_title' => ['nullable', 'string', 'max:255'],
             'about_content' => ['nullable', 'string'],
-            'contact_title' => ['nullable', 'string', 'max:255'],
-            'contact_content' => ['nullable', 'string'],
-            'contact_phone' => ['nullable', 'string', 'max:50'],
-            'contact_email' => ['nullable', 'string', 'max:255'],
-            'contact_address' => ['nullable', 'string', 'max:255'],
         ]);
 
         $this->upsertContent('banner', [
@@ -53,16 +48,6 @@ class AdminHomePageController extends Controller
         $this->upsertContent('about', [
             'title' => $data['about_title'] ?? null,
             'content' => $data['about_content'] ?? null,
-        ]);
-
-        $this->upsertContent('contact', [
-            'title' => $data['contact_title'] ?? null,
-            'content' => $data['contact_content'] ?? null,
-            'extra' => [
-                'phone' => $data['contact_phone'] ?? null,
-                'email' => $data['contact_email'] ?? null,
-                'address' => $data['contact_address'] ?? null,
-            ],
         ]);
 
         AuditLogger::log('home_page_content_updated', HomePageContent::class, null, 'Cập nhật nội dung trang chủ');

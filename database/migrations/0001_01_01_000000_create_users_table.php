@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('username')->unique();
             $table->string('name');
             $table->string('email')->nullable();
-            $table->string('role')->default('student'); // admin, teacher, homeroom, student
+            $table->string('role')->default('student'); // admin, staff, teacher, student, parent
             $table->unsignedBigInteger('teacher_id')->nullable();
             $table->unsignedBigInteger('student_id')->nullable();
             $table->string('password');

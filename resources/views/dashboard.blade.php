@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Dashboard')
+@section('title', 'Bảng điều khiển')
 
 @section('content')
 @php
@@ -20,14 +20,20 @@
 
     if ($user->isTeacher()) {
         $addCard('bi-calendar3-week', 'Thời khóa biểu', 'Xem lịch dạy và lịch học trong tuần.', route('timetable.index'));
+        $addCard('bi-people', 'Lớp đang giảng dạy', 'Xem danh sách lớp và học sinh đang giảng dạy.', route('teacher.classes'));
         $addCard('bi-table', 'Nhập điểm', 'Mở bảng điểm theo lớp, môn và học kỳ.', route('scores.index'));
         $addCard('bi-graph-up', 'Báo cáo lớp', 'Theo dõi tổng kết học tập của lớp.', route('reports.class-summary'));
         $addCard('bi-chat-dots', 'Tin nhắn', 'Trao đổi thông tin với học sinh, phụ huynh và nhà trường.', route('messages.inbox'));
     }
 
     if ($user->isHomeroom()) {
+        $addCard('bi-person-lines-fill', 'Lớp chủ nhiệm', 'Xem danh sách học sinh và hồ sơ lớp chủ nhiệm.', route('teacher.classes'));
+        $addCard('bi-clipboard-data', 'Theo dõi điểm toàn lớp', 'Theo dõi kết quả học tập của lớp chủ nhiệm.', route('reports.class-summary'));
+        $addCard('bi-calendar-check', 'Theo dõi điểm danh', 'Theo dõi chuyên cần của lớp chủ nhiệm.', route('attendance.index'));
         $addCard('bi-clipboard-check', 'Hạnh kiểm', 'Cập nhật hạnh kiểm và nhận xét học sinh.', route('conduct.index'));
         $addCard('bi-person-check', 'Điểm danh', 'Ghi nhận tình trạng chuyên cần theo lớp.', route('attendance.index'));
+        $addCard('bi-journal-text', 'Sổ chủ nhiệm', 'Tổng hợp thông tin học sinh, điểm danh và hạnh kiểm.', route('reports.class-summary'));
+        $addCard('bi-send', 'Liên hệ phụ huynh', 'Gửi tin nhắn trao đổi với phụ huynh khi cần.', route('messages.create'));
         $addCard('bi-cpu', 'AI hỗ trợ học tập', 'Mở công cụ AI hỗ trợ học tập.', route('ai.run.form'));
     }
 
@@ -74,15 +80,6 @@
         'values' => $adminOverview['scoreLevels']->pluck('count')->values()->all(),
     ];
 @endphp
-
-@unless($user->isAdmin() || $user->isStaff())
-<div class="page-heading">
-    <div>
-        <h5>Chức năng chính</h5>
-        <div class="text-muted">Chọn nhanh chức năng theo vai trò đang đăng nhập.</div>
-    </div>
-</div>
-@endunless
 
 @if($user->isAdmin() || $user->isStaff())
     <div class="admin-dashboard">
@@ -310,6 +307,121 @@
         </div>
     </div>
 
+    @if($user->isTeacher() && $teacherDashboard)
+        <div class="row g-3 mb-3">
+            <div class="col-md-6 col-xl-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Lớp đang dạy</div>
+                        <div class="fs-3 fw-bold">{{ $teacherDashboard['class_count'] }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Số tiết hôm nay</div>
+                        <div class="fs-3 fw-bold">{{ $teacherDashboard['today_period_count'] }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Thông báo mới</div>
+                        <div class="fs-3 fw-bold">{{ $teacherDashboard['announcements']->count() }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Lịch thi gần nhất</div>
+                        <div class="fs-3 fw-bold">{{ $teacherDashboard['upcoming_exams']->count() }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-lg-7">
+                <div class="card h-100">
+                    <div class="card-header">Thời khóa biểu hôm nay</div>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Tiết</th>
+                                    <th>Môn</th>
+                                    <th>Lớp</th>
+                                    <th>Phòng</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($teacherDashboard['today_entries'] as $entry)
+                                    <tr>
+                                        <td class="fw-semibold">{{ $entry->period }}</td>
+                                        <td>{{ $entry->assignment?->subject?->name ?? $entry->subject?->name ?? '-' }}</td>
+                                        <td>{{ $entry->timetable?->classRoom?->name ?? '-' }}</td>
+                                        <td>{{ $entry->displayRoom() ?? '-' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4"><div class="empty-state"><i class="bi bi-calendar-check"></i>Hôm nay chưa có tiết dạy.</div></td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="card h-100">
+                    <div class="card-header">Thông báo và lịch thi</div>
+                    <div class="list-group list-group-flush">
+                        @forelse($teacherDashboard['announcements'] as $post)
+                            <a href="{{ route('announcements.index') }}" class="list-group-item list-group-item-action">
+                                <div class="fw-semibold">{{ $post->title }}</div>
+                                <div class="text-muted small">{{ optional($post->published_at)->format('d/m/Y') }}</div>
+                            </a>
+                        @empty
+                            <div class="list-group-item text-muted">Chưa có thông báo mới.</div>
+                        @endforelse
+                        @forelse($teacherDashboard['upcoming_exams'] as $exam)
+                            <a href="{{ route('exam-schedules.index') }}" class="list-group-item list-group-item-action">
+                                <div class="fw-semibold">{{ $exam->subject?->name ?? $exam->title }} - {{ $exam->classRoom?->name }}</div>
+                                <div class="text-muted small">{{ optional($exam->exam_date)->format('d/m/Y') }} · {{ $exam->timeRange() }}</div>
+                            </a>
+                        @empty
+                            <div class="list-group-item text-muted">Chưa có lịch thi sắp diễn ra.</div>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if($user->isParent() && ($parentChildren ?? collect())->count() > 1)
+        <div class="card mb-3">
+            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                <div>
+                    <div class="fw-semibold">Chọn học sinh</div>
+                    <div class="text-muted small">Dữ liệu phụ huynh sẽ ưu tiên hiển thị theo học sinh đang chọn.</div>
+                </div>
+                <form method="POST" action="{{ route('parent.select-child') }}" class="d-flex gap-2 align-items-center">
+                    @csrf
+                    <select name="student_id" class="form-select" onchange="this.form.submit()">
+                        @foreach($parentChildren as $child)
+                            <option value="{{ $child->id }}" @selected(($selectedParentStudent?->id ?? null) === $child->id)>
+                                {{ $child->student_code }} - {{ $child->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </form>
+            </div>
+        </div>
+    @endif
+
     <div class="role-dashboard">
         @forelse($cards as $card)
             <a href="{{ $card['url'] }}" class="feature-card">
@@ -445,6 +557,73 @@
                                 <td class="fw-semibold">{{ $c->semester->name }}</td>
                                 <td>{{ $c->conduct_level }}</td>
                                 <td>{{ $c->comment }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="3">
+                                    <div class="empty-state"><i class="bi bi-clipboard-check"></i>Chưa có dữ liệu hạnh kiểm.</div>
+                                </td>
+                            </tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
+
+@if($user->isParent() && ($selectedParentStudent ?? null))
+    <div class="row g-3 mt-2">
+        <div class="col-lg-7">
+            <div class="card h-100">
+                <div class="card-header">Điểm của {{ $selectedParentStudent->name }}</div>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Môn</th>
+                                <th>Học kỳ</th>
+                                <th>TB</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse(($parentScores ?? collect()) as $score)
+                            <tr>
+                                <td class="fw-semibold">{{ $score->subject->name }}</td>
+                                <td>{{ $score->semester->name }}</td>
+                                <td><span class="badge bg-info">{{ $score->average }}</span></td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="3">
+                                    <div class="empty-state"><i class="bi bi-clipboard-data"></i>Chưa có dữ liệu điểm.</div>
+                                </td>
+                            </tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card h-100">
+                <div class="card-header">Hạnh kiểm</div>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Học kỳ</th>
+                                <th>Mức</th>
+                                <th>Nhận xét</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse(($parentConduct ?? collect()) as $item)
+                            <tr>
+                                <td class="fw-semibold">{{ $item->semester->name }}</td>
+                                <td>{{ $item->conduct_level }}</td>
+                                <td>{{ $item->comment }}</td>
                             </tr>
                         @empty
                             <tr>

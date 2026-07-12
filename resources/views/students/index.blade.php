@@ -16,10 +16,10 @@
 	    <div class="d-flex align-items-center gap-2">
 	        @unless($readOnly)
 	            <a class="btn btn-secondary" href="{{ route('students.import-template') }}">
-	                <i class="bi bi-download me-1"></i>Tải file mẫu
+	                <i class="bi bi-download me-1"></i>Tải tệp mẫu
 	            </a>
 	            <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#studentImportModal">
-	                <i class="bi bi-upload me-1"></i>Import
+	                <i class="bi bi-upload me-1"></i>Nhập dữ liệu
 	            </button>
             <a class="btn btn-primary" href="{{ route('students.create') }}">
                 <i class="bi bi-plus-lg me-1"></i>Thêm học sinh
@@ -118,7 +118,6 @@
                     <td>{{ $student->classRoom->name ?? '-' }}</td>
                     <td>
                         <div>{{ $student->parent_phone ?: '-' }}</div>
-                        <div class="text-muted small">{{ $student->email ?: '' }}</div>
                     </td>
 	                    <td><span class="badge {{ $student->statusBadgeClass() }}">{{ $student->statusLabel() }}</span></td>
 	                    <td class="text-end">
@@ -242,10 +241,6 @@
                                         <span>SĐT phụ huynh</span>
                                         <strong>{{ $student->parent_phone ?: '-' }}</strong>
                                     </article>
-                                    <article>
-                                        <span>Email phụ huynh</span>
-                                        <strong>{{ $student->email ?: '-' }}</strong>
-                                    </article>
                                 </div>
                             </section>
 
@@ -324,8 +319,8 @@
                     @csrf
                     <div class="modal-header">
                         <div>
-                            <h5 class="modal-title">Import học sinh</h5>
-                            <div class="text-muted small">Template: Họ tên, Ngày sinh, Giới tính, SĐT phụ huynh, Email phụ huynh, Địa chỉ, Nơi sinh, Dân tộc, Tôn giáo, Ghi chú, Ngày nhập học, Loại nhập học, Trạng thái, Trường cũ, Khối hiện tại.</div>
+                            <h5 class="modal-title">Nhập dữ liệu học sinh</h5>
+                            <div class="text-muted small">Tệp mẫu: Họ tên, Ngày sinh, Giới tính, Họ tên phụ huynh, Quan hệ, SĐT phụ huynh, Địa chỉ phụ huynh, Địa chỉ, Nơi sinh, Dân tộc, Tôn giáo, Ghi chú, Ngày nhập học, Loại nhập học, Trạng thái, Trường cũ, Khối hiện tại.</div>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                     </div>
@@ -339,16 +334,16 @@
                             </select>
                         </div>
                         <div>
-                            <label class="form-label">File CSV/XLSX</label>
+                            <label class="form-label">Tệp CSV/XLSX</label>
                             <input type="file" name="file" class="form-control" accept=".csv,.txt,.xlsx" required>
                         </div>
 	                    </div>
 	                    <div class="modal-footer">
 	                        <a class="btn btn-outline-primary" href="{{ route('students.import-template') }}">
-	                            <i class="bi bi-download me-1"></i>Tải file mẫu
+	                            <i class="bi bi-download me-1"></i>Tải tệp mẫu
 	                        </a>
 	                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-	                        <button class="btn btn-primary">Import</button>
+	                        <button class="btn btn-primary">Nhập dữ liệu</button>
 	                    </div>
                 </form>
             </div>

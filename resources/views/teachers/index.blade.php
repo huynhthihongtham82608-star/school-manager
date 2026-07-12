@@ -18,9 +18,8 @@
                     <th>Mã</th>
                     <th>Họ tên</th>
                     <th>Môn chính</th>
-                    <th>GVCN</th>
+                    <th>Lớp chủ nhiệm</th>
                     <th>Trạng thái</th>
-                    <th>Tài khoản</th>
                     <th></th>
                 </tr>
             </thead>
@@ -32,10 +31,16 @@
                         <div class="fw-semibold">{{ $teacher->name }}</div>
                         <div class="text-muted small">{{ $teacher->phone ?: '-' }}</div>
                     </td>
-                    <td>{{ $teacher->main_subject ?: '-' }}</td>
-                    <td>{!! $teacher->is_homeroom ? '<span class="badge bg-info">Có</span>' : '-' !!}</td>
+                    <td>{{ $teacher->primarySubjectName() }}</td>
+                    <td>
+                        @php($teacherHomeroomClasses = $selectedYearId ? $teacher->homeroomClasses->where('school_year_id', $selectedYearId) : $teacher->homeroomClasses)
+                        @forelse($teacherHomeroomClasses as $class)
+                            <span class="badge bg-info">{{ $class->name }}</span>
+                        @empty
+                            <span class="text-muted">Chưa phân công</span>
+                        @endforelse
+                    </td>
                     <td><span class="badge {{ $teacher->workStatusBadgeClass() }}">{{ $teacher->workStatusLabel() }}</span></td>
-                    <td>{{ $teacher->user?->username ?: '-' }}</td>
                     <td class="text-end">
                         <div class="content-action-group justify-content-end">
                             <a href="{{ route('teachers.edit', $teacher) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
@@ -70,7 +75,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7"><div class="empty-state"><i class="bi bi-person-badge"></i>Chưa có giáo viên.</div></td>
+                    <td colspan="6"><div class="empty-state"><i class="bi bi-person-badge"></i>Chưa có giáo viên.</div></td>
                 </tr>
             @endforelse
             </tbody>
@@ -79,14 +84,8 @@
 </div>
 
 @foreach($teachers as $teacher)
-    @php
-        $teachingAssignments = $selectedYearId
-            ? $teacher->assignments->where('school_year_id', $selectedYearId)
-            : $teacher->assignments;
-        $homeroomClasses = $selectedYearId
-            ? $teacher->homeroomClasses->where('school_year_id', $selectedYearId)
-            : $teacher->homeroomClasses;
-    @endphp
+    @php($teacherTeachingAssignments = $selectedYearId ? $teacher->assignments->where('school_year_id', $selectedYearId) : $teacher->assignments)
+    @php($teacherHomeroomDetailClasses = $selectedYearId ? $teacher->homeroomClasses->where('school_year_id', $selectedYearId) : $teacher->homeroomClasses)
     <div class="modal fade content-modal teacher-profile-modal" id="teacherDetail{{ $teacher->id }}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
@@ -100,7 +99,7 @@
                             <h5>{{ $teacher->name }}</h5>
                             <div class="teacher-profile-code">{{ $teacher->teacher_code }}</div>
                             <div class="d-flex flex-wrap gap-2 align-items-center">
-                                <span class="badge bg-light text-dark border">{{ $teacher->main_subject ?: 'Chưa cập nhật bộ môn' }}</span>
+                                <span class="badge bg-light text-dark border">{{ $teacher->primarySubjectName() !== '-' ? $teacher->primarySubjectName() : 'Chưa cập nhật bộ môn' }}</span>
                                 <span class="badge {{ $teacher->workStatusBadgeClass() }}">{{ $teacher->workStatusLabel() }}</span>
                             </div>
                         </div>
@@ -116,7 +115,7 @@
                             <strong>{{ $teacher->dob?->format('d/m/Y') ?? '-' }}</strong>
                         </article>
                         <article>
-                            <span>Email</span>
+                            <span>Thư điện tử</span>
                             <strong>{{ $teacher->email ?: '-' }}</strong>
                         </article>
                         <article>
@@ -140,7 +139,7 @@
                     <div class="teacher-detail-section mt-3">
                         <div class="teacher-detail-title"><i class="bi bi-journal-bookmark"></i><h6>Danh sách lớp đang dạy</h6></div>
                         <div class="teacher-pill-list">
-                            @forelse($teachingAssignments as $assignment)
+                            @forelse($teacherTeachingAssignments as $assignment)
                                 <span class="teacher-pill">
                                     {{ $assignment->subject->name ?? '-' }} - {{ $assignment->classRoom->name ?? '-' }}
                                 </span>
@@ -152,17 +151,13 @@
 
                     <div class="teacher-detail-section mt-3">
                         <div class="teacher-detail-title"><i class="bi bi-people"></i><h6>Lớp đang chủ nhiệm</h6></div>
-                        @if($teacher->is_homeroom)
-                            <div class="teacher-pill-list">
-                                @forelse($homeroomClasses as $class)
-                                    <span class="teacher-pill">Chủ nhiệm: {{ $class->name }}</span>
-                                @empty
-                                    <div class="text-muted">Chưa được phân công chủ nhiệm</div>
-                                @endforelse
-                            </div>
-                        @else
-                            <div class="text-muted">Chưa được phân công chủ nhiệm</div>
-                        @endif
+                        <div class="teacher-pill-list">
+                            @forelse($teacherHomeroomDetailClasses as $class)
+                                <span class="teacher-pill">Chủ nhiệm: {{ $class->name }}</span>
+                            @empty
+                                <div class="text-muted">Chưa được phân công chủ nhiệm</div>
+                            @endforelse
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

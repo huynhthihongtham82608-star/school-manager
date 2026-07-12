@@ -83,12 +83,12 @@ class User extends Authenticatable
 
     public function isTeacher(): bool
     {
-        return in_array($this->role, ['teacher', 'homeroom'], true);
+        return $this->role === 'teacher';
     }
 
     public function isHomeroom(): bool
     {
-        return $this->role === 'homeroom';
+        return $this->isTeacher() && (bool) $this->teacher?->is_homeroom;
     }
 
     public function isStudent(): bool

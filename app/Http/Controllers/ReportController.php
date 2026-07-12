@@ -13,21 +13,27 @@ class ReportController extends Controller
 {
     public function classSummary(Request $request)
     {
-        $classes = SchoolClass::orderBy('name')->get();
-        $semesters = Semester::with('schoolYear')->get();
+        $selectedYearId = $this->selectedSchoolYearId($request);
+        $selectedSemesterId = $this->selectedSemesterId($request);
+        $classes = SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->orderBy('name')
+            ->get();
+        $semesters = Semester::with('schoolYear')
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->get();
         $selectedClass = null;
         $selectedSemester = null;
         $rows = collect();
         $stats = ['excellent' => 0, 'good' => 0, 'average' => 0, 'weak' => 0];
 
-        if ($request->filled('class_id') && $request->filled('semester_id')) {
+        if ($request->filled('class_id') && ($request->filled('semester_id') || $selectedSemesterId)) {
             $request->validate([
                 'class_id' => 'required|exists:classes,id',
-                'semester_id' => 'required|exists:semesters,id',
+                'semester_id' => 'nullable|exists:semesters,id',
             ]);
 
             $selectedClass = SchoolClass::find($request->input('class_id'));
-            $selectedSemester = Semester::find($request->input('semester_id'));
+            $selectedSemester = Semester::find($request->input('semester_id') ?: $selectedSemesterId);
 
             $students = Student::where('class_id', $selectedClass->id)->with('scoreHeaders')->get();
             $subjects = Subject::all()->keyBy('id');
@@ -58,6 +64,7 @@ class ReportController extends Controller
             'semesters',
             'selectedClass',
             'selectedSemester',
+            'selectedSemesterId',
             'rows',
             'stats'
         ));

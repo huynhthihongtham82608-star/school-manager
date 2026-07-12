@@ -5,7 +5,7 @@
 <div class="page-heading">
     <div>
         <h5>Báo cáo tổng kết lớp</h5>
-        <div class="text-muted">Xem tổng quan điểm trung bình, học lực và hạnh kiểm theo học kỳ.</div>
+        <div class="text-muted">Xem tổng quan điểm trung bình, học lực và hạnh kiểm theo học kỳ đang làm việc.</div>
     </div>
 </div>
 
@@ -15,7 +15,7 @@
             <div class="col-md-4">
                 <label class="form-label">Lớp</label>
                 <select name="class_id" class="form-select" required>
-                    <option value="">--Chọn lớp--</option>
+                    <option value="">Chọn lớp</option>
                     @foreach($classes as $class)
                         <option value="{{ $class->id }}" @selected($selectedClass && $selectedClass->id === $class->id)>{{ $class->name }}</option>
                     @endforeach
@@ -23,10 +23,11 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Học kỳ</label>
-                <select name="semester_id" class="form-select" required>
-                    <option value="">--Chọn học kỳ--</option>
+                <select name="semester_id" class="form-select">
                     @foreach($semesters as $semester)
-                        <option value="{{ $semester->id }}" @selected($selectedSemester && $selectedSemester->id === $semester->id)>{{ $semester->name }}</option>
+                        <option value="{{ $semester->id }}" @selected(($selectedSemester && $selectedSemester->id === $semester->id) || (! $selectedSemester && (string) $selectedSemesterId === (string) $semester->id))>
+                            {{ $semester->normalizedName() }}
+                        </option>
                     @endforeach
                 </select>
             </div>
@@ -43,7 +44,7 @@
         <div class="col-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="text-muted small fw-semibold">Giỏi</div><div class="stat-value">{{ $stats['excellent'] }}</div><div class="small text-muted">{{ round($stats['excellent']/$total*100,1) }}%</div></div></div></div>
         <div class="col-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="text-muted small fw-semibold">Khá</div><div class="stat-value">{{ $stats['good'] }}</div><div class="small text-muted">{{ round($stats['good']/$total*100,1) }}%</div></div></div></div>
         <div class="col-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="text-muted small fw-semibold">Trung bình</div><div class="stat-value">{{ $stats['average'] }}</div><div class="small text-muted">{{ round($stats['average']/$total*100,1) }}%</div></div></div></div>
-        <div class="col-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="text-muted small fw-semibold">Yếu</div><div class="stat-value">{{ $stats['weak'] }}</div><div class="small text-muted">{{ round($stats['weak']/$total*100,1) }}%</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="text-muted small fw-semibold">Cần hỗ trợ</div><div class="stat-value">{{ $stats['weak'] }}</div><div class="small text-muted">{{ round($stats['weak']/$total*100,1) }}%</div></div></div></div>
     </div>
 
     <div class="card">
@@ -51,9 +52,9 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Mã HS</th>
+                        <th>Mã học sinh</th>
                         <th>Họ tên</th>
-                        <th>TB</th>
+                        <th>Điểm trung bình</th>
                         <th>Học lực</th>
                         <th>Hạnh kiểm</th>
                     </tr>
@@ -63,9 +64,9 @@
                     <tr>
                         <td class="fw-semibold">{{ $row['student']->student_code }}</td>
                         <td>{{ $row['student']->name }}</td>
-                        <td>{{ $row['avg'] }}</td>
+                        <td>{{ $row['avg'] ?? 'Chưa có dữ liệu' }}</td>
                         <td>{{ $row['study_rank'] }}</td>
-                        <td>{{ $row['conduct'] }}</td>
+                        <td>{{ $row['conduct'] ?? 'Chưa có dữ liệu' }}</td>
                     </tr>
                 @empty
                     <tr>

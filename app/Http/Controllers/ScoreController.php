@@ -20,6 +20,7 @@ class ScoreController extends Controller
     {
         $user = Auth::user();
         $selectedYearId = $this->selectedSchoolYearId($request);
+        $selectedSemesterId = $this->selectedSemesterId($request);
         $years = SchoolYear::all();
         $semesters = Semester::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->get();
         $subjects = Subject::all();
@@ -39,7 +40,7 @@ class ScoreController extends Controller
             $assignments = [];
         }
 
-        return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'assignments', 'selectedYearId'));
+        return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'assignments', 'selectedYearId', 'selectedSemesterId'));
     }
 
     public function entry(Request $request)
@@ -157,9 +158,7 @@ class ScoreController extends Controller
                 ->where('semester_id', $semester->id)
                 ->where('status', TeachingAssignment::STATUS_ACTIVE)
                 ->exists();
-            $isHomeroom = $class->homeroom_teacher_id === $teacherId;
-
-            if ($isAssigned || $isHomeroom) {
+            if ($isAssigned) {
                 return;
             }
         }

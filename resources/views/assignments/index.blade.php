@@ -10,7 +10,7 @@
 <div class="page-heading">
     <div>
         <h5>Phân công giảng dạy</h5>
-        <div class="text-muted">Gán giáo viên theo năm học, học kỳ, lớp và môn học.</div>
+        <div class="text-muted">Phân công giáo viên theo năm học và học kỳ đang làm việc.</div>
     </div>
     <div class="d-flex align-items-center gap-2">
         @unless($readOnly)
@@ -22,9 +22,6 @@
             </button>
             <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 320px;">
                 <form method="GET" action="{{ route('assignments.index') }}" class="d-grid gap-3">
-                    @if($selectedYearId)
-                        <input type="hidden" name="school_year_id" value="{{ $selectedYearId }}">
-                    @endif
                     <div>
                         <label class="form-label small">Lớp</label>
                         <select name="class_id" class="form-select">
@@ -39,16 +36,7 @@
                         <select name="teacher_id" class="form-select">
                             <option value="all">Tất cả giáo viên</option>
                             @foreach($teachers as $teacher)
-                                <option value="{{ $teacher->id }}" @selected($filters['teacher_id'] === $teacher->id)>{{ $teacher->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label small">Môn học</label>
-                        <select name="subject_id" class="form-select">
-                            <option value="all">Tất cả môn học</option>
-                            @foreach($subjects as $subject)
-                                <option value="{{ $subject->id }}" @selected($filters['subject_id'] === $subject->id)>{{ $subject->name }}</option>
+                                <option value="{{ $teacher->id }}" @selected($filters['teacher_id'] === $teacher->id)>{{ $teacher->teacher_code }} - {{ $teacher->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -69,7 +57,7 @@
                         </select>
                     </div>
                     <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('assignments.index', array_filter(['school_year_id' => $selectedYearId])) }}" class="btn btn-secondary">Xóa lọc</a>
+                        <a href="{{ route('assignments.index') }}" class="btn btn-secondary">Xóa lọc</a>
                         <button class="btn btn-primary">Áp dụng</button>
                     </div>
                 </form>
@@ -83,11 +71,9 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>Năm học</th>
-                    <th>Học kỳ</th>
-                    <th>Lớp</th>
-                    <th>Môn học</th>
                     <th>Giáo viên</th>
+                    <th>Lớp</th>
+                    <th>Số tiết/tuần</th>
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
                     <th></th>
@@ -97,11 +83,12 @@
             @forelse($assignments as $assignment)
                 @php($deleteCheck = $deleteChecks[(string) $assignment->getKey()] ?? ['allowed' => false, 'message' => null])
                 <tr>
-                    <td>{{ $assignment->schoolYear->name ?? '-' }}</td>
-                    <td>{{ $assignment->semester?->normalizedName() ?? '-' }}</td>
+                    <td>
+                        <div class="fw-semibold">{{ $assignment->teacher->name ?? '-' }}</div>
+                        <div class="text-muted small">{{ $assignment->teacher->teacher_code ?? '-' }} · {{ $assignment->teacher?->primarySubjectName() ?? ($assignment->subject->name ?? '-') }}</div>
+                    </td>
                     <td class="fw-semibold">{{ $assignment->classRoom->name ?? '-' }}</td>
-                    <td>{{ $assignment->subject->name ?? '-' }}</td>
-                    <td>{{ $assignment->teacher->name ?? '-' }}</td>
+                    <td>{{ $assignment->weekly_periods ?: '-' }}</td>
                     <td>{{ $assignment->roleLabel() }}</td>
                     <td><span class="badge {{ $assignment->statusBadgeClass() }}">{{ $assignment->statusLabel() }}</span></td>
                     <td class="text-end">
@@ -138,7 +125,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8"><div class="empty-state"><i class="bi bi-diagram-3"></i>Chưa có phân công.</div></td>
+                    <td colspan="6"><div class="empty-state"><i class="bi bi-diagram-3"></i>Chưa có phân công.</div></td>
                 </tr>
             @endforelse
             </tbody>

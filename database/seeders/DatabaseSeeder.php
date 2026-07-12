@@ -38,28 +38,28 @@ class DatabaseSeeder extends Seeder
         );
 
         // Subjects
-        $toan = Subject::updateOrCreate(['code' => 'TOAN'], ['name' => 'Toan', 'credit' => 1, 'type' => Subject::TYPE_REQUIRED, 'status' => Subject::STATUS_ACTIVE, 'is_weighted' => 0]);
-        $van = Subject::updateOrCreate(['code' => 'NGU_VAN'], ['name' => 'Ngu van', 'credit' => 1, 'type' => Subject::TYPE_REQUIRED, 'status' => Subject::STATUS_ACTIVE, 'is_weighted' => 0]);
-        $anh = Subject::updateOrCreate(['code' => 'TIENG_ANH'], ['name' => 'Tieng Anh', 'credit' => 1, 'type' => Subject::TYPE_REQUIRED, 'status' => Subject::STATUS_ACTIVE, 'is_weighted' => 0]);
+        $toan = Subject::updateOrCreate(['name' => 'Toan'], ['code' => 'MH001', 'credit' => 1, 'type' => Subject::TYPE_REQUIRED, 'status' => Subject::STATUS_ACTIVE, 'is_weighted' => 0]);
+        $van = Subject::updateOrCreate(['name' => 'Ngu van'], ['code' => 'MH002', 'credit' => 1, 'type' => Subject::TYPE_REQUIRED, 'status' => Subject::STATUS_ACTIVE, 'is_weighted' => 0]);
+        $anh = Subject::updateOrCreate(['name' => 'Tieng Anh'], ['code' => 'MH003', 'credit' => 1, 'type' => Subject::TYPE_REQUIRED, 'status' => Subject::STATUS_ACTIVE, 'is_weighted' => 0]);
 
         // Teachers
         $teacherToan = Teacher::updateOrCreate(
             ['teacher_code' => 'GV001'],
-            ['name' => 'Nguyen Van Toan', 'phone' => '0901234567', 'email' => 'gvtoan@example.com', 'qualification' => 'DH', 'main_subject' => 'Toan', 'is_homeroom' => 0]
+            ['name' => 'Nguyen Van Toan', 'phone' => '0901234567', 'email' => 'gvtoan@example.com', 'qualification' => 'DH', 'main_subject' => $toan->name, 'primary_subject_id' => $toan->id, 'is_homeroom' => 0]
         );
         $teacherGvcn = Teacher::updateOrCreate(
             ['teacher_code' => 'GV002'],
-            ['name' => 'Tran Thi Chu Nhiem', 'phone' => '0908888888', 'email' => 'gvcn@example.com', 'qualification' => 'DH', 'main_subject' => 'Ngu van', 'is_homeroom' => 1]
+            ['name' => 'Tran Thi Chu Nhiem', 'phone' => '0908888888', 'email' => 'gvcn@example.com', 'qualification' => 'DH', 'main_subject' => $van->name, 'primary_subject_id' => $van->id, 'is_homeroom' => 1]
         );
 
         // Classes
         $class10a1 = SchoolClass::updateOrCreate(
             ['name' => '10A1', 'school_year_id' => $year->id],
-            ['grade_level' => 10, 'homeroom_teacher_id' => $teacherGvcn->id, 'capacity' => 45]
+            ['grade_level' => 10, 'semester_id' => $hk1->id, 'homeroom_teacher_id' => $teacherGvcn->id, 'capacity' => 45]
         );
         $class10a2 = SchoolClass::updateOrCreate(
             ['name' => '10A2', 'school_year_id' => $year->id],
-            ['grade_level' => 10, 'homeroom_teacher_id' => null, 'capacity' => 45]
+            ['grade_level' => 10, 'semester_id' => $hk1->id, 'homeroom_teacher_id' => null, 'capacity' => 45]
         );
 
         // Students
@@ -79,13 +79,13 @@ class DatabaseSeeder extends Seeder
         );
 
         User::updateOrCreate(
-            ['username' => 'gvtoan'],
-            ['role' => 'teacher', 'teacher_id' => $teacherToan->id, 'password_hash' => Hash::make('gv123'), 'is_active' => 1]
+            ['username' => $teacherToan->teacher_code],
+            ['role' => 'teacher', 'teacher_id' => $teacherToan->id, 'password_hash' => Hash::make('12345678'), 'force_change_password' => true, 'is_active' => 1]
         );
 
         User::updateOrCreate(
-            ['username' => 'gvcn10a1'],
-            ['role' => 'homeroom', 'teacher_id' => $teacherGvcn->id, 'password_hash' => Hash::make('gv123'), 'is_active' => 1]
+            ['username' => $teacherGvcn->teacher_code],
+            ['role' => 'teacher', 'teacher_id' => $teacherGvcn->id, 'password_hash' => Hash::make('12345678'), 'force_change_password' => true, 'is_active' => 1]
         );
 
         User::updateOrCreate(
@@ -107,11 +107,11 @@ class DatabaseSeeder extends Seeder
         // Teaching assignments
         TeachingAssignment::updateOrCreate(
             ['teacher_id' => $teacherToan->id, 'class_id' => $class10a1->id, 'subject_id' => $toan->id, 'school_year_id' => $year->id, 'semester_id' => $hk1->id, 'role' => TeachingAssignment::ROLE_PRIMARY],
-            ['status' => TeachingAssignment::STATUS_ACTIVE]
+            ['status' => TeachingAssignment::STATUS_ACTIVE, 'weekly_periods' => 4]
         );
         TeachingAssignment::updateOrCreate(
             ['teacher_id' => $teacherGvcn->id, 'class_id' => $class10a1->id, 'subject_id' => $van->id, 'school_year_id' => $year->id, 'semester_id' => $hk1->id, 'role' => TeachingAssignment::ROLE_PRIMARY],
-            ['status' => TeachingAssignment::STATUS_ACTIVE]
+            ['status' => TeachingAssignment::STATUS_ACTIVE, 'weekly_periods' => 4]
         );
 
         // Grade window: open for 10A1-Toan-HK1

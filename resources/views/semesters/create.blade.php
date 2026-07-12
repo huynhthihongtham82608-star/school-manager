@@ -24,7 +24,7 @@
             @error('school_year_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-3">
-            <label class="form-label">Trạng thái mặc định</label>
+            <label class="form-label">Trạng thái ban đầu</label>
             <div class="form-control bg-light">Bản nháp</div>
         </div>
     </div>

@@ -31,7 +31,7 @@
                     @error('name')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Email</label>
+                    <label class="form-label">Thư điện tử</label>
                     <input type="email" name="email" class="form-control @error('email') is-invalid @enderror" value="{{ old('email', $teacher->email) }}">
                     @error('email')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                 </div>
@@ -41,9 +41,8 @@
                     @error('phone')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-12">
-                    <label class="form-label">Bộ môn</label>
-                    <input type="text" name="main_subject" class="form-control @error('main_subject') is-invalid @enderror" value="{{ old('main_subject', $teacher->main_subject) }}">
-                    @error('main_subject')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                    <label class="form-label">Môn chính</label>
+                    <div class="form-control bg-light">{{ $teacher->primarySubjectName() !== '-' ? $teacher->primarySubjectName() : 'Chưa cập nhật' }}</div>
                 </div>
             </div>
         @elseif($user->isStudent() && $student)
@@ -82,11 +81,6 @@
                     <input type="text" name="address" class="form-control @error('address') is-invalid @enderror" value="{{ old('address', $student->address) }}">
                     @error('address')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control @error('email') is-invalid @enderror" value="{{ old('email', $student->email) }}">
-                    @error('email')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                </div>
                 <div class="col-md-12">
                     <label class="form-label">Số điện thoại phụ huynh</label>
                     <input type="text" name="parent_phone" class="form-control @error('parent_phone') is-invalid @enderror" value="{{ old('parent_phone', $student->parent_phone) }}">
@@ -104,11 +98,6 @@
                     <label class="form-label">Số điện thoại</label>
                     <input type="text" name="phone" class="form-control @error('phone') is-invalid @enderror" value="{{ old('phone', $parent->phone) }}">
                     @error('phone')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control @error('email') is-invalid @enderror" value="{{ old('email', $parent->email) }}">
-                    @error('email')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-12">
                     <label class="form-label">Địa chỉ</label>

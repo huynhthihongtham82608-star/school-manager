@@ -17,42 +17,33 @@
             <a class="btn btn-primary" href="{{ route('rooms.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm phòng</a>
         @endunless
         <div class="dropdown">
-            <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Lọc loại phòng" aria-label="Lọc loại phòng">
+            <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Bộ lọc" aria-label="Bộ lọc">
                 <i class="bi bi-funnel"></i>
             </button>
-            <ul class="dropdown-menu dropdown-menu-end">
-                @foreach($typeFilters as $value => $label)
-                    <li>
-                        <a class="dropdown-item {{ $selectedType === $value ? 'active' : '' }}" href="{{ route('rooms.index', array_filter(['type' => $value === 'all' ? null : $value, 'status' => $selectedStatus === 'all' ? null : $selectedStatus])) }}">
-                            @if($selectedType === $value)
-                                <i class="bi bi-check2 me-2"></i>
-                            @else
-                                <i class="bi bi-circle me-2 text-muted"></i>
-                            @endif
-                            {{ $label }}
-                        </a>
-                    </li>
-                @endforeach
-            </ul>
-        </div>
-        <div class="dropdown">
-            <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Lọc trạng thái" aria-label="Lọc trạng thái">
-                <i class="bi bi-sliders"></i>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end">
-                @foreach($statusFilters as $value => $label)
-                    <li>
-                        <a class="dropdown-item {{ $selectedStatus === $value ? 'active' : '' }}" href="{{ route('rooms.index', array_filter(['type' => $selectedType === 'all' ? null : $selectedType, 'status' => $value === 'all' ? null : $value])) }}">
-                            @if($selectedStatus === $value)
-                                <i class="bi bi-check2 me-2"></i>
-                            @else
-                                <i class="bi bi-circle me-2 text-muted"></i>
-                            @endif
-                            {{ $label }}
-                        </a>
-                    </li>
-                @endforeach
-            </ul>
+            <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 320px;">
+                <form method="GET" action="{{ route('rooms.index') }}" class="d-grid gap-3">
+                    <div>
+                        <label class="form-label small">Loại phòng</label>
+                        <select name="type" class="form-select">
+                            @foreach($typeFilters as $value => $label)
+                                <option value="{{ $value }}" @selected($selectedType === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label small">Trạng thái</label>
+                        <select name="status" class="form-select">
+                            @foreach($statusFilters as $value => $label)
+                                <option value="{{ $value }}" @selected($selectedStatus === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ route('rooms.index') }}" class="btn btn-secondary">Xóa lọc</a>
+                        <button class="btn btn-primary">Áp dụng</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>

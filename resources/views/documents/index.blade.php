@@ -3,7 +3,8 @@
 
 @section('content')
 @php
-    $canManageDocuments = auth()->user()->isAdmin() || auth()->user()->isStaff();
+    $canManageDocuments = auth()->user()->isAdmin() || auth()->user()->isStaff() || auth()->user()->isTeacher();
+    $isTeacherDocumentManager = auth()->user()->isTeacher() && ! (auth()->user()->isAdmin() || auth()->user()->isStaff());
     $roleOptions = [
         'all' => 'Tất cả',
         'admin' => 'Admin',
@@ -39,7 +40,11 @@
                 <div class="col-md-3">
                     <label class="form-label">Môn học</label>
                     <select name="subject_id" class="form-select">
-                        <option value="">Tất cả</option>
+                        @if(! $isTeacherDocumentManager)
+                            <option value="">Tất cả</option>
+                        @else
+                            <option value="">Chọn môn học</option>
+                        @endif
                         @foreach($subjects as $subject)
                             <option value="{{ $subject->id }}">{{ $subject->name }}</option>
                         @endforeach
@@ -48,7 +53,7 @@
                 <div class="col-md-3">
                     <label class="form-label">Lớp</label>
                     <select name="class_id" class="form-select">
-                        <option value="">Tất cả</option>
+                        <option value="">{{ $isTeacherDocumentManager ? 'Áp dụng chung theo môn' : 'Tất cả' }}</option>
                         @foreach($classes as $class)
                             <option value="{{ $class->id }}">{{ $class->name }}</option>
                         @endforeach
@@ -124,6 +129,7 @@
                             $detailId = 'document-detail-' . $document->id;
                             $editId = 'document-edit-' . $document->id;
                             $targetRoleText = collect($document->targetRoles())->map(fn ($role) => $roleOptions[$role] ?? $role)->join(', ');
+                            $canManageThisDocument = in_array($document->id, $manageableDocumentIds ?? [], true);
                         @endphp
                         <tr>
                             <td>
@@ -145,16 +151,18 @@
                                             <i class="bi bi-box-arrow-up-right"></i><span class="visually-hidden">Mở tài liệu</span>
                                         </a>
                                     @endif
-                                    <button type="button" class="content-action-btn icon-only edit" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa">
-                                        <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
-                                    </button>
-                                    <form method="POST" action="{{ route('documents.destroy', $document) }}">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="content-action-btn icon-only delete" title="Xóa" aria-label="Xóa" data-bs-toggle="tooltip">
-                                            <i class="bi bi-trash"></i><span class="visually-hidden">Xóa</span>
+                                    @if($canManageThisDocument)
+                                        <button type="button" class="content-action-btn icon-only edit" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa">
+                                            <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                         </button>
-                                    </form>
+                                        <form method="POST" action="{{ route('documents.destroy', $document) }}">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="content-action-btn icon-only delete" title="Xóa" aria-label="Xóa" data-bs-toggle="tooltip">
+                                                <i class="bi bi-trash"></i><span class="visually-hidden">Xóa</span>
+                                            </button>
+                                        </form>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -249,7 +257,11 @@
                                         <div class="col-md-3">
                                             <label class="form-label">Môn học</label>
                                             <select name="subject_id" class="form-select">
-                                                <option value="">Tất cả</option>
+                                                @if(! $isTeacherDocumentManager)
+                                                    <option value="">Tất cả</option>
+                                                @else
+                                                    <option value="">Chọn môn học</option>
+                                                @endif
                                                 @foreach($subjects as $subject)
                                                     <option value="{{ $subject->id }}" @selected($document->subject_id === $subject->id)>{{ $subject->name }}</option>
                                                 @endforeach
@@ -258,7 +270,7 @@
                                         <div class="col-md-3">
                                             <label class="form-label">Lớp</label>
                                             <select name="class_id" class="form-select">
-                                                <option value="">Tất cả</option>
+                                                <option value="">{{ $isTeacherDocumentManager ? 'Áp dụng chung theo môn' : 'Tất cả' }}</option>
                                                 @foreach($classes as $class)
                                                     <option value="{{ $class->id }}" @selected($document->class_id === $class->id)>{{ $class->name }}</option>
                                                 @endforeach

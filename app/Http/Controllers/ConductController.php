@@ -15,6 +15,7 @@ class ConductController extends Controller
     {
         $user = Auth::user();
         $selectedYearId = $this->selectedSchoolYearId($request);
+        $selectedSemesterId = $this->selectedSemesterId($request);
         $classes = SchoolClass::with('schoolYear')
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->get();
@@ -28,18 +29,17 @@ class ConductController extends Controller
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->get();
         $selectedClass = null;
-        $selectedSemester = null;
+        $selectedSemester = $selectedSemesterId ? $semesters->firstWhere('id', $selectedSemesterId) : null;
         $students = collect();
         $records = collect();
 
-        if ($request->filled('class_id') && $request->filled('semester_id')) {
+        if ($request->filled('class_id') && $selectedSemesterId) {
             $request->validate([
                 'class_id' => 'required|exists:classes,id',
-                'semester_id' => 'required|exists:semesters,id',
             ]);
 
             $selectedClass = SchoolClass::find($request->input('class_id'));
-            $selectedSemester = Semester::find($request->input('semester_id'));
+            $selectedSemester = Semester::find($selectedSemesterId);
             $this->authorizeHomeroom($selectedClass);
 
             $students = Student::where('class_id', $selectedClass->id)->orderBy('student_code')->get();

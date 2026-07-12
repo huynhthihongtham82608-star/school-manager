@@ -6,6 +6,7 @@ use App\Http\Controllers\AiController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\BackupController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\ConductController;
 use App\Http\Controllers\DashboardController;
@@ -25,7 +26,9 @@ use App\Http\Controllers\ScoreController;
 use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\TeacherController;
+use App\Http\Controllers\TeacherPortalController;
 use App\Http\Controllers\TeachingAssignmentController;
 use App\Http\Controllers\TimetableController;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +42,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->n
 Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonly'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/school-years/history/clear', [SchoolYearController::class, 'clearHistoryMode'])->name('school-years.history.clear');
+    Route::post('/academic-context', [SchoolYearController::class, 'updateWorkingContext'])->name('academic-context.update');
 
     // Profile routes - accessible to all authenticated users
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
@@ -46,6 +50,7 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
     Route::post('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
     Route::get('/profile/change-password', [ProfileController::class, 'showChangePasswordForm'])->name('profile.change-password');
     Route::post('/profile/change-password', [ProfileController::class, 'updatePassword'])->name('profile.update-password');
+    Route::post('/parent/select-child', [DashboardController::class, 'selectParentChild'])->name('parent.select-child');
 
     Route::middleware('role:admin,staff')->group(function () {
         Route::get('admin/home-page', [AdminHomePageController::class, 'index'])->name('admin.home-page.index');
@@ -85,28 +90,47 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::post('students/import', [StudentController::class, 'import'])->name('students.import');
         Route::post('students/{student}/reset-password', [StudentController::class, 'resetPassword'])->name('students.reset-password');
         Route::resource('students', StudentController::class)->except(['show']);
+        Route::post('parents/{parent}/reset-password', [ParentController::class, 'resetPassword'])->name('parents.reset-password');
         Route::resource('parents', ParentController::class)->except(['show']);
         Route::resource('assignments', TeachingAssignmentController::class)->except(['show']);
         Route::resource('grade-windows', GradeWindowController::class)->only(['index', 'store', 'update']);
 
-        Route::post('documents', [LearningDocumentController::class, 'store'])->name('documents.store');
-        Route::put('documents/{document}', [LearningDocumentController::class, 'update'])->name('documents.update');
-        Route::delete('documents/{document}', [LearningDocumentController::class, 'destroy'])->name('documents.destroy');
         Route::post('exam-schedules', [ExamScheduleController::class, 'store'])->name('exam-schedules.store');
         Route::put('exam-schedules/{examSchedule}', [ExamScheduleController::class, 'update'])->name('exam-schedules.update');
         Route::delete('exam-schedules/{examSchedule}', [ExamScheduleController::class, 'destroy'])->name('exam-schedules.destroy');
-        Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
+        Route::middleware('role:admin')->group(function () {
+            Route::get('system/settings', [SystemSettingController::class, 'edit'])->name('system.settings.edit');
+            Route::put('system/settings', [SystemSettingController::class, 'update'])->name('system.settings.update');
+            Route::get('system/backups', [BackupController::class, 'index'])->name('system.backups.index');
+            Route::post('system/backups', [BackupController::class, 'store'])->name('system.backups.store');
+            Route::get('system/backups/{filename}', [BackupController::class, 'download'])->name('system.backups.download');
+            Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
+        });
     });
 
-    Route::middleware('role:admin,teacher,homeroom')->group(function () {
+    Route::middleware('role:admin,teacher')->group(function () {
         Route::get('scores', [ScoreController::class, 'index'])->name('scores.index');
         Route::get('scores/entry', [ScoreController::class, 'entry'])->name('scores.entry');
         Route::post('scores/entry', [ScoreController::class, 'store'])->name('scores.store');
     });
 
+    Route::middleware('role:admin,staff,teacher')->group(function () {
+        Route::post('documents', [LearningDocumentController::class, 'store'])->name('documents.store');
+        Route::put('documents/{document}', [LearningDocumentController::class, 'update'])->name('documents.update');
+        Route::delete('documents/{document}', [LearningDocumentController::class, 'destroy'])->name('documents.destroy');
+    });
+
+    Route::middleware('role:teacher')->group(function () {
+        Route::get('teacher/classes', [TeacherPortalController::class, 'classes'])->name('teacher.classes');
+        Route::get('teacher/classes/{class}/students', [TeacherPortalController::class, 'classStudents'])->name('teacher.classes.students');
+    });
+
     Route::middleware('role:admin,homeroom')->group(function () {
         Route::get('conduct', [ConductController::class, 'index'])->name('conduct.index');
         Route::post('conduct', [ConductController::class, 'store'])->name('conduct.store');
+    });
+
+    Route::middleware('role:admin,teacher')->group(function () {
         Route::post('attendance', [AttendanceController::class, 'store'])->name('attendance.store');
     });
 
@@ -119,8 +143,13 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
 
     Route::get('messages/inbox', [MessageController::class, 'inbox'])->name('messages.inbox');
     Route::get('messages/sent', [MessageController::class, 'sent'])->name('messages.sent');
+    Route::get('messages/trash', [MessageController::class, 'trash'])->name('messages.trash');
     Route::get('messages/create', [MessageController::class, 'create'])->name('messages.create');
     Route::post('messages', [MessageController::class, 'store'])->name('messages.store');
+    Route::post('messages/{message}/reply', [MessageController::class, 'reply'])->name('messages.reply');
+    Route::patch('messages/{message}/restore', [MessageController::class, 'restore'])->name('messages.restore');
+    Route::delete('messages/{message}/force', [MessageController::class, 'forceDestroy'])->name('messages.force-destroy');
+    Route::delete('messages/{message}', [MessageController::class, 'destroy'])->name('messages.destroy');
     Route::get('messages/{message}', [MessageController::class, 'show'])->name('messages.show');
 
     Route::get('announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
@@ -135,8 +164,9 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
     Route::get('ai/reports', [AiController::class, 'reports'])->name('ai.reports');
     Route::get('ai/run', [AiController::class, 'runForm'])->name('ai.run.form')->middleware('role:admin,homeroom,staff');
     Route::post('ai/run', [AiController::class, 'run'])->name('ai.run')->middleware('role:admin,homeroom,staff');
+    Route::get('ai/export', [AiController::class, 'export'])->name('ai.export')->middleware('role:admin,homeroom,staff');
 
     Route::get('reports/class-summary', [ReportController::class, 'classSummary'])
-        ->middleware('role:admin,teacher,homeroom')
+        ->middleware('role:admin,teacher')
         ->name('reports.class-summary');
 });

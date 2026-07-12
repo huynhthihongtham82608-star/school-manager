@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\SchoolYear;
+use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Services\AdminProtectionService;
@@ -19,6 +19,7 @@ class TeacherController extends Controller
         $selectedYearId = $this->selectedSchoolYearId($request);
         $teachers = Teacher::with([
             'user',
+            'primarySubject',
             'assignments.classRoom',
             'assignments.subject',
             'assignments.schoolYear',
@@ -33,7 +34,9 @@ class TeacherController extends Controller
 
     public function create()
     {
-        return view('teachers.create');
+        return view('teachers.create', [
+            'subjects' => Subject::where('status', Subject::STATUS_ACTIVE)->orderBy('name')->get(),
+        ]);
     }
 
     public function store(Request $request)
@@ -45,10 +48,11 @@ class TeacherController extends Controller
         $teacher = Teacher::create($teacherData);
 
         User::create([
-            'username' => $data['username'],
-            'role' => $teacher->is_homeroom ? 'homeroom' : 'teacher',
+            'username' => $teacher->teacher_code,
+            'role' => 'teacher',
             'teacher_id' => $teacher->id,
-            'password_hash' => Hash::make($data['password']),
+            'password_hash' => Hash::make('12345678'),
+            'force_change_password' => true,
             'is_active' => $teacher->isWorking() ? 1 : 0,
         ]);
 
@@ -59,7 +63,13 @@ class TeacherController extends Controller
 
     public function edit(Teacher $teacher)
     {
-        return view('teachers.edit', compact('teacher'));
+        return view('teachers.edit', [
+            'teacher' => $teacher->load('primarySubject'),
+            'subjects' => Subject::where('status', Subject::STATUS_ACTIVE)
+                ->orWhere('id', $teacher->primary_subject_id)
+                ->orderBy('name')
+                ->get(),
+        ]);
     }
 
     public function update(Request $request, Teacher $teacher)
@@ -71,7 +81,8 @@ class TeacherController extends Controller
 
         if ($teacher->user) {
             $update = [
-                'role' => $teacher->is_homeroom ? 'homeroom' : 'teacher',
+                'username' => $teacher->teacher_code,
+                'role' => 'teacher',
                 'is_active' => $teacher->isWorking() ? 1 : 0,
             ];
 
@@ -82,11 +93,16 @@ class TeacherController extends Controller
                 }
             }
 
-            if (! empty($data['password'])) {
-                $update['password_hash'] = Hash::make($data['password']);
-            }
-
             $teacher->user->update($update);
+        } else {
+            User::create([
+                'username' => $teacher->teacher_code,
+                'role' => 'teacher',
+                'teacher_id' => $teacher->id,
+                'password_hash' => Hash::make('12345678'),
+                'force_change_password' => true,
+                'is_active' => $teacher->isWorking() ? 1 : 0,
+            ]);
         }
 
         AuditLogger::log('teacher_updated', Teacher::class, (string) $teacher->getKey(), 'Cập nhật giáo viên ' . $teacher->name);
@@ -98,7 +114,7 @@ class TeacherController extends Controller
     {
         $user = $teacher->user ?: User::create([
             'username' => $teacher->teacher_code,
-            'role' => $teacher->is_homeroom ? 'homeroom' : 'teacher',
+            'role' => 'teacher',
             'teacher_id' => $teacher->id,
             'password_hash' => Hash::make('12345678'),
             'is_active' => $teacher->isWorking() ? 1 : 0,
@@ -142,7 +158,12 @@ class TeacherController extends Controller
     private function validatedData(Request $request, ?Teacher $teacher = null): array
     {
         return $request->validate([
-            'teacher_code' => ['required', 'string', Rule::unique('teachers', 'teacher_code')->ignore($teacher?->id)],
+            'teacher_code' => [
+                'required',
+                'string',
+                Rule::unique('teachers', 'teacher_code')->ignore($teacher?->id),
+                Rule::unique('users', 'username')->ignore($teacher?->user?->id),
+            ],
             'name' => ['required', 'string', 'max:255'],
             'dob' => ['nullable', 'date'],
             'gender' => ['nullable', Rule::in(array_keys(Teacher::genderLabels()))],
@@ -152,15 +173,16 @@ class TeacherController extends Controller
             'joined_at' => ['nullable', 'date'],
             'work_status' => ['required', Rule::in(array_keys(Teacher::workStatuses()))],
             'qualification' => ['nullable', 'string', 'max:255'],
-            'main_subject' => ['nullable', 'string', 'max:255'],
-            'is_homeroom' => ['nullable', 'boolean'],
-            'username' => [$teacher ? 'nullable' : 'required', 'string', Rule::unique('users', 'username')->ignore($teacher?->user?->id)],
-            'password' => [$teacher ? 'nullable' : 'required', 'string', 'min:6'],
+            'primary_subject_id' => ['required', 'exists:subjects,id'],
         ]);
     }
 
     private function teacherPayload(array $data, Request $request): array
     {
+        $subject = ! empty($data['primary_subject_id'])
+            ? Subject::find($data['primary_subject_id'])
+            : null;
+
         return [
             'teacher_code' => $data['teacher_code'],
             'name' => $data['name'],
@@ -172,20 +194,8 @@ class TeacherController extends Controller
             'joined_at' => $data['joined_at'] ?? null,
             'work_status' => $data['work_status'] ?? Teacher::STATUS_WORKING,
             'qualification' => $data['qualification'] ?? null,
-            'main_subject' => $data['main_subject'] ?? null,
-            'is_homeroom' => $request->boolean('is_homeroom'),
+            'primary_subject_id' => $data['primary_subject_id'] ?? null,
+            'main_subject' => $subject?->name,
         ];
-    }
-
-    protected function selectedSchoolYearId(?Request $request = null): ?string
-    {
-        $request ??= request();
-
-        if ($this->isHistoricalReadOnly()) {
-            return session('history_school_year_id');
-        }
-
-        return $request->query('school_year_id')
-            ?: SchoolYear::where('is_active', true)->value('id');
     }
 }

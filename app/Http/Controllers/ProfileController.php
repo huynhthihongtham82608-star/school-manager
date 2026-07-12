@@ -22,7 +22,7 @@ class ProfileController extends Controller
 
         // Load role-specific data
         if ($user->isTeacher()) {
-            $data['teacher'] = $user->teacher;
+            $data['teacher'] = $user->teacher?->load('primarySubject');
         } elseif ($user->isStudent()) {
             $data['student'] = $user->student;
         } elseif ($user->isParent()) {
@@ -45,7 +45,7 @@ class ProfileController extends Controller
 
         // Load role-specific data for editing
         if ($user->isTeacher()) {
-            $data['teacher'] = $user->teacher;
+            $data['teacher'] = $user->teacher?->load('primarySubject');
         } elseif ($user->isStudent()) {
             $data['student'] = $user->student;
             $data['classes'] = \App\Models\SchoolClass::orderBy('name')->get();
@@ -77,7 +77,6 @@ class ProfileController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => 'nullable|email|max:255',
                 'phone' => 'nullable|string|max:20',
-                'main_subject' => 'nullable|string|max:255',
             ]);
             
             if ($user->teacher) {
@@ -91,7 +90,6 @@ class ProfileController extends Controller
                 'dob' => 'nullable|date',
                 'address' => 'nullable|string|max:500',
                 'parent_phone' => 'nullable|string|max:20',
-                'email' => 'nullable|email|max:255',
                 'class_id' => 'nullable|exists:school_classes,id',
             ]);
             
@@ -103,7 +101,6 @@ class ProfileController extends Controller
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'phone' => 'nullable|string|max:20',
-                'email' => 'nullable|email|max:255',
                 'address' => 'nullable|string|max:500',
             ]);
             

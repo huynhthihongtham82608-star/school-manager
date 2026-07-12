@@ -8,6 +8,7 @@ use App\Models\SchoolClass;
 use App\Models\SchoolEvent;
 use App\Models\SchoolPost;
 use App\Models\Student;
+use App\Models\SystemSetting;
 use App\Models\Teacher;
 use Illuminate\Support\Facades\Schema;
 
@@ -16,6 +17,7 @@ class LandingPageController extends Controller
     public function index()
     {
         $contents = $this->homeContents();
+        $settings = SystemSetting::current();
 
         $banner = $contents['banner'] ?? [
             'title' => 'Trường học hiện đại, kết nối và phát triển',
@@ -29,10 +31,14 @@ class LandingPageController extends Controller
             'content' => 'Nhà trường hướng đến môi trường học tập an toàn, chuyên nghiệp và lấy học sinh làm trung tâm.',
         ];
 
-        $contact = $contents['contact'] ?? [
+        $contact = [
             'title' => 'Thông tin liên hệ',
             'content' => 'Vui lòng liên hệ văn phòng nhà trường để được hỗ trợ.',
-            'extra' => [],
+            'extra' => [
+                'phone' => $settings->phone,
+                'email' => $settings->email,
+                'address' => $settings->address,
+            ],
         ];
 
         $news = $this->posts(SchoolPost::TYPE_NEWS, 3);
@@ -41,7 +47,7 @@ class LandingPageController extends Controller
         $documents = $this->documents(4);
         $stats = $this->stats();
 
-        return view('home', compact('banner', 'about', 'contact', 'news', 'announcements', 'events', 'documents', 'stats'));
+        return view('home', compact('settings', 'banner', 'about', 'contact', 'news', 'announcements', 'events', 'documents', 'stats'));
     }
 
     private function homeContents(): array
@@ -51,6 +57,7 @@ class LandingPageController extends Controller
         }
 
         return HomePageContent::query()
+            ->whereIn('key', ['banner', 'about'])
             ->get()
             ->mapWithKeys(fn ($item) => [$item->key => $item->toArray()])
             ->all();

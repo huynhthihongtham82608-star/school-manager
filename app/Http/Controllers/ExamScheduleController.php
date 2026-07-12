@@ -19,6 +19,7 @@ class ExamScheduleController extends Controller
     {
         $user = $request->user();
         $selectedYearId = $this->selectedSchoolYearId($request);
+        $selectedSemesterId = $this->selectedSemesterId($request);
         $query = Schema::hasTable('exam_schedules')
             ? ExamSchedule::with(['classRoom', 'subject', 'semester.schoolYear'])
             : null;
@@ -34,7 +35,9 @@ class ExamScheduleController extends Controller
         }
 
         if ($query && $user->isParent() && $user->parentProfile) {
-            $classIds = $user->parentProfile->students()->pluck('students.class_id')->filter()->unique();
+            $students = $user->parentProfile->students()->orderBy('student_code')->get(['students.id', 'students.class_id']);
+            $selected = $students->firstWhere('id', session('selected_parent_student_id')) ?: $students->first();
+            $classIds = collect([$selected?->class_id])->filter();
             $query->whereIn('class_id', $classIds);
         }
 
@@ -52,6 +55,10 @@ class ExamScheduleController extends Controller
             });
         }
 
+        if ($query && $selectedSemesterId) {
+            $query->where('semester_id', $selectedSemesterId);
+        }
+
         $schedules = $query ? $query->orderBy('exam_date')->orderBy('start_time')->paginate(12) : collect();
         $classes = Schema::hasTable('classes')
             ? SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->orderBy('name')->get()
@@ -63,7 +70,7 @@ class ExamScheduleController extends Controller
         $years = Schema::hasTable('school_years') ? SchoolYear::orderByDesc('start_date')->get() : collect();
         $examTypes = ExamSchedule::EXAM_TYPES;
 
-        return view('exam_schedules.index', compact('schedules', 'classes', 'subjects', 'semesters', 'years', 'examTypes', 'selectedYearId'));
+        return view('exam_schedules.index', compact('schedules', 'classes', 'subjects', 'semesters', 'years', 'examTypes', 'selectedYearId', 'selectedSemesterId'));
     }
 
     public function store(Request $request)

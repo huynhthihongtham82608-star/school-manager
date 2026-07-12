@@ -29,7 +29,7 @@ class SchoolEventController extends Controller
         if (Schema::hasTable('school_events')) {
             $events = SchoolEvent::where('is_published', true)->orderBy('starts_at')->paginate(10);
             $events->setCollection($events->getCollection()
-                ->filter(fn (SchoolEvent $event) => $event->isVisibleToRole($request->user()->role))
+                ->filter(fn (SchoolEvent $event) => $event->isVisibleToUser($request->user()))
                 ->values());
         } else {
             $events = collect();

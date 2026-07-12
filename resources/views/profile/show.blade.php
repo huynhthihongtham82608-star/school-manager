@@ -53,9 +53,9 @@
             <div class="info-list">
                 <div class="info-item"><div class="info-label">Mã GV</div><div class="info-value">{{ $teacher->teacher_code }}</div></div>
                 <div class="info-item"><div class="info-label">Họ tên</div><div class="info-value">{{ $teacher->name }}</div></div>
-                <div class="info-item"><div class="info-label">Email</div><div class="info-value">{{ $teacher->email ?? 'Chưa cập nhật' }}</div></div>
+                <div class="info-item"><div class="info-label">Thư điện tử</div><div class="info-value">{{ $teacher->email ?? 'Chưa cập nhật' }}</div></div>
                 <div class="info-item"><div class="info-label">Số điện thoại</div><div class="info-value">{{ $teacher->phone ?? 'Chưa cập nhật' }}</div></div>
-                <div class="info-item"><div class="info-label">Bộ môn</div><div class="info-value">{{ $teacher->main_subject ?? 'Chưa cập nhật' }}</div></div>
+                <div class="info-item"><div class="info-label">Môn chính</div><div class="info-value">{{ $teacher->primarySubjectName() !== '-' ? $teacher->primarySubjectName() : 'Chưa cập nhật' }}</div></div>
                 <div class="info-item">
                     <div class="info-label">Chức vụ</div>
                     <div class="info-value">
@@ -79,14 +79,12 @@
                 <div class="info-item"><div class="info-label">Lớp</div><div class="info-value">{{ $student->classRoom?->name ?? 'Chưa cập nhật' }}</div></div>
                 <div class="info-item"><div class="info-label">Trạng thái</div><div class="info-value"><span class="badge bg-info">{{ ucfirst($student->status ?? 'studying') }}</span></div></div>
                 <div class="info-item"><div class="info-label">Địa chỉ</div><div class="info-value">{{ $student->address ?? 'Chưa cập nhật' }}</div></div>
-                <div class="info-item"><div class="info-label">Email</div><div class="info-value">{{ $student->email ?? 'Chưa cập nhật' }}</div></div>
                 <div class="info-item"><div class="info-label">SĐT phụ huynh</div><div class="info-value">{{ $student->parent_phone ?? 'Chưa cập nhật' }}</div></div>
             </div>
         @elseif($user->isParent() && $parent)
             <div class="info-list mb-4">
                 <div class="info-item"><div class="info-label">Họ tên</div><div class="info-value">{{ $parent->name }}</div></div>
                 <div class="info-item"><div class="info-label">Số điện thoại</div><div class="info-value">{{ $parent->phone ?? 'Chưa cập nhật' }}</div></div>
-                <div class="info-item"><div class="info-label">Email</div><div class="info-value">{{ $parent->email ?? 'Chưa cập nhật' }}</div></div>
                 <div class="info-item"><div class="info-label">Địa chỉ</div><div class="info-value">{{ $parent->address ?? 'Chưa cập nhật' }}</div></div>
             </div>
 

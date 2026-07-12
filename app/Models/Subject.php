@@ -10,6 +10,8 @@ class Subject extends Model
 {
     use HasFactory, UsesUuid;
 
+    public const CODE_PREFIX = 'MH';
+
     public const TYPE_REQUIRED = 'required';
     public const TYPE_ELECTIVE = 'elective';
     public const TYPE_REMEDIAL = 'remedial';
@@ -62,6 +64,11 @@ class Subject extends Model
         return $this->hasMany(SubjectPeriodNorm::class);
     }
 
+    public function primaryTeachers()
+    {
+        return $this->hasMany(Teacher::class, 'primary_subject_id');
+    }
+
     public function periodNormForGrade(int $gradeLevel): ?SubjectPeriodNorm
     {
         if ($this->relationLoaded('periodNorms')) {
@@ -99,7 +106,8 @@ class Subject extends Model
     {
         return $this->assignments()->exists()
             || $this->timetableEntries()->exists()
-            || $this->scoreHeaders()->exists();
+            || $this->scoreHeaders()->exists()
+            || $this->primaryTeachers()->exists();
     }
 
     public function canEditCode(): bool
@@ -110,5 +118,20 @@ class Subject extends Model
     public function canDelete(): bool
     {
         return ! $this->isUsed();
+    }
+
+    public static function nextCode(): string
+    {
+        $maxNumber = static::query()
+            ->where('code', 'like', self::CODE_PREFIX . '%')
+            ->pluck('code')
+            ->map(function ($code) {
+                return preg_match('/^' . self::CODE_PREFIX . '(\d+)$/', (string) $code, $matches)
+                    ? (int) $matches[1]
+                    : 0;
+            })
+            ->max() ?? 0;
+
+        return self::CODE_PREFIX . str_pad((string) ($maxNumber + 1), 3, '0', STR_PAD_LEFT);
     }
 }

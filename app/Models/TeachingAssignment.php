@@ -40,6 +40,7 @@ class TeachingAssignment extends Model
         'semester_id',
         'role',
         'custom_role',
+        'weekly_periods',
         'note',
         'status',
         'archived_at',
@@ -47,6 +48,7 @@ class TeachingAssignment extends Model
 
     protected $casts = [
         'archived_at' => 'datetime',
+        'weekly_periods' => 'integer',
     ];
 
     public function teacher()

@@ -2,48 +2,60 @@
 @section('title', 'Thêm phụ huynh')
 
 @section('content')
-<h5 class="mb-3">Thêm phụ huynh</h5>
 <form method="POST" action="{{ route('parents.store') }}" class="card shadow-sm p-4">
     @csrf
     <div class="row g-3">
-        <div class="col-md-4">
-            <label class="form-label">Họ tên</label>
-            <input class="form-control" name="name" required>
+        <div class="col-md-3">
+            <label class="form-label">Mã phụ huynh</label>
+            <div class="form-control bg-light text-muted">Tự sinh khi lưu</div>
+        </div>
+        <div class="col-md-5">
+            <label class="form-label">Họ tên phụ huynh</label>
+            <input class="form-control" name="name" value="{{ old('name') }}" required>
+            @error('name')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-4">
-            <label class="form-label">SĐT</label>
-            <input class="form-control" name="phone">
+            <label class="form-label">Quan hệ</label>
+            <select class="form-select" name="relation" required>
+                @foreach(\App\Models\ParentProfile::relationLabels() as $value => $label)
+                    <option value="{{ $value }}" @selected(old('relation', \App\Models\ParentProfile::RELATION_GUARDIAN) === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+            @error('relation')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-4">
-            <label class="form-label">Email</label>
-            <input class="form-control" name="email" type="email">
+            <label class="form-label">Số điện thoại</label>
+            <input class="form-control" name="phone" value="{{ old('phone') }}" required>
+            <div class="text-muted small mt-1">Số điện thoại được dùng làm tên đăng nhập.</div>
+            @error('phone')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-12">
             <label class="form-label">Địa chỉ</label>
-            <input class="form-control" name="address">
+            <input class="form-control" name="address" value="{{ old('address') }}">
+            @error('address')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-6">
+        <div class="col-md-7">
             <label class="form-label">Liên kết học sinh</label>
-            <select class="form-select" name="student_ids[]" multiple>
-                @foreach($students as $st)
-                    <option value="{{ $st->id }}">{{ $st->student_code }} - {{ $st->name }}</option>
+            <select class="form-select d-none" name="student_ids[]" multiple data-parent-student-select>
+                @foreach($students as $student)
+                    <option value="{{ $student->id }}" @selected(collect(old('student_ids', []))->contains($student->id))>
+                        {{ $student->student_code }} - {{ $student->name }}{{ $student->classRoom ? ' - ' . $student->classRoom->name : '' }}
+                    </option>
                 @endforeach
             </select>
-            <div class="text-muted small mt-1">Giữ Ctrl để chọn nhiều.</div>
-        </div>
-        <hr>
-        <div class="col-md-4">
-            <label class="form-label">Tài khoản</label>
-            <input class="form-control" name="username" required>
-        </div>
-        <div class="col-md-4">
-            <label class="form-label">Mật khẩu</label>
-            <input class="form-control" name="password" type="password" required>
+            <div class="parent-student-picker" data-parent-student-picker>
+                <div class="parent-student-tags" data-parent-student-tags></div>
+                <input type="text" class="parent-student-search" data-parent-student-search placeholder="Tìm theo mã học sinh hoặc họ tên...">
+                <div class="parent-student-dropdown" data-parent-student-dropdown></div>
+            </div>
+            <div class="text-muted small mt-1">Nhập mã học sinh hoặc họ tên để tìm nhanh. Nếu số điện thoại đã tồn tại, hệ thống chỉ liên kết thêm học sinh.</div>
+            @error('student_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
     </div>
-    <div class="mt-3">
+    <div class="form-actions mt-4">
+        <a class="btn btn-secondary" href="{{ route('parents.index') }}">Hủy</a>
         <button class="btn btn-primary">Lưu</button>
-        <a class="btn btn-link" href="{{ route('parents.index') }}">Hủy</a>
     </div>
 </form>
+@include('parents.partials.student-picker')
 @endsection

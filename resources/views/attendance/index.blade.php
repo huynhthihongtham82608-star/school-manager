@@ -3,7 +3,7 @@
 
 @section('content')
 @php
-    $canManageAttendance = auth()->user()->isAdmin() || auth()->user()->isHomeroom();
+    $canManageAttendance = auth()->user()->isAdmin() || auth()->user()->isTeacher();
     $statusLabels = \App\Models\AttendanceRecord::STATUSES;
     $statusBadge = [
         'present' => 'bg-success',
@@ -25,15 +25,7 @@
         <div class="card-header">Chọn thông tin điểm danh</div>
         <div class="card-body">
             <form method="GET" action="{{ route('attendance.index') }}" class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label">Năm học</label>
-                    <select name="school_year_id" class="form-select" required>
-                        <option value="">Chọn năm học</option>
-                        @foreach($schoolYears as $year)
-                            <option value="{{ $year->id }}" @selected($selectedYearId === $year->id)>{{ $year->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <input type="hidden" name="school_year_id" value="{{ $selectedYearId }}">
                 <div class="col-md-3">
                     <label class="form-label">Học kỳ</label>
                     <select name="semester_id" class="form-select" required>

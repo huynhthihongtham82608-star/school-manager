@@ -128,11 +128,6 @@
             <input type="text" name="parent_phone" class="form-control" value="{{ old('parent_phone', $student->parent_phone) }}">
             @error('parent_phone')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-6">
-            <label class="form-label">Email phụ huynh</label>
-            <input type="email" name="email" class="form-control" value="{{ old('email', $student->email) }}">
-            @error('email')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
         <div class="col-12">
             <label class="form-label">Địa chỉ</label>
             <input type="text" name="address" class="form-control" value="{{ old('address', $student->address) }}">

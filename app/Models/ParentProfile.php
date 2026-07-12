@@ -10,14 +10,36 @@ class ParentProfile extends Model
 {
     use HasFactory, UsesUuid;
 
+    public const RELATION_FATHER = 'father';
+    public const RELATION_MOTHER = 'mother';
+    public const RELATION_GUARDIAN = 'guardian';
+
     protected $table = 'parents';
 
     protected $fillable = [
+        'parent_code',
         'name',
         'phone',
         'email',
         'address',
     ];
+
+    public static function relationLabels(): array
+    {
+        return [
+            self::RELATION_FATHER => 'Cha',
+            self::RELATION_MOTHER => 'Mẹ',
+            self::RELATION_GUARDIAN => 'Người giám hộ',
+        ];
+    }
+
+    public static function relationLabel(?string $relation): string
+    {
+        return self::relationLabels()[$relation] ?? match ($relation) {
+            'PH' => 'Phụ huynh',
+            default => $relation ?: '-',
+        };
+    }
 
     public function students()
     {

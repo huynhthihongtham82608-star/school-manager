@@ -69,7 +69,7 @@
                                         @if(! $year->is_active && ! $year->isArchived())
                                             <li>
                                                 <button type="button" class="dropdown-item" data-activate-school-year data-action="{{ route('school-years.activate', $year) }}" data-year-name="{{ $year->name }}">
-                                                    <i class="bi bi-check-circle me-2"></i>Kích hoạt
+                                                    <i class="bi bi-check-circle me-2"></i>Đặt làm hiện hành
                                                 </button>
                                             </li>
                                             <li>
@@ -113,13 +113,13 @@
             <input type="hidden" name="confirm_activation" value="1">
             <div class="modal-header">
                 <div>
-                    <div class="modal-kicker">Xác nhận kích hoạt</div>
-                    <h5 class="modal-title">Chuyển năm học hoạt động</h5>
+                    <div class="modal-kicker">Xác nhận hiện hành</div>
+                    <h5 class="modal-title">Đổi năm học hiện hành</h5>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-0">Hiện đang có một năm học hoạt động. Bạn có muốn chuyển sang năm học <strong data-activate-year-name></strong> không?</p>
+                <p class="mb-0">Hiện đang có một năm học hiện hành. Bạn có muốn chuyển sang năm học <strong data-activate-year-name></strong> không?</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>

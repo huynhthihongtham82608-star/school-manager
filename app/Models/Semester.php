@@ -50,7 +50,7 @@ class Semester extends Model
         return [
             self::STATUS_DRAFT => 'Bản nháp',
             self::STATUS_INACTIVE => 'Chưa hoạt động',
-            self::STATUS_ACTIVE => 'Hoạt động',
+            self::STATUS_ACTIVE => 'Hiện hành',
             self::STATUS_LOCKED => 'Khóa',
             self::STATUS_ARCHIVED => 'Lưu trữ',
         ];
@@ -101,6 +101,11 @@ class Semester extends Model
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+    public function isCurrent(): bool
+    {
+        return $this->isActive();
     }
 
     public function isLocked(): bool

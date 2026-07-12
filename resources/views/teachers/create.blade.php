@@ -17,8 +17,13 @@
         </div>
         <div class="col-md-4">
             <label class="form-label">Môn chính</label>
-            <input type="text" name="main_subject" class="form-control" value="{{ old('main_subject') }}">
-            @error('main_subject')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+            <select name="primary_subject_id" class="form-select" required>
+                <option value="">Chọn môn chính</option>
+                @foreach($subjects as $subject)
+                    <option value="{{ $subject->id }}" @selected(old('primary_subject_id') === $subject->id)>{{ $subject->name }}</option>
+                @endforeach
+            </select>
+            @error('primary_subject_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-3">
             <label class="form-label">Ngày sinh</label>
@@ -50,7 +55,7 @@
             @error('work_status')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-4">
-            <label class="form-label">Email</label>
+            <label class="form-label">Thư điện tử</label>
             <input type="email" name="email" class="form-control" value="{{ old('email') }}">
             @error('email')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
@@ -68,23 +73,6 @@
             <label class="form-label">Địa chỉ</label>
             <input type="text" name="address" class="form-control" value="{{ old('address') }}">
             @error('address')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-4 d-flex align-items-center">
-            <div class="form-check mt-3">
-                <input class="form-check-input" type="checkbox" name="is_homeroom" value="1" id="is_homeroom" @checked(old('is_homeroom'))>
-                <label class="form-check-label" for="is_homeroom">Cho phép làm GVCN</label>
-            </div>
-        </div>
-        <hr>
-        <div class="col-md-4">
-            <label class="form-label">Tài khoản</label>
-            <input type="text" name="username" class="form-control" value="{{ old('username') }}" required>
-            @error('username')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-4">
-            <label class="form-label">Mật khẩu</label>
-            <input type="password" name="password" class="form-control" required>
-            @error('password')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
     </div>
     <div class="mt-4 d-flex justify-content-end gap-2">

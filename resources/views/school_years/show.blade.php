@@ -9,7 +9,7 @@
     $actionLabels = [
         'school_year_created' => 'Tạo năm học',
         'school_year_updated' => 'Chỉnh sửa',
-        'school_year_activated' => 'Kích hoạt',
+        'school_year_activated' => 'Đặt làm hiện hành',
         'school_year_archived' => 'Lưu trữ',
         'school_year_initialized' => 'Khởi tạo năm học mới từ năm học này',
     ];
@@ -112,8 +112,8 @@
                     <div><dt>Ngày tạo</dt><dd>{{ $formatDate($schoolYear->created_at) }}</dd></div>
                     <div><dt>Người cập nhật gần nhất</dt><dd>{{ $formatUser($logSummary['updated'] ?? null) }}</dd></div>
                     <div><dt>Ngày cập nhật</dt><dd>{{ $formatDate($schoolYear->updated_at) }}</dd></div>
-                    <div><dt>Người kích hoạt</dt><dd>{{ $formatUser($logSummary['activated'] ?? null) }}</dd></div>
-                    <div><dt>Ngày kích hoạt</dt><dd>{{ $formatDate(($logSummary['activated'] ?? null)?->created_at) }}</dd></div>
+                    <div><dt>Người đặt hiện hành</dt><dd>{{ $formatUser($logSummary['activated'] ?? null) }}</dd></div>
+                    <div><dt>Ngày đặt hiện hành</dt><dd>{{ $formatDate(($logSummary['activated'] ?? null)?->created_at) }}</dd></div>
                     <div><dt>Người lưu trữ</dt><dd>{{ $formatUser($logSummary['archived'] ?? null) }}</dd></div>
                     <div><dt>Ngày lưu trữ</dt><dd>{{ $schoolYear->archived_at ? $schoolYear->archived_at->format('d/m/Y H:i') : $formatDate(($logSummary['archived'] ?? null)?->created_at) }}</dd></div>
                 </dl>

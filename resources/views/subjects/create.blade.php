@@ -7,7 +7,8 @@
     <div class="row g-3">
         <div class="col-md-3">
             <label class="form-label">Mã môn</label>
-            <input type="text" name="code" class="form-control" value="{{ old('code') }}" maxlength="50" required>
+            <input type="text" class="form-control" value="{{ $nextCode }}" readonly disabled>
+            <div class="form-text">Mã môn được hệ thống tự sinh theo định dạng MH001.</div>
             @error('code')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-5">

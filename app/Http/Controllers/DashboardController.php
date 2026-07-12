@@ -15,9 +15,12 @@ use App\Models\Student;
 use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\TeachingAssignment;
+use App\Models\TimetableEntry;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
 {
@@ -37,19 +40,25 @@ class DashboardController extends Controller
             'attendance' => Schema::hasTable('attendance_records') ? AttendanceRecord::count() : 0,
         ];
 
-        $activeYear = SchoolYear::where('is_active', true)->first();
-        $adminOverview = $this->adminOverviewData();
+        $activeYear = SchoolYear::find($this->selectedSchoolYearId(request()));
+        $adminOverview = $this->adminOverviewData($activeYear?->getKey());
 
         $teacherAssignments = collect();
+        $teacherDashboard = null;
         $homeroomClass = null;
         $studentScores = collect();
         $conduct = null;
+        $parentChildren = collect();
+        $selectedParentStudent = null;
+        $parentScores = collect();
+        $parentConduct = collect();
 
         if ($user->isTeacher()) {
             $teacher = $user->teacher;
             if ($teacher) {
                 $teacherAssignments = $teacher->assignments()->with(['classRoom', 'subject', 'schoolYear'])->get();
                 $homeroomClass = SchoolClass::where('homeroom_teacher_id', $teacher->id)->with('students')->first();
+                $teacherDashboard = $this->teacherDashboardData($user);
             }
         } elseif ($user->isStudent()) {
             $student = $user->student;
@@ -59,6 +68,18 @@ class DashboardController extends Controller
                     ->get();
                 $conduct = Conduct::where('student_id', $student->id)->with(['classRoom', 'semester'])->get();
             }
+        } elseif ($user->isParent() && $user->parentProfile) {
+            $parentChildren = $user->parentProfile->students()->with('classRoom')->orderBy('student_code')->get();
+            $selectedParentStudent = $this->selectedParentStudent($parentChildren);
+
+            if ($selectedParentStudent) {
+                $parentScores = ScoreHeader::where('student_id', $selectedParentStudent->id)
+                    ->with(['subject', 'semester'])
+                    ->get();
+                $parentConduct = Conduct::where('student_id', $selectedParentStudent->id)
+                    ->with(['classRoom', 'semester'])
+                    ->get();
+            }
         }
 
         return view('dashboard', compact(
@@ -67,17 +88,115 @@ class DashboardController extends Controller
             'adminOverview',
             'activeYear',
             'teacherAssignments',
+            'teacherDashboard',
             'homeroomClass',
             'studentScores',
-            'conduct'
+            'conduct',
+            'parentChildren',
+            'selectedParentStudent',
+            'parentScores',
+            'parentConduct'
         ));
     }
 
-    private function adminOverviewData(): array
+    public function selectParentChild(Request $request)
+    {
+        $user = Auth::user();
+
+        if (! $user?->isParent() || ! $user->parentProfile) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'student_id' => ['required', 'exists:students,id'],
+        ]);
+
+        $allowed = $user->parentProfile->students()
+            ->where('students.id', $data['student_id'])
+            ->exists();
+
+        if (! $allowed) {
+            throw ValidationException::withMessages([
+                'student_id' => 'Học sinh không thuộc tài khoản phụ huynh này.',
+            ]);
+        }
+
+        session(['selected_parent_student_id' => $data['student_id']]);
+
+        return back();
+    }
+
+    private function selectedParentStudent($children)
+    {
+        if ($children->isEmpty()) {
+            return null;
+        }
+
+        $selectedId = session('selected_parent_student_id');
+
+        return $children->firstWhere('id', $selectedId) ?: $children->first();
+    }
+
+    private function teacherDashboardData($user): array
+    {
+        $teacher = $user->teacher;
+        $todayWeekday = now()->isoWeekday();
+
+        $assignments = $teacher->assignments()
+            ->with(['classRoom', 'subject', 'semester.schoolYear'])
+            ->where('status', TeachingAssignment::STATUS_ACTIVE)
+            ->get();
+
+        $todayEntries = collect();
+        if ($todayWeekday >= 1 && $todayWeekday <= 6) {
+            $todayEntries = TimetableEntry::with(['timetable.classRoom', 'assignment.subject', 'roomInfo'])
+                ->where('teacher_id', $teacher->id)
+                ->where('day_of_week', $todayWeekday)
+                ->where('status', TimetableEntry::STATUS_ACTIVE)
+                ->orderBy('period')
+                ->get();
+        }
+
+        $announcements = Schema::hasTable('school_posts')
+            ? SchoolPost::where('type', SchoolPost::TYPE_ANNOUNCEMENT)
+                ->where('is_published', true)
+                ->latest('published_at')
+                ->latest()
+                ->get()
+                ->filter(fn (SchoolPost $post) => $post->isVisibleToUser($user))
+                ->take(5)
+                ->values()
+            : collect();
+
+        $classIds = $assignments->pluck('class_id')->filter()->unique()->values();
+        $upcomingExams = Schema::hasTable('exam_schedules')
+            ? ExamSchedule::with(['classRoom', 'subject'])
+                ->whereIn('class_id', $classIds)
+                ->whereDate('exam_date', '>=', now()->toDateString())
+                ->orderBy('exam_date')
+                ->orderBy('start_time')
+                ->get()
+                ->filter(fn (ExamSchedule $schedule) => $schedule->isPublished())
+                ->take(5)
+                ->values()
+            : collect();
+
+        return [
+            'class_count' => $classIds->count(),
+            'today_period_count' => $todayEntries->count(),
+            'today_entries' => $todayEntries,
+            'announcements' => $announcements,
+            'upcoming_exams' => $upcomingExams,
+        ];
+    }
+
+    private function adminOverviewData(?string $schoolYearId = null): array
     {
         $today = now()->toDateString();
 
-        $classesWithStudentCount = SchoolClass::withCount('students')->get();
+        $classesWithStudentCount = SchoolClass::withCount('students')
+            ->when($schoolYearId, fn ($query) => $query->where('school_year_id', $schoolYearId))
+            ->get();
         $studentsByGrade = collect([10, 11, 12])->map(function (int $grade) use ($classesWithStudentCount) {
             $count = $classesWithStudentCount
                 ->filter(fn (SchoolClass $class) => $this->classGrade($class) === $grade)
@@ -91,13 +210,15 @@ class DashboardController extends Controller
 
         $attendanceByStatus = collect(AttendanceRecord::STATUSES)->map(function (string $label, string $status) {
             $count = Schema::hasTable('attendance_records')
-                ? AttendanceRecord::where('status', $status)->count()
+                ? AttendanceRecord::where('status', $status)
+                    ->when($schoolYearId, fn ($query) => $query->where('school_year_id', $schoolYearId))
+                    ->count()
                 : 0;
 
             return compact('label', 'count');
         })->values();
 
-        $scoreLevels = $this->scoreLevelStats();
+        $scoreLevels = $this->scoreLevelStats($schoolYearId);
 
         $quickInfo = [
             [
@@ -118,7 +239,11 @@ class DashboardController extends Controller
                 'label' => 'Lịch thi sắp diễn ra',
                 'icon' => 'bi-calendar2-check',
                 'value' => Schema::hasTable('exam_schedules')
-                    ? ExamSchedule::all()->filter(fn (ExamSchedule $schedule) => $schedule->isPublished() && $this->examScheduleStartsAt($schedule)?->isFuture())->count()
+                    ? ExamSchedule::all()
+                        ->filter(fn (ExamSchedule $schedule) => $schedule->isPublished()
+                            && (! $schoolYearId || str_contains((string) $schedule->note, '"school_year_id":"' . $schoolYearId . '"'))
+                            && $this->examScheduleStartsAt($schedule)?->isFuture())
+                        ->count()
                     : 0,
             ],
             [
@@ -129,12 +254,22 @@ class DashboardController extends Controller
         ];
 
         $attendedClassIds = Schema::hasTable('attendance_records')
-            ? AttendanceRecord::whereDate('attendance_date', $today)->distinct()->pluck('class_id')->filter()
+            ? AttendanceRecord::whereDate('attendance_date', $today)
+                ->when($schoolYearId, fn ($query) => $query->where('school_year_id', $schoolYearId))
+                ->distinct()
+                ->pluck('class_id')
+                ->filter()
             : collect();
-        $classesWithoutAttendance = SchoolClass::whereNotIn('id', $attendedClassIds)->orderBy('name')->get(['id', 'name']);
+        $classesWithoutAttendance = SchoolClass::whereNotIn('id', $attendedClassIds)
+            ->when($schoolYearId, fn ($query) => $query->where('school_year_id', $schoolYearId))
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         $draftExamSchedules = Schema::hasTable('exam_schedules')
-            ? ExamSchedule::all()->filter(fn (ExamSchedule $schedule) => $schedule->isDraft())->count()
+            ? ExamSchedule::all()
+                ->filter(fn (ExamSchedule $schedule) => $schedule->isDraft()
+                    && (! $schoolYearId || str_contains((string) $schedule->note, '"school_year_id":"' . $schoolYearId . '"')))
+                ->count()
             : 0;
 
         $draftAnnouncements = Schema::hasTable('school_posts')
@@ -179,7 +314,7 @@ class DashboardController extends Controller
         return compact('studentsByGrade', 'attendanceByStatus', 'scoreLevels', 'quickInfo', 'tasks');
     }
 
-    private function scoreLevelStats()
+    private function scoreLevelStats(?string $schoolYearId = null)
     {
         $levels = collect([
             'Giỏi' => 0,
@@ -188,7 +323,10 @@ class DashboardController extends Controller
             'Yếu' => 0,
         ]);
 
-        ScoreHeader::whereNotNull('average')->pluck('average')->each(function ($average) use ($levels) {
+        ScoreHeader::whereNotNull('average')
+            ->when($schoolYearId ?? null, fn ($query) => $query->where('school_year_id', $schoolYearId))
+            ->pluck('average')
+            ->each(function ($average) use ($levels) {
             $average = (float) $average;
 
             if ($average >= 8) {

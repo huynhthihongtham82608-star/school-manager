@@ -49,15 +49,39 @@ class SchoolPost extends Model
 
     public function isVisibleToRole(?string $role): bool
     {
+        return $this->isVisibleToAnyRole([$role]);
+    }
+
+    public function isVisibleToUser(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        $roles = [$user->role === 'staff' ? 'admin' : $user->role];
+
+        if ($user->isTeacher()) {
+            $roles[] = 'teacher';
+        }
+
+        if ($user->isHomeroom()) {
+            $roles[] = 'homeroom';
+        }
+
+        return $this->isVisibleToAnyRole($roles);
+    }
+
+    private function isVisibleToAnyRole(array $roles): bool
+    {
         $targets = $this->targetRoles();
 
         if (in_array('all', $targets, true)) {
             return true;
         }
 
-        $role = $role === 'staff' ? 'admin' : $role;
+        $roles = array_map(fn ($role) => $role === 'staff' ? 'admin' : $role, $roles);
 
-        return in_array($role, $targets, true);
+        return (bool) array_intersect($roles, $targets);
     }
 
     public static function withMeta(?string $content, array $targetRoles): string

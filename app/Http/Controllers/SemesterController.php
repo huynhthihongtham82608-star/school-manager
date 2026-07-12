@@ -14,6 +14,7 @@ use App\Models\TeachingAssignment;
 use App\Models\Timetable;
 use App\Models\TimetableEntry;
 use App\Support\AuditLogger;
+use App\Support\CurrentAcademicContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
@@ -140,6 +141,24 @@ class SemesterController extends Controller
     public function activate(Semester $semester)
     {
         $this->denyHistoricalWrite();
+
+        if (! $semester->canActivate()) {
+            return back()->withErrors(['semester' => 'Chỉ học kỳ Chưa hoạt động mới được đặt làm hiện hành.']);
+        }
+
+        if ($semester->schoolYear?->isArchived()) {
+            return back()->withErrors(['semester' => 'Không thể đặt học kỳ thuộc năm học đã lưu trữ làm hiện hành.']);
+        }
+
+        $currentYear = app(CurrentAcademicContext::class)->schoolYear();
+        if (! $currentYear || (string) $semester->school_year_id !== (string) $currentYear->getKey()) {
+            return back()->withErrors(['semester' => 'Học kỳ hiện hành phải thuộc năm học hiện hành.']);
+        }
+
+        app(CurrentAcademicContext::class)->setCurrentSemester($semester);
+        AuditLogger::log('semester_activated', Semester::class, (string) $semester->getKey(), 'Đặt học kỳ hiện hành ' . $semester->name);
+
+        return back()->with('success', 'Đã đặt học kỳ hiện hành.');
 
         if (! $semester->canActivate()) {
             return back()->withErrors(['semester' => 'Chỉ học kỳ Chưa hoạt động mới được kích hoạt.']);
@@ -280,6 +299,10 @@ class SemesterController extends Controller
 
     private function nameAliases(string $name): array
     {
+        return str_contains($name, '1')
+            ? ['Học kỳ 1', 'Học kì 1', 'HK1', 'Hoc ky 1']
+            : ['Học kỳ 2', 'Học kì 2', 'HK2', 'Hoc ky 2'];
+
         return $name === 'Học kỳ 1'
             ? ['Học kỳ 1', 'Học kì 1', 'HK1', 'Hoc ky 1']
             : ['Học kỳ 2', 'Học kì 2', 'HK2', 'Hoc ky 2'];
@@ -287,6 +310,8 @@ class SemesterController extends Controller
 
     private function termOrder(string $name): int
     {
+        return str_contains($name, '1') ? 1 : 2;
+
         return $name === 'Học kỳ 1' ? 1 : 2;
     }
 

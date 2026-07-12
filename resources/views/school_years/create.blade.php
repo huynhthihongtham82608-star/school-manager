@@ -28,9 +28,9 @@
         <div class="col-12">
             <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="is_active" value="1" id="is_active" @checked(old('is_active'))>
-                <label class="form-check-label" for="is_active">Kích hoạt năm học này</label>
+                <label class="form-check-label" for="is_active">Đặt làm năm học hiện hành</label>
             </div>
-            <div class="form-text">Mặc định năm học mới ở trạng thái chưa hoạt động.</div>
+            <div class="form-text">Năm học mới ban đầu ở trạng thái chưa hoạt động.</div>
         </div>
     </div>
     <div class="mt-3 d-flex justify-content-end gap-2">
@@ -44,13 +44,13 @@
         <div class="modal-content">
             <div class="modal-header">
                 <div>
-                    <div class="modal-kicker">Xác nhận kích hoạt</div>
-                    <h5 class="modal-title">Chuyển năm học hoạt động</h5>
+                    <div class="modal-kicker">Xác nhận hiện hành</div>
+                    <h5 class="modal-title">Đổi năm học hiện hành</h5>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-0">Đang có một năm học hoạt động. Bạn có muốn chuyển sang năm học <strong data-target-year-label></strong> không?</p>
+                <p class="mb-0">Đang có một năm học hiện hành. Bạn có muốn chuyển sang năm học <strong data-target-year-label></strong> không?</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>

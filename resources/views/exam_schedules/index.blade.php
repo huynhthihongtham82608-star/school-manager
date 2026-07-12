@@ -23,23 +23,56 @@
         <h5>Lịch thi</h5>
         <div class="text-muted">Quản lý lịch kiểm tra, lịch thi, phòng thi và ghi chú.</div>
     </div>
+    <div class="d-flex align-items-center gap-2">
+        <div class="dropdown">
+            <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Bộ lọc" aria-label="Bộ lọc">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 280px;">
+                <form method="GET" action="{{ route('exam-schedules.index') }}" class="d-grid gap-3">
+                    <div>
+                        <label class="form-label small">Năm học</label>
+                        <select name="school_year_id" class="form-select">
+                            <option value="">Tất cả năm học</option>
+                            @foreach($years as $year)
+                                <option value="{{ $year->id }}" @selected($selectedYearId === $year->id)>{{ $year->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ route('exam-schedules.index') }}" class="btn btn-secondary">Xóa lọc</a>
+                        <button class="btn btn-primary">Áp dụng</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        @if($canManageSchedules)
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#examScheduleCreateModal">
+                <i class="bi bi-plus-lg me-1"></i>Thêm lịch thi
+            </button>
+        @endif
+    </div>
 </div>
 
 @if($canManageSchedules)
-    <div class="management-card mb-3">
-        <div class="management-card-header">
+    <div class="modal fade content-modal" id="examScheduleCreateModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
             <div>
                 <h6>Thêm lịch thi</h6>
                 <p>Tạo lịch thi theo năm học, học kỳ, lớp, môn học và phòng thi.</p>
             </div>
         </div>
-        <form method="POST" action="{{ route('exam-schedules.store') }}" class="row g-3">
+        <form method="POST" action="{{ route('exam-schedules.store') }}">
+            <div class="modal-body">
+                <div class="row g-3">
             @csrf
             <div class="col-md-3">
                 <label class="form-label">Năm học</label>
                 <select name="school_year_id" class="form-select" required>
                     @foreach($years as $year)
-                        <option value="{{ $year->id }}">{{ $year->name }}</option>
+                        <option value="{{ $year->id }}" @selected($selectedYearId === $year->id)>{{ $year->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -47,7 +80,7 @@
                 <label class="form-label">Học kỳ</label>
                 <select name="semester_id" class="form-select" required>
                     @foreach($semesters as $semester)
-                        <option value="{{ $semester->id }}">{{ $semester->name }}</option>
+                        <option value="{{ $semester->id }}" @selected($selectedSemesterId === $semester->id)>{{ $semester->normalizedName() }}</option>
                     @endforeach
                 </select>
             </div>
@@ -109,7 +142,11 @@
                     Thêm lịch thi
                 </button>
             </div>
+                </div>
+            </div>
         </form>
+            </div>
+        </div>
     </div>
 @endif
 

@@ -8,11 +8,8 @@
     <div class="row g-3">
         <div class="col-md-3">
             <label class="form-label">Mã môn</label>
-            <input type="text" name="code" class="form-control" value="{{ old('code', $subject->code) }}" maxlength="50" required @disabled($isUsed)>
-            @if($isUsed)
-                <input type="hidden" name="code" value="{{ $subject->code }}">
-                <div class="form-text">Môn học đã phát sinh dữ liệu nên không thể sửa mã.</div>
-            @endif
+            <input type="text" class="form-control" value="{{ $subject->code }}" readonly disabled>
+            <div class="form-text">Mã môn được quản lý tự động theo định dạng MH001.</div>
             @error('code')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-5">

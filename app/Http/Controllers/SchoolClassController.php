@@ -92,6 +92,8 @@ class SchoolClassController extends Controller
             'status' => SchoolClass::STATUS_DRAFT,
         ]);
 
+        $this->syncHomeroomTeacherFlags($class);
+
         AuditLogger::log('class_created', SchoolClass::class, (string) $class->getKey(), 'Tạo lớp học ' . $class->name);
 
         return redirect()
@@ -134,6 +136,7 @@ class SchoolClassController extends Controller
         }
 
         $class->update($data);
+        $this->syncHomeroomTeacherFlags($class, $oldTeacherId ? (string) $oldTeacherId : null);
 
         AuditLogger::log('class_updated', SchoolClass::class, (string) $class->getKey(), 'Chỉnh sửa lớp học ' . $class->name);
 
@@ -200,7 +203,9 @@ class SchoolClassController extends Controller
 
         $className = $class->name;
         $classId = (string) $class->getKey();
+        $oldTeacherId = $class->homeroom_teacher_id ? (string) $class->homeroom_teacher_id : null;
         $class->delete();
+        $this->refreshTeacherHomeroomFlag($oldTeacherId);
 
         AuditLogger::log('class_deleted', SchoolClass::class, $classId, 'Xóa lớp học ' . $className);
 
@@ -395,9 +400,9 @@ class SchoolClassController extends Controller
             ->orderBy('name')
             ->get();
 
-        $activeYearId = SchoolYear::where('is_active', true)->value('id');
-        $currentTeacher = $class?->homeroomTeacher;
-        $currentTeacherId = $currentTeacher?->isWorking() ? $class?->homeroom_teacher_id : null;
+        $activeYearId = $this->selectedSchoolYearId(request());
+        $activeSemesterId = $this->selectedSemesterId(request());
+        $currentTeacherId = $class?->homeroom_teacher_id;
         $usedTeacherIds = SchoolClass::query()
             ->where('school_year_id', $activeYearId)
             ->when($class, fn ($query) => $query->whereKeyNot($class->getKey()))
@@ -406,8 +411,7 @@ class SchoolClassController extends Controller
 
         $teachers = Teacher::query()
             ->where(function ($query) use ($currentTeacherId) {
-                $query->where('is_homeroom', true)
-                    ->where('work_status', Teacher::STATUS_WORKING)
+                $query->where('work_status', Teacher::STATUS_WORKING)
                     ->when($currentTeacherId, fn ($teacherQuery) => $teacherQuery->orWhere('id', $currentTeacherId));
             })
             ->where(function ($query) use ($usedTeacherIds, $currentTeacherId) {
@@ -421,6 +425,8 @@ class SchoolClassController extends Controller
             'teachers' => $teachers,
             'years' => $years,
             'semesters' => $semesters,
+            'selectedYearId' => $activeYearId,
+            'selectedSemesterId' => $activeSemesterId,
         ];
     }
 
@@ -452,13 +458,12 @@ class SchoolClassController extends Controller
 
         if (! empty($validated['homeroom_teacher_id'])) {
             $teacherCanBeHomeroom = Teacher::whereKey($validated['homeroom_teacher_id'])
-                ->where('is_homeroom', true)
                 ->where('work_status', Teacher::STATUS_WORKING)
                 ->exists();
 
             if (! $teacherCanBeHomeroom) {
                 throw ValidationException::withMessages([
-                    'homeroom_teacher_id' => 'Giáo viên này chưa được phép làm giáo viên chủ nhiệm.',
+                    'homeroom_teacher_id' => 'Chỉ được chọn giáo viên đang công tác làm giáo viên chủ nhiệm.',
                 ]);
             }
 
@@ -491,20 +496,7 @@ class SchoolClassController extends Controller
 
     private function effectiveSchoolYearId(Request $request): ?string
     {
-        if ($request->query('school_year_id')) {
-            $year = SchoolYear::find($request->query('school_year_id'));
-
-            if ($year && (! $year->isArchived() || $this->isHistoricalReadOnly())) {
-                return $year->id;
-            }
-        }
-
-        if ($this->isHistoricalReadOnly()) {
-            return session('history_school_year_id');
-        }
-
-        return SchoolYear::where('is_active', true)->value('id')
-            ?: SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->value('id');
+        return $this->selectedSchoolYearId($request);
     }
 
     private function deleteCheck(SchoolClass $class): array
@@ -562,12 +554,40 @@ class SchoolClassController extends Controller
             return;
         }
 
+        $oldTeacherId = $class->homeroom_teacher_id ? (string) $class->homeroom_teacher_id : null;
+
         $class->update([
             'status' => SchoolClass::STATUS_ARCHIVED,
             'archived_at' => $class->archived_at ?? now(),
         ]);
+        $this->refreshTeacherHomeroomFlag($oldTeacherId);
 
         AuditLogger::log($action, SchoolClass::class, (string) $class->getKey(), $description);
+    }
+
+    private function syncHomeroomTeacherFlags(SchoolClass $class, ?string $oldTeacherId = null): void
+    {
+        if ($class->homeroom_teacher_id) {
+            Teacher::whereKey($class->homeroom_teacher_id)->update(['is_homeroom' => true]);
+        }
+
+        if ($oldTeacherId && (string) $oldTeacherId !== (string) $class->homeroom_teacher_id) {
+            $this->refreshTeacherHomeroomFlag($oldTeacherId);
+        }
+    }
+
+    private function refreshTeacherHomeroomFlag(?string $teacherId): void
+    {
+        if (! $teacherId) {
+            return;
+        }
+
+        $hasHomeroomClass = SchoolClass::where('homeroom_teacher_id', $teacherId)
+            ->where('status', '!=', SchoolClass::STATUS_ARCHIVED)
+            ->whereHas('schoolYear', fn ($query) => $query->whereNull('archived_at'))
+            ->exists();
+
+        Teacher::whereKey($teacherId)->update(['is_homeroom' => $hasHomeroomClass]);
     }
 
     private function denyHistoricalWrite(): void

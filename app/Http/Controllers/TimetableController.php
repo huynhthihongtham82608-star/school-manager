@@ -35,6 +35,7 @@ class TimetableController extends Controller
     {
         $user = Auth::user();
         $selectedYearId = $this->effectiveSchoolYearId($request);
+        $selectedSemesterId = $this->selectedSemesterId($request);
         $classes = SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->orderBy('name')
             ->get();
@@ -48,14 +49,13 @@ class TimetableController extends Controller
         $timetable = null;
         $entries = collect();
 
-        if ($request->filled('class_id') && $request->filled('semester_id')) {
+        if ($request->filled('class_id') && $selectedSemesterId) {
             $request->validate([
                 'class_id' => 'required|exists:classes,id',
-                'semester_id' => 'required|exists:semesters,id',
             ]);
 
             $selectedClass = SchoolClass::find($request->input('class_id'));
-            $selectedSemester = Semester::find($request->input('semester_id'));
+            $selectedSemester = Semester::find($selectedSemesterId);
 
             $timetable = Timetable::where('class_id', $selectedClass->id)
                 ->where('semester_id', $selectedSemester->id)
@@ -71,7 +71,8 @@ class TimetableController extends Controller
         } elseif ($user->isStudent() && $user->student) {
             $selectedClass = $user->student->classRoom;
         } elseif ($user->isParent() && $user->parentProfile) {
-            $child = $user->parentProfile->students()->with('classRoom')->first();
+            $children = $user->parentProfile->students()->with('classRoom')->orderBy('student_code')->get();
+            $child = $children->firstWhere('id', session('selected_parent_student_id')) ?: $children->first();
             $selectedClass = $child?->classRoom;
         } elseif ($user->isTeacher() && $user->teacher) {
             return $this->teacherView();
@@ -87,12 +88,14 @@ class TimetableController extends Controller
             'days' => self::DAYS,
             'periods' => self::PERIODS,
             'selectedYearId' => $selectedYearId,
+            'selectedSemesterId' => $selectedSemesterId,
         ]);
     }
 
     public function manage(Request $request)
     {
         $selectedYearId = $this->effectiveSchoolYearId($request);
+        $selectedSemesterId = $this->selectedSemesterId($request);
         $readOnly = $this->isHistoricalReadOnly();
         $years = $readOnly
             ? SchoolYear::whereKey($selectedYearId)->get()
@@ -117,14 +120,13 @@ class TimetableController extends Controller
         $cloneTargetSemesters = collect();
         $rooms = $readOnly ? Room::orderBy('name')->get() : Room::where('status', Room::STATUS_ACTIVE)->orderBy('name')->get();
 
-        if ($request->filled('class_id') && $request->filled('semester_id')) {
+        if ($request->filled('class_id') && $selectedSemesterId) {
             $request->validate([
                 'class_id' => 'required|exists:classes,id',
-                'semester_id' => 'required|exists:semesters,id',
             ]);
 
             $selectedClass = SchoolClass::find($request->input('class_id'));
-            $selectedSemester = Semester::find($request->input('semester_id'));
+            $selectedSemester = Semester::find($selectedSemesterId);
             $this->validateSelection($selectedClass, $selectedSemester, $readOnly);
 
             $timetableQuery = Timetable::where('class_id', $selectedClass->id)
@@ -168,6 +170,7 @@ class TimetableController extends Controller
             'entries' => $entries,
             'assignments' => $assignments,
             'selectedYearId' => $selectedYearId,
+            'selectedSemesterId' => $selectedSemesterId,
             'readOnly' => $readOnly,
             'days' => self::DAYS,
             'periods' => self::PERIODS,
@@ -711,15 +714,7 @@ class TimetableController extends Controller
 
     private function effectiveSchoolYearId(Request $request): ?string
     {
-        if ($request->query('school_year_id')) {
-            return $request->query('school_year_id');
-        }
-
-        if ($this->isHistoricalReadOnly()) {
-            return session('history_school_year_id');
-        }
-
-        return SchoolYear::where('is_active', true)->value('id');
+        return $this->selectedSchoolYearId($request);
     }
 
     private function denyHistoricalWrite(): void
