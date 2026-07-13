@@ -42,7 +42,6 @@
         $addCard('bi-bar-chart-line', 'Điểm số', 'Theo dõi điểm thành phần và điểm trung bình của bản thân.', route('scores.index'));
         $addCard('bi-person-check', 'Điểm danh', 'Theo dõi tình trạng chuyên cần của bản thân.', route('attendance.index'));
         $addCard('bi-clipboard-check', 'Hạnh kiểm', 'Xem hạnh kiểm và nhận xét theo học kỳ.', route('conduct.index'));
-        $addCard('bi-calendar2-check', 'Lịch thi', 'Xem lịch kiểm tra, lịch thi và phòng thi của lớp.', route('exam-schedules.index'));
         $addCard('bi-chat-dots', 'Tin nhắn', 'Xem thông báo và trao đổi từ nhà trường.', route('messages.inbox'));
     }
 
@@ -56,10 +55,8 @@
         $addCard('bi-megaphone', 'Thông báo', 'Cập nhật tin tức và thông báo mới từ nhà trường.', route('announcements.index'));
         $addCard('bi-calendar-event', 'Sự kiện', 'Theo dõi các hoạt động và sự kiện sắp diễn ra.', route('events.index'));
         $addCard('bi-journal-bookmark', 'Tài liệu học tập', 'Truy cập thư viện tài liệu được chia sẻ.', route('documents.index'));
-        $addCard('bi-calendar2-check', 'Lịch thi', 'Xem lịch kiểm tra, lịch thi và phòng thi.', route('exam-schedules.index'));
+        $addCard('bi-calendar2-check', 'Lịch kiểm tra', 'Xem lịch kiểm tra của lớp, môn học và phòng kiểm tra.', route('exam-schedules.index'));
         $addCard('bi-cpu', 'AI hỗ trợ học tập', 'Theo dõi cảnh báo và nhận xét học tập được tổng hợp.', $user->isParent() ? route('ai.reports') : route('ai.alerts'));
-        $addCard('bi-robot', 'Chatbot hỗ trợ', 'Hỏi nhanh về điểm, lịch học, tài liệu và thông báo.', route('chatbot.index'));
-        $addCard('bi-person-circle', 'Hồ sơ cá nhân', 'Xem và cập nhật thông tin cá nhân.', route('profile.show'));
     }
 
     $adminCards = [
@@ -338,7 +335,7 @@
             <div class="col-md-6 col-xl-3">
                 <div class="card h-100">
                     <div class="card-body">
-                        <div class="text-muted small">Lịch thi gần nhất</div>
+                        <div class="text-muted small">Lịch kiểm tra gần nhất</div>
                         <div class="fs-3 fw-bold">{{ $teacherDashboard['upcoming_exams']->count() }}</div>
                     </div>
                 </div>
@@ -353,7 +350,7 @@
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>Tiết</th>
+                                    <th>Buổi / Tiết</th>
                                     <th>Môn</th>
                                     <th>Lớp</th>
                                     <th>Phòng</th>
@@ -362,7 +359,7 @@
                             <tbody>
                                 @forelse($teacherDashboard['today_entries'] as $entry)
                                     <tr>
-                                        <td class="fw-semibold">{{ $entry->period }}</td>
+                                        <td class="fw-semibold">{{ $entry->displayPeriod() }}</td>
                                         <td>{{ $entry->assignment?->subject?->name ?? $entry->subject?->name ?? '-' }}</td>
                                         <td>{{ $entry->timetable?->classRoom?->name ?? '-' }}</td>
                                         <td>{{ $entry->displayRoom() ?? '-' }}</td>
@@ -379,7 +376,7 @@
             </div>
             <div class="col-lg-5">
                 <div class="card h-100">
-                    <div class="card-header">Thông báo và lịch thi</div>
+                    <div class="card-header">Thông báo và lịch kiểm tra</div>
                     <div class="list-group list-group-flush">
                         @forelse($teacherDashboard['announcements'] as $post)
                             <a href="{{ route('announcements.index') }}" class="list-group-item list-group-item-action">
@@ -395,7 +392,7 @@
                                 <div class="text-muted small">{{ optional($exam->exam_date)->format('d/m/Y') }} · {{ $exam->timeRange() }}</div>
                             </a>
                         @empty
-                            <div class="list-group-item text-muted">Chưa có lịch thi sắp diễn ra.</div>
+                            <div class="list-group-item text-muted">Chưa có lịch kiểm tra sắp diễn ra.</div>
                         @endforelse
                     </div>
                 </div>

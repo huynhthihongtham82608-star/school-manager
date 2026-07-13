@@ -114,7 +114,9 @@ return new class extends Migration
         Schema::create('score_details', function (Blueprint $table) {
             $table->id();
             $table->foreignId('score_header_id')->constrained('score_headers')->cascadeOnDelete();
+            $table->string('exam_schedule_id', 50)->nullable()->index();
             $table->enum('type', ['oral', 'quiz', 'test', 'midterm', 'final']);
+            $table->string('name')->nullable();
             $table->decimal('value', 5, 2);
             $table->unsignedTinyInteger('weight_group')->default(1); // HS1=1, HS2=2, HS3=3
             $table->timestamps();

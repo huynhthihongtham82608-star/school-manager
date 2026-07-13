@@ -1,5 +1,5 @@
-@extends('layouts.app')
-@section('title', 'Lịch thi')
+﻿@extends('layouts.app')
+@section('title', 'Lịch kiểm tra')
 
 @section('content')
 @php
@@ -20,8 +20,12 @@
 
 <div class="page-heading">
     <div>
-        <h5>Lịch thi</h5>
-        <div class="text-muted">Quản lý lịch kiểm tra, lịch thi, phòng thi và ghi chú.</div>
+        <h5>Lịch kiểm tra</h5>
+        <div class="text-muted">
+            {{ $canManageSchedules
+                ? 'Quản lý các kỳ kiểm tra chung của nhà trường, thời gian mở nhập điểm và ghi chú.'
+                : 'Theo dõi lịch kiểm tra phù hợp với lớp, môn học và vai trò đang đăng nhập.' }}
+        </div>
     </div>
     <div class="d-flex align-items-center gap-2">
         <div class="dropdown">
@@ -48,7 +52,7 @@
         </div>
         @if($canManageSchedules)
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#examScheduleCreateModal">
-                <i class="bi bi-plus-lg me-1"></i>Thêm lịch thi
+                <i class="bi bi-plus-lg me-1"></i>Thêm lịch kiểm tra
             </button>
         @endif
     </div>
@@ -60,8 +64,8 @@
             <div class="modal-content">
                 <div class="modal-header">
             <div>
-                <h6>Thêm lịch thi</h6>
-                <p>Tạo lịch thi theo năm học, học kỳ, lớp, môn học và phòng thi.</p>
+                <h6>Thêm lịch kiểm tra</h6>
+                <p>Tạo lịch kiểm tra theo năm học, học kỳ, lớp, môn học và phòng.</p>
             </div>
         </div>
         <form method="POST" action="{{ route('exam-schedules.store') }}">
@@ -101,15 +105,19 @@
                 </select>
             </div>
             <div class="col-md-4">
-                <label class="form-label">Loại kỳ thi</label>
-                <select name="title" class="form-select" required>
-                    @foreach($examTypes as $type)
-                        <option value="{{ $type }}">{{ $type }}</option>
+                <label class="form-label">Loại kiểm tra</label>
+                <select name="type" class="form-select" required data-exam-type-select>
+                    @foreach($examTypes as $type => $label)
+                        <option value="{{ $type }}">{{ $label }}</option>
                     @endforeach
                 </select>
             </div>
+            <div class="col-md-4 d-none" data-custom-exam-type-wrap>
+                <label class="form-label">Tên loại kiểm tra</label>
+                <input name="custom_display_name" class="form-control" maxlength="255" placeholder="Ví dụ: Thi thử tốt nghiệp" data-custom-exam-type-input>
+            </div>
             <div class="col-md-3">
-                <label class="form-label">Ngày thi</label>
+                <label class="form-label">Ngày kiểm tra</label>
                 <input type="date" name="exam_date" class="form-control" required>
             </div>
             <div class="col-md-2">
@@ -123,6 +131,14 @@
             <div class="col-md-1">
                 <label class="form-label">Phòng</label>
                 <input name="room" class="form-control" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Ngày mở nhập điểm</label>
+                <input type="date" name="score_input_opens_at" class="form-control" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Ngày khóa nhập điểm</label>
+                <input type="date" name="score_input_closes_at" class="form-control" required>
             </div>
             <div class="col-md-4">
                 <label class="form-label">Trạng thái quản lý</label>
@@ -139,7 +155,7 @@
             <div class="col-12 text-end">
                 <button class="btn btn-primary">
                     <i class="bi bi-plus-lg"></i>
-                    Thêm lịch thi
+                    Thêm lịch kiểm tra
                 </button>
             </div>
                 </div>
@@ -153,8 +169,8 @@
 <div class="management-card">
     <div class="management-card-header">
         <div>
-            <h6>Danh sách lịch thi</h6>
-            <p>Trạng thái thời gian được hệ thống tự động xác định theo ngày giờ thi.</p>
+            <h6>Danh sách lịch kiểm tra</h6>
+            <p>Trạng thái thời gian được hệ thống tự động xác định theo ngày giờ kiểm tra.</p>
         </div>
     </div>
     <div class="table-responsive content-table-wrap">
@@ -163,10 +179,11 @@
                 <tr>
                     <th>Lớp</th>
                     <th>Môn học</th>
-                    <th>Loại kỳ thi</th>
-                    <th>Ngày thi</th>
+                    <th>Loại kiểm tra</th>
+                    <th>Ngày kiểm tra</th>
                     <th>Thời gian</th>
-                    <th>Phòng thi</th>
+                    <th>Phòng</th>
+                    <th>Nhập điểm</th>
                     <th>Trạng thái</th>
                     <th class="text-end">Thao tác</th>
                 </tr>
@@ -181,10 +198,18 @@
                 <tr>
                     <td class="fw-semibold">{{ $schedule->classRoom->name ?? 'Đang cập nhật' }}</td>
                     <td>{{ $schedule->subject->name ?? 'Đang cập nhật' }}</td>
-                    <td>{{ $schedule->title }}</td>
+                    <td>{{ $schedule->displayName() }}</td>
                     <td>{{ optional($schedule->exam_date)->format('d/m/Y') }}</td>
                     <td>{{ $schedule->timeRange() }}</td>
                     <td>{{ $schedule->room ?: 'Đang cập nhật' }}</td>
+                    <td>
+                        <span class="badge {{ $schedule->scoreInputBadgeClass() }}">{{ $schedule->scoreInputStatusLabel() }}</span>
+                        <div class="text-muted small">
+                            {{ optional($schedule->score_input_opens_at)->format('d/m/Y') ?: 'Chưa đặt' }}
+                            -
+                            {{ optional($schedule->score_input_closes_at)->format('d/m/Y') ?: 'Chưa đặt' }}
+                        </div>
+                    </td>
                     <td><span class="badge {{ $statusClass($schedule) }}">{{ $schedule->statusLabel() }}</span></td>
                     <td>
                         <div class="content-action-group justify-content-end">
@@ -212,8 +237,8 @@
                         <div class="modal-content">
                             <div class="modal-header">
                                 <div>
-                                    <div class="modal-kicker">Lịch thi</div>
-                                    <h5 class="modal-title">{{ $schedule->title }}</h5>
+                                    <div class="modal-kicker">Lịch kiểm tra</div>
+                                    <h5 class="modal-title">{{ $schedule->displayName() }}</h5>
                                 </div>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                             </div>
@@ -223,11 +248,14 @@
                                     <div><dt>Học kỳ</dt><dd>{{ $schedule->semester->name ?? 'Đang cập nhật' }}</dd></div>
                                     <div><dt>Lớp</dt><dd>{{ $schedule->classRoom->name ?? 'Đang cập nhật' }}</dd></div>
                                     <div><dt>Môn học</dt><dd>{{ $schedule->subject->name ?? 'Đang cập nhật' }}</dd></div>
-                                    <div><dt>Loại kỳ thi</dt><dd>{{ $schedule->title }}</dd></div>
-                                    <div><dt>Ngày thi</dt><dd>{{ optional($schedule->exam_date)->format('d/m/Y') }}</dd></div>
+                                    <div><dt>Loại kiểm tra</dt><dd>{{ $schedule->displayName() }}</dd></div>
+                                    <div><dt>Ngày kiểm tra</dt><dd>{{ optional($schedule->exam_date)->format('d/m/Y') }}</dd></div>
                                     <div><dt>Giờ bắt đầu</dt><dd>{{ $schedule->start_time ? substr($schedule->start_time, 0, 5) : 'Đang cập nhật' }}</dd></div>
                                     <div><dt>Giờ kết thúc</dt><dd>{{ $schedule->end_time ? substr($schedule->end_time, 0, 5) : 'Đang cập nhật' }}</dd></div>
-                                    <div><dt>Phòng thi</dt><dd>{{ $schedule->room ?: 'Đang cập nhật' }}</dd></div>
+                                    <div><dt>Phòng</dt><dd>{{ $schedule->room ?: 'Đang cập nhật' }}</dd></div>
+                                    <div><dt>Ngày mở nhập điểm</dt><dd>{{ optional($schedule->score_input_opens_at)->format('d/m/Y') ?: 'Chưa đặt' }}</dd></div>
+                                    <div><dt>Ngày khóa nhập điểm</dt><dd>{{ optional($schedule->score_input_closes_at)->format('d/m/Y') ?: 'Chưa đặt' }}</dd></div>
+                                    <div><dt>Trạng thái nhập điểm</dt><dd>{{ $schedule->scoreInputStatusLabel() }}</dd></div>
                                     <div><dt>Ghi chú</dt><dd class="content-full-text">{!! nl2br(e($schedule->note ?: 'Không có ghi chú.')) !!}</dd></div>
                                     <div><dt>Trạng thái</dt><dd>{{ $schedule->statusLabel() }}</dd></div>
                                 </dl>
@@ -248,8 +276,8 @@
                                     @method('PUT')
                                     <div class="modal-header">
                                         <div>
-                                            <div class="modal-kicker">Chỉnh sửa lịch thi</div>
-                                            <h5 class="modal-title">{{ $schedule->title }}</h5>
+                                            <div class="modal-kicker">Chỉnh sửa lịch kiểm tra</div>
+                                            <h5 class="modal-title">{{ $schedule->displayName() }}</h5>
                                         </div>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                                     </div>
@@ -288,15 +316,19 @@
                                                 </select>
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label">Loại kỳ thi</label>
-                                                <select name="title" class="form-select" required>
-                                                    @foreach($examTypes as $type)
-                                                        <option value="{{ $type }}" @selected($schedule->title === $type)>{{ $type }}</option>
+                                                <label class="form-label">Loại kiểm tra</label>
+                                                <select name="type" class="form-select" required data-exam-type-select>
+                                                    @foreach($examTypes as $type => $label)
+                                                        <option value="{{ $type }}" @selected($schedule->type === $type)>{{ $label }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
+                                            <div class="col-md-4 {{ $schedule->isCustomType() ? '' : 'd-none' }}" data-custom-exam-type-wrap>
+                                                <label class="form-label">Tên loại kiểm tra</label>
+                                                <input name="custom_display_name" class="form-control" value="{{ $schedule->isCustomType() ? $schedule->displayName() : '' }}" maxlength="255" placeholder="Ví dụ: Thi thử tốt nghiệp" data-custom-exam-type-input>
+                                            </div>
                                             <div class="col-md-3">
-                                                <label class="form-label">Ngày thi</label>
+                                                <label class="form-label">Ngày kiểm tra</label>
                                                 <input type="date" name="exam_date" class="form-control" value="{{ optional($schedule->exam_date)->format('Y-m-d') }}" required>
                                             </div>
                                             <div class="col-md-2">
@@ -310,6 +342,14 @@
                                             <div class="col-md-1">
                                                 <label class="form-label">Phòng</label>
                                                 <input name="room" class="form-control" value="{{ $schedule->room }}" required>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Ngày mở nhập điểm</label>
+                                                <input type="date" name="score_input_opens_at" class="form-control" value="{{ optional($schedule->score_input_opens_at)->format('Y-m-d') }}" required>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Ngày khóa nhập điểm</label>
+                                                <input type="date" name="score_input_closes_at" class="form-control" value="{{ optional($schedule->score_input_closes_at)->format('Y-m-d') }}" required>
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="form-label">Trạng thái quản lý</label>
@@ -336,7 +376,7 @@
                 @endif
             @empty
                 <tr>
-                    <td colspan="8"><div class="empty-state"><i class="bi bi-calendar2-x"></i>Chưa có lịch thi.</div></td>
+                    <td colspan="9"><div class="empty-state"><i class="bi bi-calendar2-x"></i>Chưa có lịch kiểm tra.</div></td>
                 </tr>
             @endforelse
             </tbody>
@@ -347,4 +387,30 @@
         <div class="content-pagination">{{ $schedules->links() }}</div>
     @endif
 </div>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('form').forEach((form) => {
+            const select = form.querySelector('[data-exam-type-select]');
+            const customWrap = form.querySelector('[data-custom-exam-type-wrap]');
+            const customInput = form.querySelector('[data-custom-exam-type-input]');
+
+            if (!select || !customWrap || !customInput) {
+                return;
+            }
+
+            const syncCustomType = () => {
+                const isCustom = select.value === 'custom';
+                customWrap.classList.toggle('d-none', !isCustom);
+                customInput.required = isCustom;
+
+                if (!isCustom) {
+                    customInput.value = '';
+                }
+            };
+
+            select.addEventListener('change', syncCustomType);
+            syncCustomType();
+        });
+    });
+</script>
 @endsection

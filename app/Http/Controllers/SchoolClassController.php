@@ -153,8 +153,8 @@ class SchoolClassController extends Controller
     {
         $this->denyHistoricalWrite();
 
-        if ($class->schoolYear?->isArchived() || $class->semester?->isArchived() || $class->semester?->isLocked()) {
-            return back()->withErrors(['class' => 'Không thể kích hoạt lớp thuộc năm học hoặc học kỳ đã khóa/lưu trữ.']);
+        if ($class->schoolYear?->isArchived()) {
+            return back()->withErrors(['class' => 'Không thể kích hoạt lớp thuộc năm học đã lưu trữ.']);
         }
 
         if ($class->isArchived()) {
@@ -216,8 +216,8 @@ class SchoolClassController extends Controller
     {
         $this->denyHistoricalWrite();
 
-        if (! $class->canEdit() || $class->schoolYear?->isArchived() || $class->semester?->isArchived() || $class->semester?->isLocked()) {
-            return back()->withErrors(['class' => 'Lớp học đang khóa hoặc lưu trữ, không thể phân học sinh.']);
+        if (! $class->canEdit() || $class->schoolYear?->isArchived()) {
+            return back()->withErrors(['class' => 'Lớp học đang khóa hoặc thuộc năm học lưu trữ, không thể phân học sinh.']);
         }
 
         $data = $request->validate([
@@ -339,8 +339,8 @@ class SchoolClassController extends Controller
             return back()->withErrors(['target_class_id' => 'Chỉ được chuyển học sinh trong cùng năm học.']);
         }
 
-        if ($targetClass->isReadOnly() || $targetClass->schoolYear?->isArchived() || $targetClass->semester?->isArchived() || $targetClass->semester?->isLocked()) {
-            return back()->withErrors(['target_class_id' => 'Lớp đích đang khóa hoặc lưu trữ.']);
+        if ($targetClass->isReadOnly() || $targetClass->schoolYear?->isArchived()) {
+            return back()->withErrors(['target_class_id' => 'Lớp đích đang khóa hoặc thuộc năm học lưu trữ.']);
         }
 
         $students = Student::whereIn('id', $studentIds)
@@ -392,14 +392,6 @@ class SchoolClassController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        $semesters = Semester::with('schoolYear')
-            ->whereIn('school_year_id', $years->pluck('id'))
-            ->where('status', '!=', Semester::STATUS_ARCHIVED)
-            ->where('status', '!=', Semester::STATUS_LOCKED)
-            ->orderBy('school_year_id')
-            ->orderBy('name')
-            ->get();
-
         $activeYearId = $this->selectedSchoolYearId(request());
         $activeSemesterId = $this->selectedSemesterId(request());
         $currentTeacherId = $class?->homeroom_teacher_id;
@@ -424,7 +416,6 @@ class SchoolClassController extends Controller
         return [
             'teachers' => $teachers,
             'years' => $years,
-            'semesters' => $semesters,
             'selectedYearId' => $activeYearId,
             'selectedSemesterId' => $activeSemesterId,
         ];
@@ -436,24 +427,15 @@ class SchoolClassController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'grade_level' => ['required', 'integer', Rule::in([10, 11, 12])],
             'school_year_id' => ['required', 'exists:school_years,id'],
-            'semester_id' => ['required', 'exists:semesters,id'],
             'homeroom_teacher_id' => ['nullable', 'exists:teachers,id'],
             'capacity' => ['required', 'integer', 'min:1', 'max:45'],
         ]);
 
         $year = SchoolYear::findOrFail($validated['school_year_id']);
-        $semester = Semester::findOrFail($validated['semester_id']);
+        $validated['semester_id'] = $class?->semester_id ?: $this->defaultSemesterIdForYear((string) $year->getKey());
 
         if ($year->isArchived()) {
             throw ValidationException::withMessages(['school_year_id' => 'Không thể tạo lớp trong năm học đã lưu trữ.']);
-        }
-
-        if ((string) $semester->school_year_id !== (string) $year->id) {
-            throw ValidationException::withMessages(['semester_id' => 'Học kỳ không thuộc năm học đã chọn.']);
-        }
-
-        if ($semester->isArchived() || $semester->isLocked()) {
-            throw ValidationException::withMessages(['semester_id' => 'Không thể tạo hoặc sửa lớp trong học kỳ đã khóa/lưu trữ.']);
         }
 
         if (! empty($validated['homeroom_teacher_id'])) {
@@ -480,14 +462,13 @@ class SchoolClassController extends Controller
         }
 
         $exists = SchoolClass::where('school_year_id', $validated['school_year_id'])
-            ->where('semester_id', $validated['semester_id'])
             ->where('name', $validated['name'])
             ->when($class, fn ($query) => $query->whereKeyNot($class->getKey()))
             ->exists();
 
         if ($exists) {
             throw ValidationException::withMessages([
-                'name' => 'Tên lớp đã tồn tại trong cùng năm học và học kỳ.',
+                'name' => 'Tên lớp đã tồn tại trong cùng năm học.',
             ]);
         }
 
@@ -497,6 +478,14 @@ class SchoolClassController extends Controller
     private function effectiveSchoolYearId(Request $request): ?string
     {
         return $this->selectedSchoolYearId($request);
+    }
+
+    private function defaultSemesterIdForYear(string $schoolYearId): ?string
+    {
+        return Semester::where('school_year_id', $schoolYearId)
+            ->orderByRaw("CASE WHEN status = ? THEN 0 ELSE 1 END", [Semester::STATUS_ACTIVE])
+            ->orderBy('name')
+            ->value('id');
     }
 
     private function deleteCheck(SchoolClass $class): array

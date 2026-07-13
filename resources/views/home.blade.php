@@ -27,8 +27,6 @@
             </a>
             @auth
                 <a href="{{ route('dashboard') }}" class="btn btn-primary"><i class="bi bi-grid me-2"></i>Bảng điều khiển</a>
-            @else
-                <a href="{{ route('login') }}" class="btn btn-primary"><i class="bi bi-box-arrow-in-right me-2"></i>Đăng nhập</a>
             @endauth
         </div>
     </header>
@@ -146,8 +144,8 @@
                                 <i class="bi bi-file-earmark-text"></i>
                                 <h3>{{ $document->title }}</h3>
                                 <p>{{ $document->description ?: 'Tài liệu được nhà trường chia sẻ.' }}</p>
-                                @if($document->file_url)
-                                    <a href="{{ $document->file_url }}" target="_blank" class="btn btn-outline-primary btn-sm">Xem tài liệu</a>
+                                @if($document->fileUrl())
+                                    <a href="{{ $document->fileUrl() }}" target="_blank" class="btn btn-outline-primary btn-sm">Xem tài liệu</a>
                                 @endif
                             </div>
                         </div>

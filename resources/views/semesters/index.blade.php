@@ -20,7 +20,6 @@
                     <th>Tên</th>
                     <th>Năm học</th>
                     <th>Trạng thái</th>
-                    <th>Hiện hành</th>
                     <th>Nhập điểm</th>
                     <th></th>
                 </tr>
@@ -32,13 +31,6 @@
                     <td class="fw-semibold">{{ $semester->normalizedName() }}</td>
                     <td>{{ $semester->schoolYear->name ?? '' }}</td>
                     <td><span class="badge {{ $semester->statusBadgeClass() }}">{{ $semester->statusLabel() }}</span></td>
-                    <td>
-                        @if($semester->isCurrent())
-                            <span class="badge bg-success">Hiện hành</span>
-                        @else
-                            <span class="badge bg-light text-muted border">Không</span>
-                        @endif
-                    </td>
                     <td>
                         @if($semester->is_score_input_open && $semester->isActive())
                             <span class="badge bg-success">Mở</span>
@@ -129,7 +121,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6"><div class="empty-state"><i class="bi bi-calendar-range"></i>Chưa có học kỳ.</div></td>
+                    <td colspan="5"><div class="empty-state"><i class="bi bi-calendar-range"></i>Chưa có học kỳ.</div></td>
                 </tr>
             @endforelse
             </tbody>

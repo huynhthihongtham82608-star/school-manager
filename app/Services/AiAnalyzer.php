@@ -17,6 +17,14 @@ use Illuminate\Support\Collection;
 
 class AiAnalyzer
 {
+    protected function scorableSubjects(): Collection
+    {
+        return Subject::whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
+            ->orderBy('name')
+            ->get()
+            ->keyBy('id');
+    }
+
     public function analyzeClass(string $classId, string $semesterId): array
     {
         $class = SchoolClass::with('homeroomTeacher')->findOrFail($classId);
@@ -77,7 +85,7 @@ class AiAnalyzer
     {
         $student = Student::with('classRoom')->findOrFail($studentId);
         $semester = Semester::with('schoolYear')->findOrFail($semesterId);
-        $subjects = Subject::orderBy('name')->get()->keyBy('id');
+        $subjects = $this->scorableSubjects();
         $previousSemester = $this->previousSemester($semester);
         $subjectRows = $this->studentSubjectRows($student->id, $semester->id, $subjects);
         $avgNow = $this->weightedAverage($subjectRows);
@@ -119,15 +127,16 @@ class AiAnalyzer
     {
         $class = SchoolClass::with(['homeroomTeacher', 'students'])->findOrFail($classId);
         $semester = Semester::with('schoolYear')->findOrFail($semesterId);
-        $subjects = Subject::orderBy('name')->get()->keyBy('id');
+        $subjects = $this->scorableSubjects();
         $studentIds = $class->students->pluck('id')->values();
         $headers = ScoreHeader::query()
             ->whereIn('student_id', $studentIds)
             ->where('semester_id', $semester->id)
+            ->whereIn('subject_id', $subjects->keys())
             ->get();
         $previousSemester = $this->previousSemester($semester);
         $previousHeaders = $previousSemester
-            ? ScoreHeader::query()->whereIn('student_id', $studentIds)->where('semester_id', $previousSemester->id)->get()
+            ? ScoreHeader::query()->whereIn('student_id', $studentIds)->where('semester_id', $previousSemester->id)->whereIn('subject_id', $subjects->keys())->get()
             : collect();
         $studentAverages = $headers
             ->groupBy('student_id')
@@ -200,12 +209,13 @@ class AiAnalyzer
             ->orderBy('grade_level')
             ->orderBy('name')
             ->get();
-        $subjects = Subject::orderBy('name')->get()->keyBy('id');
+        $subjects = $this->scorableSubjects();
         $studentClassMap = $classes->flatMap(fn (SchoolClass $class) => $class->students->mapWithKeys(fn (Student $student) => [$student->id => $class->id]));
         $studentIds = $studentClassMap->keys();
         $scoreHeaders = ScoreHeader::query()
             ->whereIn('student_id', $studentIds)
             ->when($semester, fn ($query) => $query->where('semester_id', $semester->id))
+            ->whereIn('subject_id', $subjects->keys())
             ->get();
         $headersByClass = $scoreHeaders
             ->groupBy(fn (ScoreHeader $header) => $studentClassMap->get($header->student_id));
@@ -266,6 +276,7 @@ class AiAnalyzer
     {
         return ScoreHeader::where('student_id', $studentId)
             ->where('semester_id', $semesterId)
+            ->whereIn('subject_id', $subjects->keys())
             ->get()
             ->map(function (ScoreHeader $header) use ($subjects) {
                 $subject = $subjects[$header->subject_id] ?? null;
@@ -632,6 +643,7 @@ class AiAnalyzer
 
         $headers = ScoreHeader::whereIn('student_id', $studentIds)
             ->where('semester_id', $semesterId)
+            ->whereIn('subject_id', $subjects->keys())
             ->get();
 
         return $this->subjectAveragesFromHeaders($headers, $subjects);
@@ -659,6 +671,7 @@ class AiAnalyzer
 
         return ScoreHeader::whereIn('student_id', $studentIds)
             ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
+            ->whereIn('subject_id', $subjects->keys())
             ->get()
             ->groupBy('subject_id')
             ->map(function (Collection $headers, string $subjectId) use ($subjects) {

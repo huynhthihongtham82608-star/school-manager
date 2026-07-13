@@ -21,8 +21,11 @@
             <div class="form-control bg-light">{{ $assignment->classRoom->name ?? '-' }}</div>
         </div>
         <div class="col-md-3">
-            <label class="form-label">Số tiết/tuần</label>
+            <label class="form-label">Điều chỉnh số tiết/tuần</label>
             <input type="number" name="weekly_periods" class="form-control" value="{{ old('weekly_periods', $assignment->weekly_periods) }}" min="1" max="20">
+            <div class="form-text">
+                Để trống nếu dùng định mức môn học{{ $assignment->standardWeeklyPeriods() ? ': ' . $assignment->standardWeeklyPeriods() . ' tiết/tuần' : '.' }}
+            </div>
             @error('weekly_periods')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-6">

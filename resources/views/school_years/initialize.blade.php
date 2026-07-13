@@ -119,7 +119,7 @@
 
         <div class="alert alert-light border mt-4 mb-0">
             Môn học, giáo viên, phòng học và tài liệu học tập là dữ liệu dùng chung của toàn trường nên không được sao chép khi tạo năm học mới.
-            Không khởi tạo lại điểm số, hạnh kiểm, điểm danh, lịch thi, thời khóa biểu, phân công giảng dạy, thông báo, sự kiện hoặc tin nhắn vì đây là dữ liệu riêng theo từng năm học.
+            Không khởi tạo lại điểm số, hạnh kiểm, điểm danh, lịch kiểm tra, thời khóa biểu, phân công giảng dạy, thông báo, sự kiện hoặc tin nhắn vì đây là dữ liệu riêng theo từng năm học.
         </div>
 
         <div class="mt-4 d-flex justify-content-end gap-2">

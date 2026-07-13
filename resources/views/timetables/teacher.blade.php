@@ -15,7 +15,7 @@
             <thead>
                 <tr>
                     <th>Thứ</th>
-                    <th>Tiết</th>
+                    <th>Buổi / Tiết</th>
                     <th>Lớp</th>
                     <th>Môn học</th>
                     <th>Phòng</th>
@@ -26,7 +26,7 @@
             @forelse($entries as $entry)
                 <tr>
                     <td class="fw-semibold">{{ $dayMap[$entry->day_of_week] ?? $entry->day_of_week }}</td>
-                    <td>{{ $entry->period }}</td>
+                    <td>{{ $entry->displayPeriod() }}</td>
                     <td>{{ $entry->timetable->classRoom->name ?? '' }}</td>
                     <td>{{ $entry->assignment?->subject?->name ?? $entry->subject?->name ?? '' }}</td>
                     <td>{{ $entry->displayRoom() ?? '-' }}</td>

@@ -9,6 +9,8 @@ use App\Models\TeachingAssignment;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class LearningDocumentController extends Controller
 {
@@ -23,7 +25,10 @@ class LearningDocumentController extends Controller
             $query = LearningDocument::with(['subject', 'classRoom'])->latest();
 
             if ($selectedYearId) {
-                $query->whereIn('class_id', $classIds);
+                $query->where(function ($scope) use ($classIds) {
+                    $scope->whereNull('class_id')
+                        ->orWhereIn('class_id', $classIds);
+                });
             }
 
             if (! (request()->user()->isAdmin() || request()->user()->isStaff())) {
@@ -84,14 +89,17 @@ class LearningDocumentController extends Controller
             return back()->with('error', 'Chưa có bảng learning_documents. Vui lòng chạy migration trước.');
         }
 
-        $data = $request->validate($this->rules());
+        $data = $request->validate($this->rules(true));
         $this->ensureTeacherDocumentScope($request->user(), $data);
         $targetRoles = $request->input('target_roles', ['all']);
         unset($data['target_roles']);
+        $fileUrl = $this->storeUploadedFile($request);
+        unset($data['document_file']);
 
         $document = LearningDocument::create([
             ...$data,
             'description' => LearningDocument::withMeta($data['description'] ?? null, $targetRoles),
+            'file_url' => $fileUrl,
             'uploaded_by' => $request->user()->id,
             'is_published' => $request->boolean('is_published'),
         ]);
@@ -109,10 +117,16 @@ class LearningDocumentController extends Controller
             return back()->with('error', 'Chưa có bảng learning_documents. Vui lòng chạy migration trước.');
         }
 
-        $data = $request->validate($this->rules());
+        $data = $request->validate($this->rules(false));
         $this->ensureTeacherDocumentScope($request->user(), $data);
         $targetRoles = $request->input('target_roles', ['all']);
         unset($data['target_roles']);
+        unset($data['document_file']);
+
+        if ($request->hasFile('document_file')) {
+            $data['file_url'] = $this->storeUploadedFile($request);
+            $this->deleteStoredFile($document->file_url);
+        }
 
         $document->update([
             ...$data,
@@ -134,6 +148,7 @@ class LearningDocumentController extends Controller
         }
 
         $documentId = $document->id;
+        $this->deleteStoredFile($document->file_url);
         $document->delete();
 
         AuditLogger::log('learning_document_deleted', LearningDocument::class, $documentId, 'Xóa tài liệu học tập');
@@ -141,19 +156,52 @@ class LearningDocumentController extends Controller
         return back()->with('success', 'Đã xóa tài liệu học tập.');
     }
 
-    private function rules(): array
+    private function rules(bool $requireFile = false): array
     {
         return [
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'category' => ['nullable', 'string', 'max:100'],
-            'file_url' => ['nullable', 'string', 'max:255'],
+            'document_file' => [$requireFile ? 'required' : 'nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,png,jpg,jpeg', 'max:20480'],
             'subject_id' => ['nullable', 'string', 'max:50'],
             'class_id' => ['nullable', 'string', 'max:50'],
             'is_published' => ['nullable', 'boolean'],
             'target_roles' => ['nullable', 'array'],
             'target_roles.*' => ['in:all,admin,teacher,homeroom,student,parent'],
         ];
+    }
+
+    private function storeUploadedFile(Request $request): ?string
+    {
+        if (! $request->hasFile('document_file')) {
+            return null;
+        }
+
+        $file = $request->file('document_file');
+        $extension = $file->getClientOriginalExtension();
+        $baseName = Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) ?: 'tai-lieu';
+        $fileName = $baseName . '-' . now()->format('YmdHis') . '-' . Str::random(8) . '.' . $extension;
+        $path = $file->storeAs('learning-documents', $fileName, 'public');
+
+        return 'storage/' . $path;
+    }
+
+    private function deleteStoredFile(?string $fileUrl): void
+    {
+        if (! $fileUrl || str_starts_with($fileUrl, 'http://') || str_starts_with($fileUrl, 'https://')) {
+            return;
+        }
+
+        $path = ltrim(parse_url($fileUrl, PHP_URL_PATH) ?: '', '/');
+        $prefix = 'storage/';
+
+        if (str_starts_with($path, $prefix)) {
+            $path = substr($path, strlen($prefix));
+        }
+
+        if ($path && Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
     }
 
     private function canCreateDocument($user): bool

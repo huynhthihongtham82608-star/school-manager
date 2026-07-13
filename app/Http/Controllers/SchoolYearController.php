@@ -840,7 +840,7 @@ class SchoolYearController extends Controller
             ],
             [
                 'icon' => 'bi-calendar2-check',
-                'label' => 'Lịch thi',
+                'label' => 'Lịch kiểm tra',
                 'count' => $examCount,
                 'url' => route('exam-schedules.index', $yearParams),
             ],
@@ -1188,7 +1188,7 @@ class SchoolYearController extends Controller
             'Điểm danh' => fn () => $this->modelHasRowsIn(AttendanceRecord::class, 'class_id', $classIds)
                 || $this->modelHasRowsIn(AttendanceRecord::class, 'semester_id', $semesterIds),
             'Hạnh kiểm' => fn () => $this->modelHasRows(Conduct::class, 'school_year_id', $id),
-            'Lịch thi' => fn () => $this->examSchedulesExistForYear($id, $classIds, $semesterIds),
+            'Lịch kiểm tra' => fn () => $this->examSchedulesExistForYear($id, $classIds, $semesterIds),
             'Thời khóa biểu' => fn () => $this->modelHasRows(Timetable::class, 'school_year_id', $id),
             'Phân công giảng dạy' => fn () => $this->modelHasRows(TeachingAssignment::class, 'school_year_id', $id),
             'Thông báo' => fn () => $this->contentRowsExistForYear('school_posts', 'content', $id),

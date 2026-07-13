@@ -9,7 +9,7 @@
 <div class="page-heading">
     <div>
         <h5>Lớp học</h5>
-        <div class="text-muted">Quản lý lớp theo năm học, học kỳ, khối và giáo viên chủ nhiệm.</div>
+        <div class="text-muted">Quản lý lớp theo năm học, khối và giáo viên chủ nhiệm.</div>
     </div>
     <div class="d-flex align-items-center gap-2">
         @if(! $readOnly)
@@ -42,9 +42,10 @@
         <table class="table">
             <thead>
                 <tr>
+                    <th>Mã lớp</th>
                     <th>Tên lớp</th>
                     <th>Khối</th>
-                    <th>Học kỳ</th>
+                    <th>Năm học</th>
                     <th>GVCN</th>
                     <th>Sĩ số</th>
                     <th>Trạng thái</th>
@@ -57,9 +58,10 @@
                     $deleteCheck = $deleteChecks[(string) $class->getKey()] ?? ['allowed' => false, 'message' => null];
                 @endphp
                 <tr>
-                    <td class="fw-semibold">{{ $class->name }}</td>
+                    <td class="fw-semibold">{{ strtoupper(str_replace(' ', '', $class->name)) }}</td>
+                    <td>{{ $class->name }}</td>
                     <td>{{ $class->grade_level }}</td>
-                    <td>{{ $class->semester?->normalizedName() ?? '-' }}</td>
+                    <td>{{ $class->schoolYear->name ?? '-' }}</td>
                     <td>{{ $class->homeroomTeacher->name ?? '-' }}</td>
                     <td>{{ $class->currentStudentCount() }} / {{ $class->maxCapacity() }}</td>
                     <td><span class="badge {{ $class->statusBadgeClass() }}">{{ $class->statusLabel() }}</span></td>
@@ -149,7 +151,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7"><div class="empty-state"><i class="bi bi-building"></i>Chưa có lớp học.</div></td>
+                    <td colspan="8"><div class="empty-state"><i class="bi bi-building"></i>Chưa có lớp học.</div></td>
                 </tr>
             @endforelse
             </tbody>
@@ -177,7 +179,7 @@
                     <div>
                         <h5 class="modal-title">Danh sách học sinh - {{ $class->name }}</h5>
                         <div class="text-muted small">
-                            {{ $class->schoolYear->name ?? '' }} - {{ $class->semester?->normalizedName() ?? '' }}
+                            {{ $class->schoolYear->name ?? '' }}
                         </div>
                         <div class="text-muted small">Niên khóa: {{ $cohortSummary }}</div>
                     </div>
@@ -243,7 +245,7 @@
                                     <option value="">Chọn lớp đích</option>
                                     @foreach($availableTransferClasses as $targetClass)
                                         <option value="{{ $targetClass->id }}">
-                                            {{ $targetClass->name }} - {{ $targetClass->semester?->normalizedName() ?? '' }} ({{ $targetClass->currentStudentCount() }} / {{ $targetClass->maxCapacity() }})
+                                            {{ $targetClass->name }} ({{ $targetClass->currentStudentCount() }} / {{ $targetClass->maxCapacity() }})
                                         </option>
                                     @endforeach
                                 </select>

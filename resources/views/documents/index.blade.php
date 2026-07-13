@@ -31,7 +31,7 @@
                     <p>Quản lý tài liệu học tập hiển thị trong hệ thống và Trang chủ.</p>
                 </div>
             </div>
-            <form method="POST" action="{{ route('documents.store') }}" class="row g-3">
+            <form method="POST" action="{{ route('documents.store') }}" class="row g-3" enctype="multipart/form-data">
                 @csrf
                 <div class="col-md-6">
                     <label class="form-label">Tên tài liệu</label>
@@ -64,8 +64,9 @@
                     <input name="category" class="form-control">
                 </div>
                 <div class="col-md-8">
-                    <label class="form-label">URL tài liệu</label>
-                    <input name="file_url" class="form-control">
+                    <label class="form-label">Tệp tài liệu</label>
+                    <input type="file" name="document_file" class="form-control" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg" required>
+                    <small class="text-muted">Hỗ trợ PDF, Word, Excel, PowerPoint và hình ảnh. Tối đa 20MB.</small>
                 </div>
                 <div class="col-12">
                     <label class="form-label">Mô tả</label>
@@ -130,6 +131,7 @@
                             $editId = 'document-edit-' . $document->id;
                             $targetRoleText = collect($document->targetRoles())->map(fn ($role) => $roleOptions[$role] ?? $role)->join(', ');
                             $canManageThisDocument = in_array($document->id, $manageableDocumentIds ?? [], true);
+                            $documentFileUrl = $document->fileUrl();
                         @endphp
                         <tr>
                             <td>
@@ -146,8 +148,8 @@
                                     <button type="button" class="content-action-btn icon-only detail" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}" title="Xem chi tiết" aria-label="Xem chi tiết">
                                         <i class="bi bi-eye"></i><span class="visually-hidden">Xem chi tiết</span>
                                     </button>
-                                    @if($document->file_url)
-                                        <a href="{{ $document->file_url }}" target="_blank" class="content-action-btn icon-only detail" title="Mở tài liệu" aria-label="Mở tài liệu" data-bs-toggle="tooltip">
+                                    @if($documentFileUrl)
+                                        <a href="{{ $documentFileUrl }}" target="_blank" class="content-action-btn icon-only detail" title="Mở tài liệu" aria-label="Mở tài liệu" data-bs-toggle="tooltip">
                                             <i class="bi bi-box-arrow-up-right"></i><span class="visually-hidden">Mở tài liệu</span>
                                         </a>
                                     @endif
@@ -182,6 +184,7 @@
                     $detailId = 'document-detail-' . $document->id;
                     $editId = 'document-edit-' . $document->id;
                     $targetRoleText = collect($document->targetRoles())->map(fn ($role) => $roleOptions[$role] ?? $role)->join(', ');
+                    $documentFileUrl = $document->fileUrl();
                 @endphp
 
                 <div class="modal fade content-modal" id="{{ $detailId }}" tabindex="-1" aria-hidden="true">
@@ -216,10 +219,10 @@
                                         <dt>Trạng thái</dt>
                                         <dd>{{ $document->is_published ? 'Công bố' : 'Bản nháp' }}</dd>
                                     </div>
-                                    @if($document->file_url)
+                                    @if($documentFileUrl)
                                         <div>
-                                            <dt>URL tài liệu</dt>
-                                            <dd><a href="{{ $document->file_url }}" target="_blank" class="btn btn-outline-primary btn-sm">Mở tài liệu</a></dd>
+                                            <dt>Tệp tài liệu</dt>
+                                            <dd><a href="{{ $documentFileUrl }}" target="_blank" class="btn btn-outline-primary btn-sm">Mở tài liệu</a></dd>
                                         </div>
                                     @endif
                                     <div>
@@ -238,7 +241,7 @@
                 <div class="modal fade content-modal" id="{{ $editId }}" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered modal-lg">
                         <div class="modal-content">
-                            <form method="POST" action="{{ route('documents.update', $document) }}">
+                            <form method="POST" action="{{ route('documents.update', $document) }}" enctype="multipart/form-data">
                                 @csrf
                                 @method('PUT')
                                 <div class="modal-header">
@@ -281,8 +284,15 @@
                                             <input name="category" class="form-control" value="{{ $document->category }}">
                                         </div>
                                         <div class="col-md-8">
-                                            <label class="form-label">URL tài liệu</label>
-                                            <input name="file_url" class="form-control" value="{{ $document->file_url }}">
+                                            <label class="form-label">Tệp tài liệu</label>
+                                            <input type="file" name="document_file" class="form-control" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg">
+                                            <small class="text-muted">
+                                                @if($documentFileUrl)
+                                                    Để trống nếu muốn giữ tệp hiện tại.
+                                                @else
+                                                    Chọn tệp tài liệu để đưa lên hệ thống.
+                                                @endif
+                                            </small>
                                         </div>
                                         <div class="col-12">
                                             <label class="form-label">Mô tả</label>
@@ -333,6 +343,7 @@
     <div class="content-grid">
         @forelse($documents as $document)
             @php($detailId = 'document-detail-' . $document->id)
+            @php($documentFileUrl = $document->fileUrl())
             <article class="info-card">
                 <span class="feature-card-icon mb-3"><i class="bi bi-file-earmark-text"></i></span>
                 <h6>{{ $document->title }}</h6>
@@ -344,8 +355,8 @@
                     <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}">
                         <i class="bi bi-eye me-1"></i>Xem chi tiết
                     </button>
-                    @if($document->file_url)
-                        <a href="{{ $document->file_url }}" target="_blank" class="btn btn-primary btn-sm">
+                    @if($documentFileUrl)
+                        <a href="{{ $documentFileUrl }}" target="_blank" class="btn btn-primary btn-sm">
                             <i class="bi bi-box-arrow-up-right me-1"></i>Xem tài liệu
                         </a>
                     @endif
@@ -360,6 +371,7 @@
 
     @foreach($documents as $document)
         @php($detailId = 'document-detail-' . $document->id)
+        @php($documentFileUrl = $document->fileUrl())
         <div class="modal fade content-modal" id="{{ $detailId }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content">
@@ -384,10 +396,10 @@
                                 <dt>Nhóm tài liệu</dt>
                                 <dd>{{ $document->category ?: 'Chưa phân nhóm' }}</dd>
                             </div>
-                            @if($document->file_url)
+                            @if($documentFileUrl)
                                 <div>
-                                    <dt>URL tài liệu</dt>
-                                    <dd><a href="{{ $document->file_url }}" target="_blank" class="btn btn-outline-primary btn-sm">Mở tài liệu</a></dd>
+                                    <dt>Tệp tài liệu</dt>
+                                    <dd><a href="{{ $documentFileUrl }}" target="_blank" class="btn btn-outline-primary btn-sm">Mở tài liệu</a></dd>
                                 </div>
                             @endif
                             <div>

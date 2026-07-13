@@ -12,10 +12,17 @@ class ScoreDetail extends Model
 
     protected $fillable = [
         'score_header_id',
+        'exam_schedule_id',
         'type',
+        'name',
         'value',
         'weight_group',
     ];
+
+    public function examSchedule()
+    {
+        return $this->belongsTo(ExamSchedule::class);
+    }
 
     protected $casts = [
         'value' => 'float',

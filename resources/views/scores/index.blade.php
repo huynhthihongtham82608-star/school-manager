@@ -56,7 +56,7 @@
                             <div class="d-flex flex-wrap gap-2">
                                 @forelse($score->details->groupBy('type') as $type => $items)
                                     <span class="badge bg-light text-dark border">
-                                        {{ $detailLabels[$type] ?? $type }}:
+                                        {{ $items->first()?->name ?: ($detailLabels[$type] ?? $type) }}:
                                         {{ $items->pluck('value')->map(fn ($value) => rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.'))->implode(', ') }}
                                     </span>
                                 @empty
@@ -87,14 +87,8 @@
 <div class="page-heading">
     <div>
         <h5>Nhập điểm</h5>
-        <div class="text-muted">Chọn lớp, môn và học kỳ để mở bảng nhập điểm.</div>
+        <div class="text-muted">Giáo viên bộ môn nhập điểm thường xuyên trực tiếp. Điểm giữa kỳ và cuối kỳ phụ thuộc thời gian mở trong Lịch kiểm tra.</div>
     </div>
-    @if(auth()->user()->isAdmin() || auth()->user()->isStaff())
-        <a href="{{ route('grade-windows.index') }}" class="btn btn-outline-primary">
-            <i class="bi bi-lock"></i>
-            Cấu hình khóa nhập điểm
-        </a>
-    @endif
 </div>
 
 <div class="row g-3">

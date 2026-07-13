@@ -58,16 +58,20 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th style="width:110px;">Tiết</th>
+                        <th style="width:120px;">Buổi / Tiết</th>
                         @foreach($days as $dayLabel)
                             <th>{{ $dayLabel }}</th>
                         @endforeach
                     </tr>
                 </thead>
                 <tbody>
-                @foreach($periods as $period)
+                @foreach($periodGroups as $periodGroup)
+                    <tr class="table-light">
+                        <td colspan="{{ count($days) + 1 }}" class="fw-bold">{{ $periodGroup['label'] }}</td>
+                    </tr>
+                    @foreach($periodGroup['periods'] as $period => $periodLabel)
                     <tr>
-                        <td class="fw-semibold">Tiết {{ $period }}</td>
+                        <td class="fw-semibold">{{ $periodLabel }}</td>
                         @foreach($days as $day => $dayLabel)
                             @php($entry = $entries[$day.'-'.$period] ?? null)
                             <td>
@@ -86,6 +90,7 @@
                             </td>
                         @endforeach
                     </tr>
+                    @endforeach
                 @endforeach
                 </tbody>
             </table>

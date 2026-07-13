@@ -159,33 +159,6 @@ class SemesterController extends Controller
         AuditLogger::log('semester_activated', Semester::class, (string) $semester->getKey(), 'Đặt học kỳ hiện hành ' . $semester->name);
 
         return back()->with('success', 'Đã đặt học kỳ hiện hành.');
-
-        if (! $semester->canActivate()) {
-            return back()->withErrors(['semester' => 'Chỉ học kỳ Chưa hoạt động mới được kích hoạt.']);
-        }
-
-        if ($semester->schoolYear?->isArchived()) {
-            return back()->withErrors(['semester' => 'Không thể kích hoạt học kỳ thuộc năm học đã lưu trữ.']);
-        }
-
-        $activeSemester = Semester::where('school_year_id', $semester->school_year_id)
-            ->where('status', Semester::STATUS_ACTIVE)
-            ->whereKeyNot($semester->getKey())
-            ->first();
-
-        if ($activeSemester) {
-            return back()->withErrors([
-                'semester' => 'Năm học này đang có học kỳ hoạt động. Vui lòng khóa hoặc lưu trữ học kỳ hiện tại trước khi kích hoạt học kỳ khác.',
-            ]);
-        }
-
-        $semester->update([
-            'status' => Semester::STATUS_ACTIVE,
-            'is_score_input_open' => true,
-        ]);
-        AuditLogger::log('semester_activated', Semester::class, (string) $semester->getKey(), 'Kích hoạt học kỳ ' . $semester->name);
-
-        return back()->with('success', 'Đã kích hoạt học kỳ.');
     }
 
     public function lock(Semester $semester)
@@ -345,7 +318,7 @@ class SemesterController extends Controller
             'Điểm số' => fn () => $this->modelHasRows(ScoreHeader::class, 'semester_id', $id),
             'Điểm danh' => fn () => $this->modelHasRows(AttendanceRecord::class, 'semester_id', $id),
             'Hạnh kiểm' => fn () => $this->modelHasRows(Conduct::class, 'semester_id', $id),
-            'Lịch thi' => fn () => $this->modelHasRows(ExamSchedule::class, 'semester_id', $id),
+            'Lịch kiểm tra' => fn () => $this->modelHasRows(ExamSchedule::class, 'semester_id', $id),
             'Thời khóa biểu' => fn () => $this->modelHasRows(Timetable::class, 'semester_id', $id),
         ];
 

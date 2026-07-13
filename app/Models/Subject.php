@@ -12,14 +12,24 @@ class Subject extends Model
 
     public const CODE_PREFIX = 'MH';
 
+    public const TYPE_OFFICIAL = 'official';
+    public const TYPE_HOMEROOM = 'homeroom';
+    public const TYPE_ACTIVITY = 'activity';
+
     public const TYPE_REQUIRED = 'required';
     public const TYPE_ELECTIVE = 'elective';
     public const TYPE_REMEDIAL = 'remedial';
 
     public const TYPES = [
-        self::TYPE_REQUIRED => 'Bắt buộc',
-        self::TYPE_ELECTIVE => 'Tự chọn',
-        self::TYPE_REMEDIAL => 'Phụ đạo',
+        self::TYPE_OFFICIAL => 'Chính khóa',
+        self::TYPE_HOMEROOM => 'Chủ nhiệm',
+        self::TYPE_ACTIVITY => 'Hoạt động',
+    ];
+
+    public const LEGACY_SCORABLE_TYPES = [
+        self::TYPE_REQUIRED,
+        self::TYPE_ELECTIVE,
+        self::TYPE_REMEDIAL,
     ];
 
     public const STATUS_ACTIVE = 'active';
@@ -80,7 +90,17 @@ class Subject extends Model
 
     public function typeLabel(): string
     {
-        return self::TYPES[$this->type] ?? self::TYPES[self::TYPE_REQUIRED];
+        if (in_array($this->type, self::LEGACY_SCORABLE_TYPES, true)) {
+            return self::TYPES[self::TYPE_OFFICIAL];
+        }
+
+        return self::TYPES[$this->type] ?? self::TYPES[self::TYPE_OFFICIAL];
+    }
+
+    public function isScorable(): bool
+    {
+        return $this->type === self::TYPE_OFFICIAL
+            || in_array($this->type, self::LEGACY_SCORABLE_TYPES, true);
     }
 
     public function statusLabel(): string

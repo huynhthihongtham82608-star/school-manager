@@ -29,7 +29,30 @@ class TimetableController extends Controller
         6 => 'Thứ 7',
     ];
 
-    private const PERIODS = [1, 2, 3, 4, 5];
+    private const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+    private const PERIOD_GROUPS = [
+        'morning' => [
+            'label' => 'Buổi sáng',
+            'periods' => [
+                1 => 'Tiết 1',
+                2 => 'Tiết 2',
+                3 => 'Tiết 3',
+                4 => 'Tiết 4',
+                5 => 'Tiết 5',
+            ],
+        ],
+        'afternoon' => [
+            'label' => 'Buổi chiều',
+            'periods' => [
+                6 => 'Tiết 1',
+                7 => 'Tiết 2',
+                8 => 'Tiết 3',
+                9 => 'Tiết 4',
+                10 => 'Tiết 5',
+            ],
+        ],
+    ];
 
     public function index(Request $request)
     {
@@ -101,6 +124,7 @@ class TimetableController extends Controller
             'entries' => $entries,
             'days' => self::DAYS,
             'periods' => self::PERIODS,
+            'periodGroups' => self::PERIOD_GROUPS,
             'selectedYearId' => $selectedYearId,
             'selectedSemesterId' => $selectedSemesterId,
         ]);
@@ -188,6 +212,7 @@ class TimetableController extends Controller
             'readOnly' => $readOnly,
             'days' => self::DAYS,
             'periods' => self::PERIODS,
+            'periodGroups' => self::PERIOD_GROUPS,
             'statuses' => TimetableEntry::STATUSES,
             'cloneTargetSemesters' => $cloneTargetSemesters,
             'rooms' => $rooms,
@@ -239,7 +264,7 @@ class TimetableController extends Controller
 
                 $action = $entry->wasRecentlyCreated ? 'timetable_entry_created' : 'timetable_entry_updated';
                 $description = ($entry->wasRecentlyCreated ? 'Tạo' : 'Sửa')
-                    . ' tiết ' . $slot['period']
+                    . ' ' . self::periodDisplayLabel((int) $slot['period'])
                     . ' ' . (self::DAYS[$slot['day']] ?? $slot['day'])
                     . ' lớp ' . ($timetable->classRoom->name ?? '');
 
@@ -284,7 +309,7 @@ class TimetableController extends Controller
 
         $created = DB::transaction(function () use ($sourceTimetable, $targetTimetable, $sourceClass, $targetSemester) {
             $count = 0;
-            $subjectCounts = [];
+            $assignmentCounts = [];
             $pendingEntries = [];
             $pendingSlotKeys = [];
 
@@ -325,22 +350,24 @@ class TimetableController extends Controller
             TimetableEntry::where('timetable_id', $targetTimetable->id)
                 ->where('status', '!=', TimetableEntry::STATUS_ARCHIVED)
                 ->get()
-                ->each(function (TimetableEntry $entry) use (&$subjectCounts, $pendingSlotKeys) {
+                ->each(function (TimetableEntry $entry) use (&$assignmentCounts, $pendingSlotKeys) {
                     $slotKey = $entry->day_of_week . '-' . $entry->period;
                     if (in_array($slotKey, $pendingSlotKeys, true)) {
                         return;
                     }
 
-                    $subjectCounts[$entry->subject_id] = ($subjectCounts[$entry->subject_id] ?? 0) + 1;
+                    if ($entry->assignment_id) {
+                        $assignmentCounts[$entry->assignment_id] = ($assignmentCounts[$entry->assignment_id] ?? 0) + 1;
+                    }
                 });
 
             foreach ($pendingEntries as [$sourceEntry, $targetAssignment]) {
                 if ($sourceEntry->status !== TimetableEntry::STATUS_ARCHIVED) {
-                    $subjectCounts[$targetAssignment->subject_id] = ($subjectCounts[$targetAssignment->subject_id] ?? 0) + 1;
+                    $assignmentCounts[$targetAssignment->id] = ($assignmentCounts[$targetAssignment->id] ?? 0) + 1;
                 }
             }
 
-            $this->ensureSubjectPeriodNormLimits($sourceClass, $subjectCounts);
+            $this->ensureAssignmentWeeklyPeriodLimits($assignmentCounts);
 
             foreach ($pendingEntries as [$sourceEntry, $targetAssignment]) {
                 TimetableEntry::updateOrCreate([
@@ -391,9 +418,24 @@ class TimetableController extends Controller
         ]);
     }
 
+    public static function periodSessionLabel(int $period): string
+    {
+        return $period <= 5 ? 'Buổi sáng' : 'Buổi chiều';
+    }
+
+    public static function periodNumberInSession(int $period): int
+    {
+        return $period <= 5 ? $period : $period - 5;
+    }
+
+    public static function periodDisplayLabel(int $period): string
+    {
+        return self::periodSessionLabel($period) . ' - Tiết ' . self::periodNumberInSession($period);
+    }
+
     private function activeAssignmentsFor(SchoolClass $class, Semester $semester): Collection
     {
-        return TeachingAssignment::with(['subject.periodNorms', 'teacher'])
+        return TeachingAssignment::with(['subject.periodNorms', 'teacher', 'classRoom'])
             ->where('school_year_id', $semester->school_year_id)
             ->where('semester_id', $semester->id)
             ->where('class_id', $class->id)
@@ -446,7 +488,7 @@ class TimetableController extends Controller
     private function validatedSlotsForTimetable(Request $request, Timetable $timetable): array
     {
         $slots = [];
-        $subjectCounts = [];
+        $assignmentCounts = [];
 
         foreach (self::DAYS as $day => $dayLabel) {
             foreach (self::PERIODS as $period) {
@@ -473,7 +515,7 @@ class TimetableController extends Controller
                     $room = $this->validatedRoomForTimetable($roomId);
 
                     if ($status !== TimetableEntry::STATUS_ARCHIVED) {
-                        $subjectCounts[$assignment->subject_id] = ($subjectCounts[$assignment->subject_id] ?? 0) + 1;
+                        $assignmentCounts[$assignment->id] = ($assignmentCounts[$assignment->id] ?? 0) + 1;
                     }
 
                     if ($status === TimetableEntry::STATUS_ACTIVE) {
@@ -493,7 +535,7 @@ class TimetableController extends Controller
             }
         }
 
-        $this->ensureSubjectPeriodNormLimits($timetable->classRoom, $subjectCounts);
+        $this->ensureAssignmentWeeklyPeriodLimits($assignmentCounts);
 
         return $slots;
     }
@@ -541,37 +583,41 @@ class TimetableController extends Controller
     {
         $assignment->loadMissing('subject.periodNorms');
 
-        if (! $assignment->subject?->periodNormForGrade((int) $class->grade_level)) {
-            throw ValidationException::withMessages([
-                'assignment_id' => 'Môn học này chưa cấu hình định mức tiết cho khối này.',
-            ]);
-        }
-    }
-
-    private function ensureSubjectPeriodNormLimits(SchoolClass $class, array $subjectCounts): void
-    {
-        if (! $subjectCounts) {
+        if ((int) ($assignment->effectiveWeeklyPeriods() ?: 0) > 0) {
             return;
         }
 
-        $assignments = TeachingAssignment::with('subject.periodNorms')
-            ->whereIn('subject_id', array_keys($subjectCounts))
+        throw ValidationException::withMessages([
+            'assignment_id' => 'Môn học này chưa cấu hình định mức tiết/tuần cho khối ' . $class->grade_level . ', hoặc phân công chưa có giá trị điều chỉnh.',
+        ]);
+    }
+
+    private function ensureAssignmentWeeklyPeriodLimits(array $assignmentCounts): void
+    {
+        if (! $assignmentCounts) {
+            return;
+        }
+
+        $assignments = TeachingAssignment::with(['subject.periodNorms', 'classRoom'])
+            ->whereIn('id', array_keys($assignmentCounts))
             ->get()
-            ->keyBy('subject_id');
+            ->keyBy('id');
 
-        foreach ($subjectCounts as $subjectId => $count) {
-            $subject = $assignments[$subjectId]?->subject;
-            $norm = $subject?->periodNormForGrade((int) $class->grade_level);
+        foreach ($assignmentCounts as $assignmentId => $count) {
+            $assignment = $assignments[$assignmentId] ?? null;
+            $limit = (int) ($assignment?->effectiveWeeklyPeriods() ?: 0);
 
-            if (! $norm) {
+            if ($limit <= 0) {
+                $assignment?->loadMissing(['subject', 'classRoom']);
+
                 throw ValidationException::withMessages([
-                    'assignment_id' => 'Môn học này chưa cấu hình định mức tiết cho khối này.',
+                    'assignment_id' => 'Phân công ' . ($assignment?->subject?->name ?? 'môn học') . ' lớp ' . ($assignment?->classRoom?->name ?? '') . ' chưa có định mức tiết/tuần.',
                 ]);
             }
 
-            if ($count > (int) $norm->periods_per_week) {
+            if ($count > $limit) {
                 throw ValidationException::withMessages([
-                    'assignment_id' => 'Môn ' . $subject->name . ' khối ' . $class->grade_level . ' chỉ được xếp tối đa ' . $norm->periods_per_week . ' tiết/tuần.',
+                    'assignment_id' => 'Phân công ' . ($assignment?->subject?->name ?? 'môn học') . ' lớp ' . ($assignment?->classRoom?->name ?? '') . ' chỉ được xếp tối đa ' . $limit . ' tiết/tuần. Hiện đang xếp ' . $count . '/' . $limit . ' tiết.',
                 ]);
             }
         }
@@ -592,7 +638,7 @@ class TimetableController extends Controller
 
         if ($conflict) {
             throw ValidationException::withMessages([
-                'teacher_conflict' => 'Giáo viên ' . ($assignment->teacher->name ?? '') . ' đã có lịch dạy ở ' . (self::DAYS[$day] ?? $day) . ', tiết ' . $period . '.',
+                'teacher_conflict' => 'Giáo viên ' . ($assignment->teacher->name ?? '') . ' đã có lịch dạy ở ' . (self::DAYS[$day] ?? $day) . ', ' . self::periodDisplayLabel($period) . '.',
             ]);
         }
     }
@@ -616,7 +662,7 @@ class TimetableController extends Controller
 
         if ($conflict) {
             throw ValidationException::withMessages([
-                'room_id' => 'Phòng ' . $room->name . ' đã có lịch học ở ' . (self::DAYS[$day] ?? $day) . ', tiết ' . $period . '.',
+                'room_id' => 'Phòng ' . $room->name . ' đã có lịch học ở ' . (self::DAYS[$day] ?? $day) . ', ' . self::periodDisplayLabel($period) . '.',
             ]);
         }
     }

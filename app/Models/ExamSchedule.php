@@ -10,13 +10,14 @@ class ExamSchedule extends Model
 {
     use UsesUuid;
 
+    public const TYPE_MIDTERM = 'midterm';
+    public const TYPE_FINAL_TEST = 'final_test';
+    public const TYPE_CUSTOM = 'custom';
+
     public const EXAM_TYPES = [
-        'Kiểm tra 15 phút',
-        'Kiểm tra 1 tiết',
-        'Giữa kỳ',
-        'Cuối kỳ',
-        'Khảo sát',
-        'Khác',
+        self::TYPE_MIDTERM => 'Kiểm tra giữa kỳ',
+        self::TYPE_FINAL_TEST => 'Kiểm tra cuối kỳ',
+        self::TYPE_CUSTOM => 'Khác...',
     ];
 
     public const MANAGEMENT_STATUSES = ['draft', 'published', 'canceled'];
@@ -25,6 +26,8 @@ class ExamSchedule extends Model
 
     protected $fillable = [
         'title',
+        'type',
+        'display_name',
         'class_id',
         'subject_id',
         'semester_id',
@@ -32,16 +35,86 @@ class ExamSchedule extends Model
         'start_time',
         'end_time',
         'room',
+        'score_input_opens_at',
+        'score_input_closes_at',
         'note',
     ];
 
     protected $casts = [
         'exam_date' => 'date',
+        'score_input_opens_at' => 'date',
+        'score_input_closes_at' => 'date',
     ];
 
     public function getNoteAttribute($value): ?string
     {
         return $this->stripMeta($value);
+    }
+
+    public function displayName(): string
+    {
+        return trim((string) ($this->display_name ?: $this->title)) ?: $this->typeLabel();
+    }
+
+    public function typeLabel(): string
+    {
+        return self::EXAM_TYPES[$this->type] ?? $this->display_name ?? $this->title ?? 'Khác...';
+    }
+
+    public function isCustomType(): bool
+    {
+        return $this->type === self::TYPE_CUSTOM;
+    }
+
+    public function isScoreInputOpen(?Carbon $date = null): bool
+    {
+        if (! $this->isPublished()) {
+            return false;
+        }
+
+        $date ??= now();
+        $opensAt = $this->score_input_opens_at?->copy()->startOfDay();
+        $closesAt = $this->score_input_closes_at?->copy()->endOfDay();
+
+        if (! $opensAt || ! $closesAt) {
+            return false;
+        }
+
+        return $date->betweenIncluded($opensAt, $closesAt);
+    }
+
+    public function scoreInputStatusLabel(): string
+    {
+        if ($this->isCanceled()) {
+            return 'Đã hủy';
+        }
+
+        if ($this->isDraft()) {
+            return 'Chưa công bố';
+        }
+
+        if (! $this->score_input_opens_at || ! $this->score_input_closes_at) {
+            return 'Chưa mở nhập điểm';
+        }
+
+        if (now()->lt($this->score_input_opens_at->copy()->startOfDay())) {
+            return 'Chưa mở nhập điểm';
+        }
+
+        if (now()->gt($this->score_input_closes_at->copy()->endOfDay())) {
+            return 'Đã khóa nhập điểm';
+        }
+
+        return 'Đang mở nhập điểm';
+    }
+
+    public function scoreInputBadgeClass(): string
+    {
+        return match ($this->scoreInputStatusLabel()) {
+            'Đang mở nhập điểm' => 'bg-success',
+            'Chưa mở nhập điểm' => 'bg-warning text-dark',
+            default => 'bg-secondary',
+        };
     }
 
     public function schoolYearId(): ?string

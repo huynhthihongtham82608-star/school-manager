@@ -85,6 +85,37 @@ class TeachingAssignment extends Model
         return self::ROLES[$this->role] ?? self::ROLES[self::ROLE_PRIMARY];
     }
 
+    public function hasWeeklyPeriodOverride(): bool
+    {
+        return (int) ($this->weekly_periods ?: 0) > 0;
+    }
+
+    public function standardWeeklyPeriods(): ?int
+    {
+        $this->loadMissing(['classRoom', 'subject.periodNorms']);
+
+        $gradeLevel = (int) ($this->classRoom?->grade_level ?: 0);
+        if (! $gradeLevel || ! $this->subject) {
+            return null;
+        }
+
+        return $this->subject->periodNormForGrade($gradeLevel)?->periods_per_week;
+    }
+
+    public function effectiveWeeklyPeriods(): ?int
+    {
+        if ($this->hasWeeklyPeriodOverride()) {
+            return (int) $this->weekly_periods;
+        }
+
+        return $this->standardWeeklyPeriods();
+    }
+
+    public function weeklyPeriodSourceLabel(): string
+    {
+        return $this->hasWeeklyPeriodOverride() ? 'Đã điều chỉnh' : 'Theo định mức môn học';
+    }
+
     public function statusLabel(): string
     {
         return self::STATUSES[$this->status] ?? self::STATUSES[self::STATUS_ACTIVE];

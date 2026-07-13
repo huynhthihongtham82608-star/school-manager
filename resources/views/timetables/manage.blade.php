@@ -87,16 +87,20 @@
                 <table class="table align-middle">
                     <thead>
                         <tr>
-                            <th style="width:100px;">Tiết</th>
+                            <th style="width:120px;">Buổi / Tiết</th>
                             @foreach($days as $dayLabel)
                                 <th>{{ $dayLabel }}</th>
                             @endforeach
                         </tr>
                     </thead>
                     <tbody>
-                    @foreach($periods as $period)
+                    @foreach($periodGroups as $periodGroup)
+                        <tr class="table-light">
+                            <td colspan="{{ count($days) + 1 }}" class="fw-bold">{{ $periodGroup['label'] }}</td>
+                        </tr>
+                        @foreach($periodGroup['periods'] as $period => $periodLabel)
                         <tr>
-                            <td class="fw-semibold">Tiết {{ $period }}</td>
+                            <td class="fw-semibold">{{ $periodLabel }}</td>
                             @foreach($days as $day => $dayLabel)
                                 @php($entry = $entries[$day.'-'.$period] ?? null)
                                 <td style="min-width: 260px;">
@@ -104,9 +108,9 @@
                                         <select class="form-select form-select-sm" name="entries[{{ $day }}][{{ $period }}][assignment_id]" @disabled($readOnly)>
                                             <option value="">-- Trống --</option>
                                             @foreach($assignments as $assignment)
-                                                @php($norm = $assignment->subject?->periodNormForGrade((int) $selectedClass->grade_level))
+                                                @php($effectivePeriods = $assignment->effectiveWeeklyPeriods())
                                                 <option value="{{ $assignment->id }}" @selected($entry && $entry->assignment_id === $assignment->id)>
-                                                    {{ $assignment->subject->name ?? '' }} - {{ $assignment->teacher->name ?? '' }} ({{ $assignment->roleLabel() }}){{ $norm ? ' - ' . $norm->periods_per_week . ' tiết/tuần' : '' }}
+                                                    {{ $assignment->subject->name ?? '' }} - {{ $assignment->teacher->name ?? '' }} ({{ $assignment->roleLabel() }}){{ $effectivePeriods ? ' - ' . $effectivePeriods . ' tiết/tuần, ' . mb_strtolower($assignment->weeklyPeriodSourceLabel()) : ' - chưa có định mức' }}
                                                 </option>
                                             @endforeach
                                         </select>
@@ -135,6 +139,7 @@
                                 </td>
                             @endforeach
                         </tr>
+                        @endforeach
                     @endforeach
                     </tbody>
                 </table>

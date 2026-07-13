@@ -29,17 +29,6 @@
             </select>
             @error('school_year_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-3">
-            <label class="form-label">Học kỳ</label>
-            <select name="semester_id" class="form-select" required data-class-semester>
-                @foreach($semesters as $semester)
-                    <option value="{{ $semester->id }}" data-year="{{ $semester->school_year_id }}" @selected(old('semester_id', $class->semester_id) == $semester->id)>
-                        {{ $semester->normalizedName() }} - {{ $semester->schoolYear->name ?? '' }}
-                    </option>
-                @endforeach
-            </select>
-            @error('semester_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
         <div class="col-md-4">
             <label class="form-label">Giáo viên chủ nhiệm</label>
             <select name="homeroom_teacher_id" class="form-select">
@@ -67,5 +56,4 @@
     </div>
 </form>
 
-@include('classes.partials.semester-filter-script')
 @endsection

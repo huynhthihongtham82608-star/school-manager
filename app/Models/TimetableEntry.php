@@ -70,6 +70,21 @@ class TimetableEntry extends Model
         return $this->roomInfo?->name ?: $this->room;
     }
 
+    public function sessionLabel(): string
+    {
+        return (int) $this->period <= 5 ? 'Buổi sáng' : 'Buổi chiều';
+    }
+
+    public function periodInSession(): int
+    {
+        return (int) $this->period <= 5 ? (int) $this->period : (int) $this->period - 5;
+    }
+
+    public function displayPeriod(): string
+    {
+        return $this->sessionLabel() . ' - Tiết ' . $this->periodInSession();
+    }
+
     public function statusLabel(): string
     {
         return self::STATUSES[$this->status] ?? self::STATUSES[self::STATUS_ACTIVE];

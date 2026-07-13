@@ -107,11 +107,11 @@ class DatabaseSeeder extends Seeder
         // Teaching assignments
         TeachingAssignment::updateOrCreate(
             ['teacher_id' => $teacherToan->id, 'class_id' => $class10a1->id, 'subject_id' => $toan->id, 'school_year_id' => $year->id, 'semester_id' => $hk1->id, 'role' => TeachingAssignment::ROLE_PRIMARY],
-            ['status' => TeachingAssignment::STATUS_ACTIVE, 'weekly_periods' => 4]
+            ['status' => TeachingAssignment::STATUS_ACTIVE, 'weekly_periods' => null]
         );
         TeachingAssignment::updateOrCreate(
             ['teacher_id' => $teacherGvcn->id, 'class_id' => $class10a1->id, 'subject_id' => $van->id, 'school_year_id' => $year->id, 'semester_id' => $hk1->id, 'role' => TeachingAssignment::ROLE_PRIMARY],
-            ['status' => TeachingAssignment::STATUS_ACTIVE, 'weekly_periods' => 4]
+            ['status' => TeachingAssignment::STATUS_ACTIVE, 'weekly_periods' => null]
         );
 
         // Grade window: open for 10A1-Toan-HK1

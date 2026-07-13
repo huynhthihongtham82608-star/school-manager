@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link href="{{ asset('css/school-ui.css') }}?v=20260713-function-search-order" rel="stylesheet">
+    <link href="{{ asset('css/school-ui.css') }}?v=20260714-password-center" rel="stylesheet">
 </head>
 @php
     $currentUser = auth()->user();
@@ -32,6 +32,17 @@
     $historySchoolYearId = session('viewing_mode') === 'history'
         ? session('viewing_school_year_id', session('history_school_year_id'))
         : session('history_school_year_id');
+    $showFloatingChatbot = (bool) $currentUser;
+    $floatingChatMessages = collect();
+
+    if ($showFloatingChatbot && \Illuminate\Support\Facades\Schema::hasTable('chatbot_messages')) {
+        $floatingChatMessages = \App\Models\ChatbotMessage::where('user_id', $currentUser->id)
+            ->latest('created_at')
+            ->limit(20)
+            ->get()
+            ->reverse()
+            ->values();
+    }
 
     if ($showSidebar && \Illuminate\Support\Facades\Schema::hasTable('school_years')) {
         $headerSchoolYears = \App\Models\SchoolYear::orderByDesc('start_date')
@@ -107,7 +118,7 @@
             $adminItem('bi-book', 'Môn học', route('subjects.index'), ['subjects.*', 'subjects*']),
             $adminItem('bi-diagram-3', 'Phân công giảng dạy', route('assignments.index'), ['assignments.*', 'assignments*']),
             $adminItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.manage'), ['timetable.manage', 'timetable/manage*']),
-            $adminItem('bi-calendar2-check', 'Lịch thi', route('exam-schedules.index'), ['exam-schedules.*', 'exam-schedules*']),
+            $adminItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), ['exam-schedules.*', 'exam-schedules*']),
         ];
 
         if ($currentUser->role === 'admin') {
@@ -144,10 +155,6 @@
             $adminItem('bi-bar-chart-line', 'Phân tích', route('ai.run.form'), ['ai.run.form', 'ai/run']),
             $adminItem('bi-exclamation-triangle', 'Cảnh báo', route('ai.alerts'), ['ai.alerts', 'ai/alerts']),
             $adminItem('bi-pencil-square', 'Báo cáo AI', route('ai.reports'), ['ai.reports', 'ai/reports']),
-        ]);
-
-        $addAdminGroup('chatbot', 'bi-robot', 'Chatbot', [
-            $adminItem('bi-robot', 'Chatbot hỗ trợ', route('chatbot.index'), ['chatbot.*', 'chatbot*']),
         ]);
 
         if ($currentUser->role === 'admin') {
@@ -187,34 +194,33 @@
             $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
             $addRoleItem('bi-person-check', 'Điểm danh', route('attendance.index'), 'attendance*');
             $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('conduct.index'), 'conduct*');
-            $addRoleItem('bi-calendar2-check', 'Lịch thi', route('exam-schedules.index'), 'exam-schedules*');
+            $addRoleItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), 'exam-schedules*');
             $addRoleItem('bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), 'documents*');
             $addRoleItem('bi-megaphone', 'Thông báo', route('announcements.index'), 'announcements*');
             $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.alerts'), 'ai*');
             $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
-            $addRoleItem('bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile*');
         } elseif ($currentUser->isHomeroom()) {
             $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
+            $addRoleItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), 'exam-schedules*');
             $addRoleItem('bi-people', 'Quản lý lớp chủ nhiệm', route('dashboard'), 'dashboard');
             $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('conduct.index'), 'conduct*');
             $addRoleItem('bi-table', 'Nhập điểm', route('scores.index'), 'scores*');
             $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
             $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.run.form'), 'ai*');
-            $addRoleItem('bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile*');
         } elseif ($currentUser->isTeacher()) {
             $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
+            $addRoleItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), 'exam-schedules*');
             $addRoleItem('bi-table', 'Nhập điểm', route('scores.index'), 'scores*');
             $addRoleItem('bi-people', 'Danh sách lớp', route('dashboard'), 'dashboard');
             $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
             $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.alerts'), 'ai*');
-            $addRoleItem('bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile*');
         } elseif ($currentUser->isParent()) {
             $addRoleItem('bi-bar-chart-line', 'Kết quả học tập', route('dashboard'), 'dashboard');
             $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
+            $addRoleItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), 'exam-schedules*');
             $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('dashboard'), 'dashboard');
             $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.reports'), 'ai*');
             $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
-            $addRoleItem('bi-person-circle', 'Hồ sơ cá nhân', route('profile.show'), 'profile*');
         }
     }
 
@@ -300,13 +306,6 @@
                     <span>{{ $item['label'] }}</span>
                 </a>
             @endforeach
-            <form method="POST" action="{{ route('logout') }}" data-logout-home>
-                @csrf
-                <button type="submit" class="role-nav-link role-nav-button">
-                    <i class="bi bi-box-arrow-right"></i>
-                    <span>Đăng xuất</span>
-                </button>
-            </form>
         </div>
     </nav>
     @endif
@@ -425,6 +424,54 @@
         </main>
     </div>
 </div>
+@if($showFloatingChatbot)
+<div class="floating-chatbot {{ session('chatbot_open') || old('chatbot_widget') ? 'open' : '' }}" data-floating-chatbot>
+    <button type="button" class="floating-chatbot-toggle" data-floating-chatbot-toggle aria-label="Mở chatbot hỗ trợ" aria-expanded="{{ session('chatbot_open') || old('chatbot_widget') ? 'true' : 'false' }}">
+        <i class="bi bi-robot"></i>
+    </button>
+    <section class="floating-chatbot-panel" aria-label="Chatbot hỗ trợ">
+        <div class="floating-chatbot-header">
+            <div>
+                <div class="floating-chatbot-title">Chatbot hỗ trợ</div>
+                <div class="floating-chatbot-subtitle">Hỏi nhanh về thông tin trong hệ thống</div>
+            </div>
+            <button type="button" class="floating-chatbot-close" data-floating-chatbot-close aria-label="Đóng chatbot">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="floating-chatbot-messages" data-floating-chatbot-messages>
+            @if(! \Illuminate\Support\Facades\Schema::hasTable('chatbot_messages'))
+                <div class="floating-chatbot-empty">
+                    <i class="bi bi-info-circle"></i>
+                    Chưa sẵn sàng dữ liệu chatbot.
+                </div>
+            @else
+                @forelse($floatingChatMessages as $message)
+                    <div class="chat-row chat-question">
+                        <div class="chat-bubble">{{ $message->question }}</div>
+                    </div>
+                    <div class="chat-row chat-answer">
+                        <div class="chat-bubble">{{ $message->answer }}</div>
+                    </div>
+                @empty
+                    <div class="floating-chatbot-empty">
+                        <i class="bi bi-robot"></i>
+                        Nhập câu hỏi để bắt đầu trao đổi.
+                    </div>
+                @endforelse
+            @endif
+        </div>
+        <form method="POST" action="{{ route('chatbot.ask') }}" class="floating-chatbot-form">
+            @csrf
+            <input type="hidden" name="chatbot_widget" value="1">
+            <input name="question" class="form-control" placeholder="Nhập câu hỏi..." required maxlength="1000" autocomplete="off">
+            <button class="btn btn-primary" aria-label="Gửi câu hỏi">
+                <i class="bi bi-send"></i>
+            </button>
+        </form>
+    </section>
+</div>
+@endif
 <div class="modal fade content-modal" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -572,6 +619,36 @@
     document.querySelectorAll('[data-role-menu-close], .role-sidebar a').forEach((element) => {
         element.addEventListener('click', () => document.body.classList.remove('role-menu-open'));
     });
+
+    (() => {
+        const chatbot = document.querySelector('[data-floating-chatbot]');
+
+        if (!chatbot) {
+            return;
+        }
+
+        const toggle = chatbot.querySelector('[data-floating-chatbot-toggle]');
+        const closeButton = chatbot.querySelector('[data-floating-chatbot-close]');
+        const messages = chatbot.querySelector('[data-floating-chatbot-messages]');
+
+        const setOpen = (isOpen) => {
+            chatbot.classList.toggle('open', isOpen);
+            toggle?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+
+            if (isOpen && messages) {
+                window.requestAnimationFrame(() => {
+                    messages.scrollTop = messages.scrollHeight;
+                });
+            }
+        };
+
+        toggle?.addEventListener('click', () => setOpen(!chatbot.classList.contains('open')));
+        closeButton?.addEventListener('click', () => setOpen(false));
+
+        if (chatbot.classList.contains('open') && messages) {
+            messages.scrollTop = messages.scrollHeight;
+        }
+    })();
 
     document.querySelectorAll('[data-target-role-group]').forEach((group) => {
         const allBox = group.querySelector('[data-target-role="all"]');
@@ -1207,8 +1284,9 @@
             const isLogout = form.matches('[data-logout-home]') || form.action.includes('/logout');
             const isHistoryClear = form.action.includes('/school-years/history/clear');
             const isAcademicContext = form.action.includes('/academic-context');
+            const isChatbot = form.action.includes('/chatbot');
 
-            if (isGet || isLogout || isHistoryClear || isAcademicContext) {
+            if (isGet || isLogout || isHistoryClear || isAcademicContext || isChatbot) {
                 return;
             }
 

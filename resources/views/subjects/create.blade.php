@@ -25,7 +25,7 @@
             <label class="form-label">Loại môn</label>
             <select name="type" class="form-select" required>
                 @foreach(\App\Models\Subject::TYPES as $value => $label)
-                    <option value="{{ $value }}" @selected(old('type', \App\Models\Subject::TYPE_REQUIRED) === $value)>{{ $label }}</option>
+                    <option value="{{ $value }}" @selected(old('type', \App\Models\Subject::TYPE_OFFICIAL) === $value)>{{ $label }}</option>
                 @endforeach
             </select>
             @error('type')<div class="text-danger small mt-1">{{ $message }}</div>@enderror

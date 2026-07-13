@@ -25,6 +25,9 @@ class AttendanceController extends Controller
         $selectedSemesterId = $this->selectedSemesterId($request);
         $selectedClassId = $request->query('class_id');
         $date = $request->query('date', now()->toDateString());
+        $readOnly = $this->isHistoricalReadOnly();
+        $selectedSessionType = $request->query('attendance_type');
+        $selectedTimetableEntryId = $request->query('timetable_entry_id');
 
         $schoolYears = Schema::hasTable('school_years')
             ? SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->get()
@@ -69,6 +72,9 @@ class AttendanceController extends Controller
         $existingRecords = collect();
         $selectedClass = null;
         $selectedSemester = null;
+        $selectedTimetableEntry = null;
+        $availableTimetableEntries = collect();
+        $allowedSessionTypes = AttendanceRecord::SESSION_TYPES;
         $isEditingSession = false;
 
         if ($selectedClassId && $selectedSemesterId && $date && Schema::hasTable('students')) {
@@ -76,21 +82,40 @@ class AttendanceController extends Controller
             $selectedSemester = $semesters->firstWhere('id', $selectedSemesterId);
 
             if ($selectedClass && $selectedSemester) {
-                $students = $selectedClass->students->sortBy('student_code')->values();
+                $allowedSessionTypes = $this->allowedSessionTypes($user, $selectedClass);
+                if (! array_key_exists((string) $selectedSessionType, $allowedSessionTypes)) {
+                    $selectedSessionType = array_key_first($allowedSessionTypes) ?: AttendanceRecord::SESSION_DAILY;
+                }
+
+                $availableTimetableEntries = $this->availableTimetableEntries($user, $selectedClass, $selectedSemester->id, $date);
+                if ($selectedSessionType === AttendanceRecord::SESSION_PERIOD) {
+                    $selectedTimetableEntry = $availableTimetableEntries->firstWhere('id', $selectedTimetableEntryId)
+                        ?: $availableTimetableEntries->first();
+                    $selectedTimetableEntryId = $selectedTimetableEntry?->id;
+                }
+
+                $students = $selectedClass->students()
+                    ->where('status', Student::STATUS_STUDYING)
+                    ->orderBy('student_code')
+                    ->get();
 
                 if (Schema::hasTable('attendance_records')) {
+                    $sessionKey = $this->sessionKey($selectedSessionType, $selectedTimetableEntryId);
                     $existingRecords = AttendanceRecord::where('class_id', $selectedClass->id)
                         ->where('semester_id', $selectedSemester->id)
                         ->whereDate('attendance_date', $date)
+                        ->where('session_key', $sessionKey)
                         ->get()
                         ->keyBy('student_id');
                     $isEditingSession = $existingRecords->isNotEmpty();
                 }
             }
+        } else {
+            $selectedSessionType = $selectedSessionType ?: AttendanceRecord::SESSION_DAILY;
         }
 
         $recordsQuery = Schema::hasTable('attendance_records')
-            ? AttendanceRecord::with(['student', 'classRoom.schoolYear', 'semester.schoolYear'])->latest('attendance_date')->latest()
+            ? AttendanceRecord::with(['student', 'classRoom.schoolYear', 'semester.schoolYear', 'timetableEntry.subject', 'timetableEntry.teacher'])->latest('attendance_date')->latest()
             : null;
 
         if ($recordsQuery) {
@@ -136,8 +161,14 @@ class AttendanceController extends Controller
             'selectedClassId',
             'selectedClass',
             'selectedSemester',
+            'selectedSessionType',
+            'selectedTimetableEntryId',
+            'selectedTimetableEntry',
+            'availableTimetableEntries',
+            'allowedSessionTypes',
             'isEditingSession',
-            'date'
+            'date',
+            'readOnly'
         ));
     }
 
@@ -154,6 +185,8 @@ class AttendanceController extends Controller
             'class_id' => ['required', 'string', 'max:50', 'exists:classes,id'],
             'semester_id' => ['required', 'string', 'max:50', 'exists:semesters,id'],
             'attendance_date' => ['required', 'date'],
+            'attendance_type' => ['required', 'in:' . implode(',', array_keys(AttendanceRecord::SESSION_TYPES))],
+            'timetable_entry_id' => ['nullable', 'string', 'max:50', 'exists:timetable_entries,id'],
             'status' => ['required', 'array'],
             'status.*' => ['required', 'in:present,late,excused,absent'],
             'note' => ['nullable', 'array'],
@@ -162,15 +195,27 @@ class AttendanceController extends Controller
 
         $class = SchoolClass::findOrFail($data['class_id']);
         $semester = Semester::findOrFail($data['semester_id']);
+        $timetableEntry = null;
 
-        $this->authorizeAttendanceClass($class, $data['attendance_date']);
         $this->ensureSelectionMatchesYear($data['school_year_id'], $class, $semester);
+        $this->authorizeAttendanceSession($request->user(), $class, $semester, $data['attendance_date'], $data['attendance_type'], $data['timetable_entry_id'] ?? null);
 
         if (! $semester->isActive()) {
             abort(403, 'Học kỳ không ở trạng thái Hoạt động nên không thể nhập hoặc chỉnh sửa điểm danh.');
         }
 
-        $students = Student::where('class_id', $class->id)->orderBy('student_code')->get();
+        if ($data['attendance_type'] === AttendanceRecord::SESSION_PERIOD) {
+            $timetableEntry = TimetableEntry::with(['subject', 'teacher'])->findOrFail($data['timetable_entry_id']);
+        }
+
+        $sessionKey = $this->sessionKey($data['attendance_type'], $data['timetable_entry_id'] ?? null);
+        $sessionLabel = $this->sessionLabel($data['attendance_type'], $timetableEntry);
+        $sessionOrder = $this->sessionOrder($data['attendance_type'], $timetableEntry);
+
+        $students = Student::where('class_id', $class->id)
+            ->where('status', Student::STATUS_STUDYING)
+            ->orderBy('student_code')
+            ->get();
 
         foreach ($students as $student) {
             $status = $data['status'][$student->id] ?? null;
@@ -183,10 +228,15 @@ class AttendanceController extends Controller
                 [
                     'student_id' => $student->id,
                     'attendance_date' => $data['attendance_date'],
+                    'session_key' => $sessionKey,
                 ],
                 [
                     'class_id' => $data['class_id'],
                     'semester_id' => $data['semester_id'],
+                    'session_type' => $data['attendance_type'],
+                    'timetable_entry_id' => $data['attendance_type'] === AttendanceRecord::SESSION_PERIOD ? $data['timetable_entry_id'] : null,
+                    'session_label' => $sessionLabel,
+                    'session_order' => $sessionOrder,
                     'status' => $status,
                     'note' => $data['note'][$student->id] ?? null,
                     'recorded_by' => $request->user()->id,
@@ -202,27 +252,71 @@ class AttendanceController extends Controller
                 'semester_id' => $data['semester_id'],
                 'class_id' => $data['class_id'],
                 'date' => $data['attendance_date'],
+                'attendance_type' => $data['attendance_type'],
+                'timetable_entry_id' => $data['timetable_entry_id'] ?? null,
             ])
             ->with('success', 'Đã lưu điểm danh.');
     }
 
-    private function authorizeAttendanceClass(SchoolClass $class, string $attendanceDate): void
+    private function authorizeAttendanceSession($user, SchoolClass $class, Semester $semester, string $attendanceDate, string $sessionType, ?string $timetableEntryId): void
     {
-        $user = request()->user();
+        if ($user->isAdmin() && $sessionType === AttendanceRecord::SESSION_DAILY) {
+            return;
+        }
+
+        if ($sessionType === AttendanceRecord::SESSION_DAILY) {
+            if ($user->isHomeroom() && optional($user->teacher)->id === $class->homeroom_teacher_id) {
+                return;
+            }
+
+            abort(403, 'Chỉ Admin hoặc giáo viên chủ nhiệm của lớp mới được điểm danh theo ngày.');
+        }
+
+        if (! $timetableEntryId) {
+            abort(403, 'Vui lòng chọn tiết học cần điểm danh.');
+        }
+
+        $entry = TimetableEntry::with('timetable')->findOrFail($timetableEntryId);
+        $dayOfWeek = \Illuminate\Support\Carbon::parse($attendanceDate)->isoWeekday();
+
+        if (
+            ! $entry->timetable
+            || (string) $entry->timetable->class_id !== (string) $class->id
+            || (string) $entry->timetable->semester_id !== (string) $semester->id
+            || (int) $entry->day_of_week !== (int) $dayOfWeek
+            || $entry->status !== TimetableEntry::STATUS_ACTIVE
+        ) {
+            abort(403, 'Tiết học không phù hợp với lớp, học kỳ hoặc ngày điểm danh đã chọn.');
+        }
 
         if ($user->isAdmin()) {
             return;
         }
 
-        if ($user->isHomeroom() && optional($user->teacher)->id === $class->homeroom_teacher_id) {
+        if ($user->isTeacher() && $user->teacher && (string) $entry->teacher_id === (string) $user->teacher->id) {
             return;
         }
 
-        if ($user->isTeacher() && $user->teacher && $this->teacherHasScheduledClassOnDate($user->teacher->id, $class->id, $attendanceDate)) {
-            return;
+        abort(403, 'Giáo viên chỉ được điểm danh đúng tiết học mình được phân công.');
+    }
+
+    private function allowedSessionTypes($user, ?SchoolClass $class): array
+    {
+        if ($user->isAdmin()) {
+            return AttendanceRecord::SESSION_TYPES;
         }
 
-        abort(403, 'Giáo viên chỉ được điểm danh lớp mình dạy đúng ngày có tiết học.');
+        $types = [];
+
+        if ($class && $user->isHomeroom() && optional($user->teacher)->id === $class->homeroom_teacher_id) {
+            $types[AttendanceRecord::SESSION_DAILY] = AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_DAILY];
+        }
+
+        if ($user->isTeacher()) {
+            $types[AttendanceRecord::SESSION_PERIOD] = AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_PERIOD];
+        }
+
+        return $types ?: [AttendanceRecord::SESSION_PERIOD => AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_PERIOD]];
     }
 
     private function teacherAttendanceClassIds($user)
@@ -254,21 +348,33 @@ class AttendanceController extends Controller
         return collect([$selected->id]);
     }
 
-    private function teacherHasScheduledClassOnDate(string $teacherId, string $classId, string $attendanceDate): bool
+    private function availableTimetableEntries($user, SchoolClass $class, string $semesterId, string $attendanceDate)
     {
         $dayOfWeek = \Illuminate\Support\Carbon::parse($attendanceDate)->isoWeekday();
 
         if ($dayOfWeek < 1 || $dayOfWeek > 6) {
-            return false;
+            return collect();
         }
 
-        $timetableIds = Timetable::where('class_id', $classId)->pluck('id');
+        $timetableIds = Timetable::where('class_id', $class->id)
+            ->where('semester_id', $semesterId)
+            ->pluck('id');
 
-        return TimetableEntry::whereIn('timetable_id', $timetableIds)
-            ->where('teacher_id', $teacherId)
+        if ($timetableIds->isEmpty()) {
+            return collect();
+        }
+
+        return TimetableEntry::with(['subject', 'teacher', 'roomInfo'])
+            ->whereIn('timetable_id', $timetableIds)
             ->where('day_of_week', $dayOfWeek)
             ->where('status', TimetableEntry::STATUS_ACTIVE)
-            ->exists();
+            ->when(! $user->isAdmin(), function ($query) use ($user) {
+                if ($user->isTeacher() && $user->teacher) {
+                    $query->where('teacher_id', $user->teacher->id);
+                }
+            })
+            ->orderBy('period')
+            ->get();
     }
 
     private function ensureSelectionMatchesYear(string $schoolYearId, SchoolClass $class, Semester $semester): void
@@ -295,6 +401,7 @@ class AttendanceController extends Controller
                 $record->class_id,
                 $record->semester_id ?: 'none',
                 optional($record->attendance_date)->toDateString(),
+                $record->session_key ?: 'daily',
             ]))
             ->map(function ($items, $key) {
                 $first = $items->first();
@@ -306,6 +413,10 @@ class AttendanceController extends Controller
                     'semester_id' => $first->semester_id,
                     'school_year_id' => $first->semester?->school_year_id ?? $first->classRoom?->school_year_id,
                     'date' => $first->attendance_date,
+                    'session_type' => $first->session_type ?: AttendanceRecord::SESSION_DAILY,
+                    'session_label' => $first->displaySessionLabel(),
+                    'session_order' => (int) ($first->session_order ?: 0),
+                    'timetable_entry_id' => $first->timetable_entry_id,
                     'class_name' => $first->classRoom->name ?? 'Không rõ',
                     'semester_name' => $first->semester->name ?? 'Không rõ',
                     'school_year_name' => $first->semester?->schoolYear?->name ?? $first->classRoom?->schoolYear?->name ?? 'Không rõ',
@@ -318,6 +429,13 @@ class AttendanceController extends Controller
                         ->sortBy(fn ($record) => $record->student->student_code ?? $record->student->name ?? '')
                         ->values(),
                 ];
+            })
+            ->sort(function ($left, $right) {
+                $dateCompare = (optional($right->date)->timestamp ?? 0) <=> (optional($left->date)->timestamp ?? 0);
+
+                return $dateCompare !== 0
+                    ? $dateCompare
+                    : ((int) $left->session_order <=> (int) $right->session_order);
             })
             ->values();
 
@@ -334,5 +452,38 @@ class AttendanceController extends Controller
                 'query' => $request->query(),
             ]
         );
+    }
+
+    private function sessionKey(string $sessionType, ?string $timetableEntryId = null): string
+    {
+        if ($sessionType === AttendanceRecord::SESSION_PERIOD && $timetableEntryId) {
+            return 'period:' . $timetableEntryId;
+        }
+
+        return 'daily';
+    }
+
+    private function sessionLabel(string $sessionType, ?TimetableEntry $entry = null): string
+    {
+        if ($sessionType === AttendanceRecord::SESSION_PERIOD && $entry) {
+            $subject = $entry->subject?->name ?: 'Môn học';
+            $teacher = $entry->teacher?->name;
+            $parts = [$entry->displayPeriod(), $subject];
+
+            if ($teacher) {
+                $parts[] = $teacher;
+            }
+
+            return implode(' - ', $parts);
+        }
+
+        return 'Điểm danh theo ngày';
+    }
+
+    private function sessionOrder(string $sessionType, ?TimetableEntry $entry = null): int
+    {
+        return $sessionType === AttendanceRecord::SESSION_PERIOD && $entry
+            ? (int) $entry->period
+            : 0;
     }
 }

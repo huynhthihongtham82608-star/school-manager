@@ -5,7 +5,7 @@
 <div class="page-heading">
     <div>
         <h5>Chatbot hỗ trợ</h5>
-        <div class="text-muted">Hỏi nhanh về điểm, thời khóa biểu, lịch thi, điểm danh, tài liệu và thông báo.</div>
+        <div class="text-muted">Hỏi nhanh về điểm, thời khóa biểu, lịch kiểm tra, điểm danh, tài liệu và thông báo.</div>
     </div>
 </div>
 

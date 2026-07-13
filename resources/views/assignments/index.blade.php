@@ -73,7 +73,7 @@
                 <tr>
                     <th>Giáo viên</th>
                     <th>Lớp</th>
-                    <th>Số tiết/tuần</th>
+                    <th>Tiến độ tiết</th>
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
                     <th></th>
@@ -88,7 +88,26 @@
                         <div class="text-muted small">{{ $assignment->teacher->teacher_code ?? '-' }} · {{ $assignment->teacher?->primarySubjectName() ?? ($assignment->subject->name ?? '-') }}</div>
                     </td>
                     <td class="fw-semibold">{{ $assignment->classRoom->name ?? '-' }}</td>
-                    <td>{{ $assignment->weekly_periods ?: '-' }}</td>
+                    <td>
+                        @php($period = $periodProgress[(string) $assignment->getKey()] ?? ['standard' => 0, 'expected' => 0, 'scheduled' => 0, 'percent' => 0, 'badge_class' => 'bg-light text-muted border', 'progress_class' => 'bg-warning', 'label' => 'Chưa cấu hình định mức'])
+                        @if($period['expected'] > 0)
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="badge {{ $period['badge_class'] }}">{{ $period['label'] }}</span>
+                                @if($assignment->hasWeeklyPeriodOverride())
+                                    <span class="badge bg-info">Đã điều chỉnh</span>
+                                @endif
+                            </div>
+                            <div class="small mt-2">
+                                <div>Định mức: <strong>{{ $period['expected'] }}</strong> tiết{{ $assignment->hasWeeklyPeriodOverride() && $period['standard'] ? ' (chuẩn: ' . $period['standard'] . ')' : '' }}</div>
+                                <div>Đã xếp: <strong>{{ $period['scheduled'] }}/{{ $period['expected'] }}</strong> tiết</div>
+                            </div>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar {{ $period['progress_class'] }}" style="width: {{ $period['percent'] }}%"></div>
+                            </div>
+                        @else
+                            <span class="badge {{ $period['badge_class'] }}">{{ $period['label'] }}</span>
+                        @endif
+                    </td>
                     <td>{{ $assignment->roleLabel() }}</td>
                     <td><span class="badge {{ $assignment->statusBadgeClass() }}">{{ $assignment->statusLabel() }}</span></td>
                     <td class="text-end">

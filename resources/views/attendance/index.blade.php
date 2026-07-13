@@ -3,8 +3,9 @@
 
 @section('content')
 @php
-    $canManageAttendance = auth()->user()->isAdmin() || auth()->user()->isTeacher();
+    $canManageAttendance = (auth()->user()->isAdmin() || auth()->user()->isTeacher()) && ! $readOnly;
     $statusLabels = \App\Models\AttendanceRecord::STATUSES;
+    $sessionTypes = \App\Models\AttendanceRecord::SESSION_TYPES;
     $statusBadge = [
         'present' => 'bg-success',
         'late' => 'bg-warning text-dark',
@@ -26,7 +27,7 @@
         <div class="card-body">
             <form method="GET" action="{{ route('attendance.index') }}" class="row g-3 align-items-end">
                 <input type="hidden" name="school_year_id" value="{{ $selectedYearId }}">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Học kỳ</label>
                     <select name="semester_id" class="form-select" required>
                         <option value="">Chọn học kỳ</option>
@@ -37,7 +38,7 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Lớp</label>
                     <select name="class_id" class="form-select" required>
                         <option value="">Chọn lớp</option>
@@ -49,6 +50,26 @@
                 <div class="col-md-2">
                     <label class="form-label">Ngày điểm danh</label>
                     <input type="date" name="date" class="form-control" value="{{ $date }}" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Kiểu điểm danh</label>
+                    <select name="attendance_type" class="form-select" data-attendance-type-select>
+                        @foreach($allowedSessionTypes as $typeValue => $typeLabel)
+                            <option value="{{ $typeValue }}" @selected($selectedSessionType === $typeValue)>{{ $typeLabel }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3" data-timetable-entry-filter @class(['d-none' => $selectedSessionType !== \App\Models\AttendanceRecord::SESSION_PERIOD])>
+                    <label class="form-label">Tiết học</label>
+                    <select name="timetable_entry_id" class="form-select" @disabled($selectedSessionType !== \App\Models\AttendanceRecord::SESSION_PERIOD)>
+                        @forelse($availableTimetableEntries as $entry)
+                            <option value="{{ $entry->id }}" @selected($selectedTimetableEntryId === $entry->id)>
+                                {{ $entry->displayPeriod() }} - {{ $entry->subject?->name ?? 'Môn học' }} - {{ $entry->teacher?->name ?? 'Giáo viên' }}
+                            </option>
+                        @empty
+                            <option value="">Không có tiết học phù hợp</option>
+                        @endforelse
+                    </select>
                 </div>
                 <div class="col-md-1">
                     <button class="btn btn-primary w-100" title="Tải danh sách">
@@ -67,7 +88,11 @@
                     <div class="text-muted small">
                         {{ $selectedClass?->name ?? 'Không rõ lớp' }} ·
                         {{ $selectedSemester?->name ?? 'Không rõ học kỳ' }} ·
-                        {{ \Illuminate\Support\Carbon::parse($date)->format('d/m/Y') }}
+                        {{ \Illuminate\Support\Carbon::parse($date)->format('d/m/Y') }} ·
+                        {{ $sessionTypes[$selectedSessionType] ?? 'Theo ngày' }}
+                        @if($selectedTimetableEntry)
+                            · {{ $selectedTimetableEntry->displayPeriod() }} - {{ $selectedTimetableEntry->subject?->name ?? 'Môn học' }}
+                        @endif
                     </div>
                 </div>
                 <button type="button" class="btn btn-secondary align-self-start" data-mark-all-present>
@@ -76,9 +101,15 @@
                 </button>
             </div>
 
+            @if($selectedSessionType === \App\Models\AttendanceRecord::SESSION_PERIOD && ! $selectedTimetableEntry)
+                <div class="alert alert-warning m-3 mb-0">
+                    Không có tiết học phù hợp để điểm danh. Vui lòng kiểm tra thời khóa biểu hoặc chọn ngày khác.
+                </div>
+            @endif
+
             @if($isEditingSession)
                 <div class="alert alert-info m-3 mb-0">
-                    Dữ liệu điểm danh của lớp trong ngày này đã tồn tại. Hệ thống đang mở ở chế độ chỉnh sửa.
+                    Dữ liệu điểm danh của phiên này đã tồn tại. Hệ thống đang mở ở chế độ chỉnh sửa.
                 </div>
             @endif
 
@@ -88,6 +119,8 @@
                 <input type="hidden" name="semester_id" value="{{ $selectedSemesterId }}">
                 <input type="hidden" name="class_id" value="{{ $selectedClassId }}">
                 <input type="hidden" name="attendance_date" value="{{ $date }}">
+                <input type="hidden" name="attendance_type" value="{{ $selectedSessionType }}">
+                <input type="hidden" name="timetable_entry_id" value="{{ $selectedTimetableEntryId }}">
 
                 <div class="table-responsive">
                     <table class="table">
@@ -149,7 +182,7 @@
                 </div>
 
                 <div class="card-body border-top text-end">
-                    <button class="btn btn-primary">
+                    <button class="btn btn-primary" @disabled($students->isEmpty() || ($selectedSessionType === \App\Models\AttendanceRecord::SESSION_PERIOD && ! $selectedTimetableEntry))>
                         <i class="bi bi-save"></i>
                         Lưu điểm danh
                     </button>
@@ -167,6 +200,7 @@
                 <tr>
                     <th>Lớp</th>
                     <th>Ngày</th>
+                    <th>Phiên điểm danh</th>
                     <th>Số học sinh</th>
                     <th>Có mặt</th>
                     <th>Đi muộn</th>
@@ -183,6 +217,10 @@
                         <div class="text-muted small">{{ $session->school_year_name }} · {{ $session->semester_name }}</div>
                     </td>
                     <td>{{ optional($session->date)->format('d/m/Y') }}</td>
+                    <td>
+                        <div class="fw-semibold">{{ $session->session_type === \App\Models\AttendanceRecord::SESSION_PERIOD ? 'Theo tiết học' : 'Theo ngày' }}</div>
+                        <div class="text-muted small">{{ $session->session_label }}</div>
+                    </td>
                     <td>{{ $session->total }}</td>
                     <td><span class="badge bg-success">{{ $session->present }}</span></td>
                     <td><span class="badge bg-warning text-dark">{{ $session->late }}</span></td>
@@ -206,6 +244,8 @@
                                     'semester_id' => $session->semester_id,
                                     'class_id' => $session->class_id,
                                     'date' => optional($session->date)->toDateString(),
+                                    'attendance_type' => $session->session_type,
+                                    'timetable_entry_id' => $session->timetable_entry_id,
                                 ]) }}"
                                 class="content-action-btn icon-only edit"
                                 title="Chỉnh sửa"
@@ -218,7 +258,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8">
+                    <td colspan="9">
                         <div class="empty-state">
                             <i class="bi bi-person-check"></i>
                             Chưa có dữ liệu điểm danh.
@@ -260,6 +300,10 @@
                             <div class="text-muted small">Số học sinh</div>
                             <div class="fw-semibold">{{ $session->total }}</div>
                         </div>
+                        <div class="col-md-12">
+                            <div class="text-muted small">Phiên điểm danh</div>
+                            <div class="fw-semibold">{{ $session->session_label }}</div>
+                        </div>
                     </div>
 
                     <div class="table-responsive">
@@ -298,6 +342,24 @@
 @endforeach
 
 <script>
+    document.querySelectorAll('[data-attendance-type-select]').forEach((select) => {
+        const form = select.closest('form');
+        const wrapper = form?.querySelector('[data-timetable-entry-filter]');
+        const timetableSelect = wrapper?.querySelector('select');
+
+        const syncTimetableField = () => {
+            const isPeriod = select.value === @json(\App\Models\AttendanceRecord::SESSION_PERIOD);
+            wrapper?.classList.toggle('d-none', ! isPeriod);
+
+            if (timetableSelect) {
+                timetableSelect.disabled = ! isPeriod;
+            }
+        };
+
+        select.addEventListener('change', syncTimetableField);
+        syncTimetableField();
+    });
+
     document.querySelectorAll('[data-mark-all-present]').forEach((button) => {
         button.addEventListener('click', () => {
             document.querySelectorAll('[data-attendance-present]').forEach((input) => {

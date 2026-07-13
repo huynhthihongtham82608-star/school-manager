@@ -143,7 +143,7 @@ class ProfileController extends Controller
             'force_change_password' => false,
         ]);
 
-        return redirect()->route('profile.show')
+        return redirect()->route('dashboard')
             ->with('success', 'Đổi mật khẩu thành công');
     }
 }

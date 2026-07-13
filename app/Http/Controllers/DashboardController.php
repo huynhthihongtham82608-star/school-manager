@@ -153,9 +153,13 @@ class DashboardController extends Controller
     {
         $teacher = $user->teacher;
         $todayWeekday = now()->isoWeekday();
+        $selectedYearId = $this->selectedSchoolYearId(request());
+        $selectedSemesterId = $this->selectedSemesterId(request());
 
         $assignments = $teacher->assignments()
             ->with(['classRoom', 'subject', 'semester.schoolYear'])
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
             ->where('status', TeachingAssignment::STATUS_ACTIVE)
             ->get();
 
@@ -181,9 +185,40 @@ class DashboardController extends Controller
             : collect();
 
         $classIds = $assignments->pluck('class_id')->filter()->unique()->values();
+        $homeroomClassIds = $teacher->homeroomClasses()
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->pluck('id');
+        $assignedPairs = $assignments->map(fn (TeachingAssignment $assignment) => [
+            'class_id' => $assignment->class_id,
+            'subject_id' => $assignment->subject_id,
+        ]);
+        $visibleClassIds = $classIds->merge($homeroomClassIds)->unique()->values();
+
         $upcomingExams = Schema::hasTable('exam_schedules')
             ? ExamSchedule::with(['classRoom', 'subject'])
-                ->whereIn('class_id', $classIds)
+                ->whereIn('class_id', $visibleClassIds)
+                ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
+                ->where(function ($query) use ($homeroomClassIds, $assignedPairs) {
+                    $hasCondition = false;
+
+                    if ($homeroomClassIds->isNotEmpty()) {
+                        $query->whereIn('class_id', $homeroomClassIds);
+                        $hasCondition = true;
+                    }
+
+                    foreach ($assignedPairs as $pair) {
+                        $method = $hasCondition ? 'orWhere' : 'where';
+                        $query->{$method}(function ($query) use ($pair) {
+                            $query->where('class_id', $pair['class_id'])
+                                ->where('subject_id', $pair['subject_id']);
+                        });
+                        $hasCondition = true;
+                    }
+
+                    if (! $hasCondition) {
+                        $query->whereRaw('1 = 0');
+                    }
+                })
                 ->whereDate('exam_date', '>=', now()->toDateString())
                 ->orderBy('exam_date')
                 ->orderBy('start_time')
@@ -194,7 +229,7 @@ class DashboardController extends Controller
             : collect();
 
         return [
-            'class_count' => $classIds->count(),
+            'class_count' => $visibleClassIds->count(),
             'today_period_count' => $todayEntries->count(),
             'today_entries' => $todayEntries,
             'announcements' => $announcements,
@@ -248,7 +283,7 @@ class DashboardController extends Controller
                     : 0,
             ],
             [
-                'label' => 'Lịch thi sắp diễn ra',
+                'label' => 'Lịch kiểm tra sắp diễn ra',
                 'icon' => 'bi-calendar2-check',
                 'value' => Schema::hasTable('exam_schedules')
                     ? ExamSchedule::all()
@@ -301,11 +336,11 @@ class DashboardController extends Controller
                 'empty' => 'Tất cả lớp đã có dữ liệu điểm danh hôm nay.',
             ],
             [
-                'title' => 'Có ' . $draftExamSchedules . ' lịch thi chưa công bố',
+                'title' => 'Có ' . $draftExamSchedules . ' lịch kiểm tra chưa công bố',
                 'icon' => 'bi-calendar2-check',
                 'count' => $draftExamSchedules,
-                'detail' => $draftExamSchedules > 0 ? 'Cần rà soát và công bố lịch thi phù hợp.' : null,
-                'empty' => 'Không có lịch thi ở trạng thái bản nháp.',
+                'detail' => $draftExamSchedules > 0 ? 'Cần rà soát và công bố lịch kiểm tra phù hợp.' : null,
+                'empty' => 'Không có lịch kiểm tra ở trạng thái bản nháp.',
             ],
             [
                 'title' => 'Có ' . $draftAnnouncements . ' thông báo đang ở trạng thái Bản nháp',

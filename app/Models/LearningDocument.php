@@ -70,6 +70,33 @@ class LearningDocument extends Model
         return $this->isVisibleToAnyRole($roles);
     }
 
+    public function fileUrl(): ?string
+    {
+        $url = trim((string) $this->file_url);
+
+        if ($url === '') {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $url)) {
+            $path = ltrim(parse_url($url, PHP_URL_PATH) ?: '', '/');
+
+            if (str_starts_with($path, 'storage/')) {
+                return asset($path);
+            }
+
+            return $url;
+        }
+
+        $path = ltrim($url, '/');
+
+        if (str_starts_with($path, 'storage/')) {
+            return asset($path);
+        }
+
+        return asset('storage/' . $path);
+    }
+
     private function isVisibleToAnyRole(array $roles): bool
     {
         $targets = $this->targetRoles();

@@ -12,6 +12,7 @@ use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\TeachingAssignment;
 use App\Models\Timetable;
+use App\Models\TimetableEntry;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -32,7 +33,7 @@ class TeachingAssignmentController extends Controller
         ];
         $readOnly = $this->isHistoricalReadOnly();
 
-        $assignments = TeachingAssignment::with(['teacher.primarySubject', 'classRoom', 'subject', 'schoolYear', 'semester'])
+        $assignments = TeachingAssignment::with(['teacher.primarySubject', 'classRoom', 'subject.periodNorms', 'schoolYear', 'semester'])
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
             ->when($filters['class_id'] !== 'all', fn ($query) => $query->where('class_id', $filters['class_id']))
@@ -47,12 +48,39 @@ class TeachingAssignmentController extends Controller
         $deleteChecks = $assignments->mapWithKeys(fn (TeachingAssignment $assignment) => [
             (string) $assignment->getKey() => $this->deleteCheck($assignment),
         ]);
+        $scheduledCounts = TimetableEntry::whereIn('assignment_id', $assignments->pluck('id')->filter())
+            ->where('status', '!=', TimetableEntry::STATUS_ARCHIVED)
+            ->selectRaw('assignment_id, count(*) as total')
+            ->groupBy('assignment_id')
+            ->pluck('total', 'assignment_id');
+        $periodProgress = $assignments->mapWithKeys(function (TeachingAssignment $assignment) use ($scheduledCounts) {
+            $standard = (int) ($assignment->standardWeeklyPeriods() ?: 0);
+            $expected = (int) ($assignment->effectiveWeeklyPeriods() ?: 0);
+            $scheduled = (int) ($scheduledCounts[(string) $assignment->getKey()] ?? 0);
+
+            return [
+                (string) $assignment->getKey() => [
+                    'standard' => $standard,
+                    'expected' => $expected,
+                    'scheduled' => $scheduled,
+                    'percent' => $expected > 0 ? min(100, (int) round($scheduled / $expected * 100)) : 0,
+                    'badge_class' => $expected === 0
+                        ? 'bg-light text-muted border'
+                        : ($scheduled > $expected ? 'bg-danger' : ($scheduled === $expected ? 'bg-success' : 'bg-warning text-dark')),
+                    'progress_class' => $scheduled > $expected
+                        ? 'bg-danger'
+                        : ($expected > 0 && $scheduled === $expected ? 'bg-success' : 'bg-warning'),
+                    'label' => $expected === 0
+                        ? 'Chưa cấu hình định mức'
+                        : ($scheduled > $expected ? 'Vượt số tiết' : ($scheduled === $expected ? 'Đủ' : 'Chưa đủ')),
+                ],
+            ];
+        });
 
         return view('assignments.index', [
             'assignments' => $assignments,
             'teachers' => Teacher::with('primarySubject')->where('work_status', Teacher::STATUS_WORKING)->orderBy('name')->get(),
             'classes' => SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
-                ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
                 ->orderBy('name')
                 ->get(),
             'selectedYearId' => $selectedYearId,
@@ -60,6 +88,8 @@ class TeachingAssignmentController extends Controller
             'filters' => $filters,
             'readOnly' => $readOnly,
             'deleteChecks' => $deleteChecks,
+            'scheduledCounts' => $scheduledCounts,
+            'periodProgress' => $periodProgress,
         ]);
     }
 
@@ -169,7 +199,6 @@ class TeachingAssignmentController extends Controller
             'semesters' => $activeSemester ? collect([$activeSemester]) : collect(),
             'classes' => SchoolClass::query()
                 ->when($activeYear, fn ($query) => $query->where('school_year_id', $activeYear->getKey()))
-                ->when($activeSemester, fn ($query) => $query->where('semester_id', $activeSemester->getKey()))
                 ->where('status', SchoolClass::STATUS_ACTIVE)
                 ->orderBy('grade_level')
                 ->orderBy('name')
@@ -257,8 +286,8 @@ class TeachingAssignmentController extends Controller
             throw ValidationException::withMessages(['class_id' => 'Chỉ được chọn lớp đang hoạt động.']);
         }
 
-        if ((string) $class->school_year_id !== (string) $year->getKey() || (string) $class->semester_id !== (string) $semester->getKey()) {
-            throw ValidationException::withMessages(['class_id' => 'Lớp không thuộc năm học và học kỳ đã chọn.']);
+        if ((string) $class->school_year_id !== (string) $year->getKey()) {
+            throw ValidationException::withMessages(['class_id' => 'Lớp không thuộc năm học đã chọn.']);
         }
 
         if ($subject->status !== Subject::STATUS_ACTIVE) {
@@ -315,6 +344,22 @@ class TeachingAssignmentController extends Controller
                 ]);
             }
         }
+
+        if ($assignment) {
+            $scheduledCount = TimetableEntry::where('assignment_id', $assignment->getKey())
+                ->where('status', '!=', TimetableEntry::STATUS_ARCHIVED)
+                ->count();
+            $assignment->fill(['weekly_periods' => $data['weekly_periods']]);
+            $assignment->setRelation('subject', $subject->loadMissing('periodNorms'));
+            $assignment->setRelation('classRoom', $class);
+            $effectiveLimit = (int) ($assignment->effectiveWeeklyPeriods() ?: 0);
+
+            if ($effectiveLimit > 0 && $scheduledCount > $effectiveLimit) {
+                throw ValidationException::withMessages([
+                    'weekly_periods' => 'Phân công này đã được xếp ' . $scheduledCount . ' tiết trong thời khóa biểu, không thể đặt định mức hiệu lực nhỏ hơn.',
+                ]);
+            }
+        }
     }
 
     private function deleteCheck(TeachingAssignment $assignment): array
@@ -361,8 +406,8 @@ class TeachingAssignmentController extends Controller
             ->pluck('id');
 
         return $timetableIds->isNotEmpty()
-            && \App\Models\TimetableEntry::whereIn('timetable_id', $timetableIds)
-                ->where('subject_id', $assignment->subject_id)
+            && TimetableEntry::whereIn('timetable_id', $timetableIds)
+                ->where('assignment_id', $assignment->getKey())
                 ->exists();
     }
 
