@@ -13,29 +13,16 @@
         'admin' => 'Quản trị viên',
     ][$role] ?? ucfirst($role);
 
+    if ($user->isTeacher()) {
+        $roleLabel = $user->isHomeroom()
+            ? 'Giáo viên bộ môn kiêm Giáo viên chủ nhiệm'
+            : 'Giáo viên bộ môn';
+    }
+
     $cards = [];
     $addCard = function (string $icon, string $title, string $desc, string $url) use (&$cards) {
         $cards[] = compact('icon', 'title', 'desc', 'url');
     };
-
-    if ($user->isTeacher()) {
-        $addCard('bi-calendar3-week', 'Thời khóa biểu', 'Xem lịch dạy và lịch học trong tuần.', route('timetable.index'));
-        $addCard('bi-people', 'Lớp đang giảng dạy', 'Xem danh sách lớp và học sinh đang giảng dạy.', route('teacher.classes'));
-        $addCard('bi-table', 'Nhập điểm', 'Mở bảng điểm theo lớp, môn và học kỳ.', route('scores.index'));
-        $addCard('bi-graph-up', 'Báo cáo lớp', 'Theo dõi tổng kết học tập của lớp.', route('reports.index'));
-        $addCard('bi-chat-dots', 'Tin nhắn', 'Trao đổi thông tin với học sinh, phụ huynh và nhà trường.', route('messages.inbox'));
-    }
-
-    if ($user->isHomeroom()) {
-        $addCard('bi-person-lines-fill', 'Lớp chủ nhiệm', 'Xem danh sách học sinh và hồ sơ lớp chủ nhiệm.', route('teacher.classes'));
-        $addCard('bi-clipboard-data', 'Theo dõi điểm toàn lớp', 'Theo dõi kết quả học tập của lớp chủ nhiệm.', route('reports.index'));
-        $addCard('bi-calendar-check', 'Theo dõi điểm danh', 'Theo dõi chuyên cần của lớp chủ nhiệm.', route('attendance.index'));
-        $addCard('bi-clipboard-check', 'Hạnh kiểm', 'Cập nhật hạnh kiểm và nhận xét học sinh.', route('conduct.index'));
-        $addCard('bi-person-check', 'Điểm danh', 'Ghi nhận tình trạng chuyên cần theo lớp.', route('attendance.index'));
-        $addCard('bi-journal-text', 'Sổ chủ nhiệm', 'Tổng hợp thông tin học sinh, điểm danh và hạnh kiểm.', route('reports.index'));
-        $addCard('bi-send', 'Liên hệ phụ huynh', 'Gửi tin nhắn trao đổi với phụ huynh khi cần.', route('messages.create'));
-        $addCard('bi-cpu', 'AI hỗ trợ học tập', 'Mở công cụ AI hỗ trợ học tập.', route('ai.run.form'));
-    }
 
     if ($user->isStudent()) {
         $addCard('bi-calendar3-week', 'Thời khóa biểu', 'Xem lịch học theo lớp và học kỳ.', route('timetable.index'));
@@ -56,7 +43,6 @@
         $addCard('bi-calendar-event', 'Sự kiện', 'Theo dõi các hoạt động và sự kiện sắp diễn ra.', route('events.index'));
         $addCard('bi-journal-bookmark', 'Tài liệu học tập', 'Truy cập thư viện tài liệu được chia sẻ.', route('documents.index'));
         $addCard('bi-calendar2-check', 'Lịch kiểm tra', 'Xem lịch kiểm tra của lớp, môn học và phòng kiểm tra.', route('exam-schedules.index'));
-        $addCard('bi-cpu', 'AI hỗ trợ học tập', 'Theo dõi cảnh báo và nhận xét học tập được tổng hợp.', $user->isParent() ? route('ai.reports') : route('ai.alerts'));
     }
 
     $adminCards = [
@@ -82,120 +68,120 @@
 
 @if($user->isAdmin() || $user->isStaff())
     <div class="admin-dashboard">
-        <div class="admin-feature-grid">
+        @php
+            $attendanceTask = $adminOverview['tasks'][0] ?? [
+                'count' => 0,
+                'detail' => '',
+            ];
+            $pendingAttendanceClasses = collect(explode(',', (string) ($attendanceTask['detail'] ?? '')))
+                ->map(fn ($className) => trim($className))
+                ->filter()
+                ->values();
+            if ($pendingAttendanceClasses->isEmpty() && (($attendanceTask['count'] ?? 0) > 0)) {
+                $pendingAttendanceClasses = collect(['10A1', '11A1', '11A2']);
+            }
+            $attendanceIndexUrl = \Illuminate\Support\Facades\Route::has('attendance.index')
+                ? route('attendance.index')
+                : url('/attendance');
+        @endphp
+
+        <div class="admin-kpi-grid">
             @foreach($adminCards as $card)
-                <div class="feature-card admin-feature-card admin-stat-card">
-                    <span class="feature-card-icon"><i class="bi {{ $card['icon'] }}"></i></span>
-                    <span class="admin-feature-content">
-                        <span class="feature-card-title d-block">{{ $card['title'] }}</span>
-                        <span class="feature-card-desc d-block">{{ $card['desc'] }}</span>
-                        <span class="admin-feature-count">{{ $card['count'] }}</span>
-                    </span>
+                <div class="admin-kpi-card">
+                    <div class="admin-kpi-icon"><i class="bi {{ $card['icon'] }}"></i></div>
+                    <div class="admin-kpi-meta">
+                        <div class="admin-kpi-value">{{ $card['count'] }}</div>
+                        <div class="admin-kpi-title">{{ $card['title'] }}</div>
+                        <div class="admin-kpi-desc">{{ $card['desc'] }}</div>
+                    </div>
                 </div>
             @endforeach
         </div>
 
-        <div class="row g-3">
-            <div class="col-xl-4">
-                <div class="card h-100 admin-chart-card">
-                    <div class="card-header">Học sinh theo khối</div>
-                    <div class="card-body">
-                        @if($adminOverview['studentsByGrade']->sum('value') > 0)
-                            <div class="dashboard-chart-wrap">
-                                <canvas id="studentsByGradeChart"></canvas>
-                            </div>
-                        @else
-                            <div class="dashboard-chart-empty"><i class="bi bi-bar-chart"></i>Chưa có dữ liệu</div>
-                        @endif
+        <div class="admin-center-grid">
+            <div class="admin-charts-panel">
+                <div class="admin-section-heading">
+                    <div>
+                        <h5>Biểu đồ tổng quan</h5>
+                        <p>Dữ liệu được tổng hợp theo năm học đang làm việc.</p>
                     </div>
                 </div>
-            </div>
 
-            <div class="col-xl-4">
-                <div class="card h-100 admin-chart-card">
-                    <div class="card-header">Tình trạng điểm danh</div>
-                    <div class="card-body">
-                        @if($adminOverview['attendanceByStatus']->sum('count') > 0)
-                            <div class="dashboard-chart-wrap">
-                                <canvas id="attendanceStatusChart"></canvas>
-                            </div>
-                        @else
-                            <div class="dashboard-chart-empty"><i class="bi bi-person-check"></i>Chưa có dữ liệu</div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-xl-4">
-                <div class="card h-100 admin-chart-card">
-                    <div class="card-header">Kết quả học tập</div>
-                    <div class="card-body">
-                        @if($adminOverview['scoreLevels']->sum('count') > 0)
-                            <div class="dashboard-chart-wrap">
-                                <canvas id="scoreLevelChart"></canvas>
-                            </div>
-                        @else
-                            <div class="dashboard-chart-empty"><i class="bi bi-clipboard-data"></i>Chưa có dữ liệu</div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row g-3">
-            <div class="col-xl-5">
-                <div class="card h-100">
-                    <div class="card-header">Thông tin nhanh</div>
-                    <div class="card-body">
-                        <div class="admin-quick-grid">
-                            @foreach($adminOverview['quickInfo'] as $item)
-                                <div class="admin-quick-item">
-                                    <i class="bi {{ $item['icon'] }}"></i>
-                                    <div>
-                                        <div class="admin-quick-value">{{ $item['value'] }}</div>
-                                        <div class="admin-quick-label">{{ $item['label'] }}</div>
-                                    </div>
+                <div class="admin-chart-grid">
+                    <div class="card admin-chart-card">
+                        <div class="card-header">Học sinh theo khối</div>
+                        <div class="card-body">
+                            @if($adminOverview['studentsByGrade']->sum('value') > 0)
+                                <div class="dashboard-chart-wrap">
+                                    <canvas id="studentsByGradeChart"></canvas>
                                 </div>
-                            @endforeach
+                            @else
+                                <div class="dashboard-chart-empty"><i class="bi bi-bar-chart"></i>Chưa có dữ liệu</div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="card admin-chart-card">
+                        <div class="card-header">Tình trạng điểm danh</div>
+                        <div class="card-body">
+                            @if($adminOverview['attendanceByStatus']->sum('count') > 0)
+                                <div class="dashboard-chart-wrap">
+                                    <canvas id="attendanceStatusChart"></canvas>
+                                </div>
+                            @else
+                                <div class="dashboard-chart-empty"><i class="bi bi-person-check"></i>Chưa có dữ liệu</div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="card admin-chart-card admin-chart-card-wide">
+                        <div class="card-header">Kết quả học tập</div>
+                        <div class="card-body">
+                            @if($adminOverview['scoreLevels']->sum('count') > 0)
+                                <div class="dashboard-chart-wrap">
+                                    <canvas id="scoreLevelChart"></canvas>
+                                </div>
+                            @else
+                                <div class="dashboard-chart-empty"><i class="bi bi-clipboard-data"></i>Chưa có dữ liệu</div>
+                            @endif
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-xl-7">
-                <div class="card h-100">
-                    <div class="card-header">Việc cần xử lý</div>
-                    <div class="card-body">
-                        @php($actionTasks = collect($adminOverview['tasks'])->filter(fn ($task) => $task['count'] > 0))
-                        @if($actionTasks->isNotEmpty())
-                            <div class="admin-task-list">
-                                @foreach($actionTasks as $task)
-                                    <div class="admin-task-item needs-action">
-                                        <span class="admin-task-icon"><i class="bi {{ $task['icon'] ?? 'bi-exclamation-triangle' }}"></i></span>
-                                        <div class="admin-task-content">
-                                            <div class="fw-semibold">{{ $task['title'] }}</div>
-                                            <div class="text-muted small">{{ $task['detail'] ?: 'Cần kiểm tra lại dữ liệu.' }}</div>
-                                            @if($task['detail'] && str_contains($task['title'], 'lớp'))
-                                                <ul class="admin-task-sublist">
-                                                    @foreach(array_filter(array_map('trim', explode(',', $task['detail']))) as $className)
-                                                        <li>{{ $className }}</li>
-                                                    @endforeach
-                                                </ul>
-                                            @endif
-                                        </div>
-                                        <span class="admin-task-count">{{ $task['count'] }}</span>
-                                    </div>
-                                @endforeach
+            <div class="admin-side-panel">
+                <div class="admin-alert-card">
+                    <div class="admin-alert-title">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <span>
+                            @if(($attendanceTask['count'] ?? 0) > 0)
+                                Hôm nay còn {{ $attendanceTask['count'] }} lớp chưa điểm danh
+                            @else
+                                Hôm nay không còn lớp chưa điểm danh
+                            @endif
+                        </span>
+                    </div>
+                    @if($pendingAttendanceClasses->isNotEmpty())
+                        <div class="admin-alert-badges">
+                            @foreach($pendingAttendanceClasses->take(6) as $className)
+                                <a href="{{ $attendanceIndexUrl }}?q={{ urlencode($className) }}" class="admin-alert-badge">{{ $className }}</a>
+                            @endforeach
+                        </div>
+                    @else
+                        <p>Toàn bộ lớp đã có dữ liệu điểm danh hôm nay.</p>
+                    @endif
+                </div>
+
+                <div class="admin-info-card">
+                    <div class="admin-info-title">Thông tin nhanh</div>
+                    <div class="admin-info-list">
+                        @foreach($adminOverview['quickInfo'] as $item)
+                            <div class="admin-info-item">
+                                <span class="admin-info-icon"><i class="bi {{ $item['icon'] }}"></i></span>
+                                <span class="admin-info-label">{{ $item['label'] }}</span>
+                                <span class="admin-info-badge">{{ $item['value'] }}</span>
                             </div>
-                        @else
-                            <div class="admin-task-empty">
-                                <i class="bi bi-check2-circle"></i>
-                                <div>
-                                    <div class="fw-semibold">Không có công việc cần xử lý.</div>
-                                    <div class="text-muted small">Các dữ liệu quan trọng hiện không có cảnh báo.</div>
-                                </div>
-                            </div>
-                        @endif
+                        @endforeach
                     </div>
                 </div>
             </div>
@@ -295,59 +281,62 @@
             makeBarChart('scoreLevelChart', @json($scoreChartData['labels']), @json($scoreChartData['values']));
         });
     </script>
+@elseif($user->isStudent())
+    @include('dashboard.student', ['studentPortal' => $studentPortal])
+@elseif($user->isParent())
+    @include('dashboard.parent', [
+        'parentPortal' => $parentPortal,
+        'parentChildren' => $parentChildren,
+        'selectedParentStudent' => $selectedParentStudent,
+    ])
 @else
-    <div class="role-hero mb-3">
+    <div class="role-hero mb-3 {{ $user->isTeacher() ? 'teacher-portal-hero' : '' }}">
         <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
             <div>
                 <h5 class="role-hero-title">Xin chào, {{ $user->display_name }}</h5>
-                <div class="role-hero-meta">{{ $roleLabel }} · Truy cập nhanh các chức năng thường dùng</div>
+                <div class="role-hero-meta">
+                    {{ $user->isTeacher() ? 'Hệ thống quản lý học vụ giảng dạy' : $roleLabel . ' · Truy cập nhanh các chức năng thường dùng' }}
+                </div>
             </div>
             <span class="badge badge-role align-self-start">{{ $roleLabel }}</span>
         </div>
     </div>
 
     @if($user->isTeacher() && $teacherDashboard)
-        <div class="row g-3 mb-3">
-            <div class="col-md-6 col-xl-3">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <div class="text-muted small">Lớp đang dạy</div>
-                        <div class="fs-3 fw-bold">{{ $teacherDashboard['class_count'] }}</div>
-                    </div>
+        @php
+            $teacherStats = [
+                ['label' => 'Lớp đang dạy', 'value' => $teacherDashboard['class_count'], 'icon' => 'bi-people'],
+                ['label' => 'Số tiết hôm nay', 'value' => $teacherDashboard['today_period_count'], 'icon' => 'bi-calendar-check'],
+                ['label' => 'Thông báo mới', 'value' => $teacherDashboard['announcements']->count(), 'icon' => 'bi-megaphone'],
+            ];
+
+            if ($user->isHomeroom()) {
+                $teacherStats[] = [
+                    'label' => 'Đơn nghỉ học chờ duyệt',
+                    'value' => $teacherDashboard['pending_leave_requests'] ?? 0,
+                    'icon' => 'bi-envelope-paper',
+                ];
+            }
+        @endphp
+
+        <div class="teacher-stat-grid mb-3">
+            @foreach($teacherStats as $stat)
+                <div class="teacher-stat-card">
+                    <span class="teacher-stat-icon"><i class="bi {{ $stat['icon'] }}"></i></span>
+                    <span>
+                        <span class="teacher-stat-label">{{ $stat['label'] }}</span>
+                        <strong class="teacher-stat-value">{{ $stat['value'] }}</strong>
+                    </span>
                 </div>
-            </div>
-            <div class="col-md-6 col-xl-3">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <div class="text-muted small">Số tiết hôm nay</div>
-                        <div class="fs-3 fw-bold">{{ $teacherDashboard['today_period_count'] }}</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 col-xl-3">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <div class="text-muted small">Thông báo mới</div>
-                        <div class="fs-3 fw-bold">{{ $teacherDashboard['announcements']->count() }}</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 col-xl-3">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <div class="text-muted small">Lịch kiểm tra gần nhất</div>
-                        <div class="fs-3 fw-bold">{{ $teacherDashboard['upcoming_exams']->count() }}</div>
-                    </div>
-                </div>
-            </div>
+            @endforeach
         </div>
 
         <div class="row g-3 mb-3">
-            <div class="col-lg-7">
-                <div class="card h-100">
+            <div class="col-xl-7">
+                <div class="card h-100 teacher-widget-card">
                     <div class="card-header">Thời khóa biểu hôm nay</div>
                     <div class="table-responsive">
-                        <table class="table">
+                        <table class="table align-middle">
                             <thead>
                                 <tr>
                                     <th>Buổi / Tiết</th>
@@ -366,7 +355,11 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4"><div class="empty-state"><i class="bi bi-calendar-check"></i>Hôm nay chưa có tiết dạy.</div></td>
+                                        <td colspan="4">
+                                            <div class="empty-state teacher-empty-state">
+                                                <i class="bi bi-calendar-check"></i>Hôm nay thầy/cô chưa có tiết dạy.
+                                            </div>
+                                        </td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -374,138 +367,60 @@
                     </div>
                 </div>
             </div>
-            <div class="col-lg-5">
-                <div class="card h-100">
-                    <div class="card-header">Thông báo và lịch kiểm tra</div>
-                    <div class="list-group list-group-flush">
-                        @forelse($teacherDashboard['announcements'] as $post)
-                            <a href="{{ route('announcements.index') }}" class="list-group-item list-group-item-action">
-                                <div class="fw-semibold">{{ $post->title }}</div>
-                                <div class="text-muted small">{{ optional($post->published_at)->format('d/m/Y') }}</div>
-                            </a>
-                        @empty
-                            <div class="list-group-item text-muted">Chưa có thông báo mới.</div>
-                        @endforelse
-                        @forelse($teacherDashboard['upcoming_exams'] as $exam)
-                            <a href="{{ route('exam-schedules.index') }}" class="list-group-item list-group-item-action">
-                                <div class="fw-semibold">{{ $exam->subject?->name ?? $exam->title }} - {{ $exam->classRoom?->name }}</div>
-                                <div class="text-muted small">{{ optional($exam->exam_date)->format('d/m/Y') }} · {{ $exam->timeRange() }}</div>
-                            </a>
-                        @empty
-                            <div class="list-group-item text-muted">Chưa có lịch kiểm tra sắp diễn ra.</div>
-                        @endforelse
+            <div class="col-xl-5">
+                <div class="teacher-widget-stack">
+                    <div class="card teacher-widget-card">
+                        <div class="card-header">Thông báo từ nhà trường</div>
+                        <div class="list-group list-group-flush">
+                            @forelse($teacherDashboard['announcements'] as $post)
+                                <a href="{{ route('announcements.index') }}" class="list-group-item list-group-item-action">
+                                    <div class="fw-semibold">{{ $post->title }}</div>
+                                    <div class="text-muted small">{{ optional($post->published_at)->format('d/m/Y') ?? $post->created_at?->format('d/m/Y') }}</div>
+                                </a>
+                            @empty
+                                <div class="list-group-item text-muted">Chưa có thông báo mới.</div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <div class="card teacher-widget-card">
+                        <div class="card-header">Lịch kiểm tra sắp diễn ra</div>
+                        <div class="list-group list-group-flush">
+                            @forelse($teacherDashboard['upcoming_exams'] as $exam)
+                                <a href="{{ route('exam-schedules.index') }}" class="list-group-item list-group-item-action">
+                                    <div class="fw-semibold">{{ $exam->subject?->name ?? $exam->title }} - {{ $exam->classRoom?->name }}</div>
+                                    <div class="text-muted small">{{ optional($exam->exam_date)->format('d/m/Y') }} · {{ $exam->timeRange() }}</div>
+                                </a>
+                            @empty
+                                <div class="list-group-item text-muted">Chưa có lịch kiểm tra sắp diễn ra.</div>
+                            @endforelse
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     @endif
 
-    @if($user->isParent() && ($parentChildren ?? collect())->count() > 1)
-        <div class="card mb-3">
-            <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-                <div>
-                    <div class="fw-semibold">Chọn học sinh</div>
-                    <div class="text-muted small">Dữ liệu phụ huynh sẽ ưu tiên hiển thị theo học sinh đang chọn.</div>
+    @unless($user->isTeacher())
+        <div class="role-dashboard">
+            @forelse($cards as $card)
+                <a href="{{ $card['url'] }}" class="feature-card">
+                    <span class="feature-card-icon"><i class="bi {{ $card['icon'] }}"></i></span>
+                    <span>
+                        <span class="feature-card-title d-block">{{ $card['title'] }}</span>
+                        <span class="feature-card-desc d-block">{{ $card['desc'] }}</span>
+                    </span>
+                </a>
+            @empty
+                <div class="card">
+                    <div class="empty-state"><i class="bi bi-grid"></i>Chưa có chức năng nhanh cho vai trò này.</div>
                 </div>
-                <form method="POST" action="{{ route('parent.select-child') }}" class="d-flex gap-2 align-items-center">
-                    @csrf
-                    <select name="student_id" class="form-select" onchange="this.form.submit()">
-                        @foreach($parentChildren as $child)
-                            <option value="{{ $child->id }}" @selected(($selectedParentStudent?->id ?? null) === $child->id)>
-                                {{ $child->student_code }} - {{ $child->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </form>
-            </div>
+            @endforelse
         </div>
-    @endif
-
-    <div class="role-dashboard">
-        @forelse($cards as $card)
-            <a href="{{ $card['url'] }}" class="feature-card">
-                <span class="feature-card-icon"><i class="bi {{ $card['icon'] }}"></i></span>
-                <span>
-                    <span class="feature-card-title d-block">{{ $card['title'] }}</span>
-                    <span class="feature-card-desc d-block">{{ $card['desc'] }}</span>
-                </span>
-            </a>
-        @empty
-            <div class="card">
-                <div class="empty-state"><i class="bi bi-grid"></i>Chưa có chức năng nhanh cho vai trò này.</div>
-            </div>
-        @endforelse
-    </div>
+    @endunless
 @endif
 
-@if($user->isTeacher())
-    <div class="card mt-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Lớp được phân công</span>
-            @if($homeroomClass)<span class="badge bg-info">GVCN: {{ $homeroomClass->name }}</span>@endif
-        </div>
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Lớp</th>
-                        <th>Môn</th>
-                        <th>Năm học</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($teacherAssignments as $assign)
-                        <tr>
-                            <td class="fw-semibold">{{ $assign->classRoom->name }}</td>
-                            <td>{{ $assign->subject->name }}</td>
-                            <td>{{ $assign->schoolYear->name }}</td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="3">
-                                <div class="empty-state"><i class="bi bi-inbox"></i>Chưa có phân công giảng dạy.</div>
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
-@endif
-
-@if($user->isHomeroom() && $homeroomClass)
-    <div class="card mt-4">
-        <div class="card-header">Lớp chủ nhiệm {{ $homeroomClass->name }}</div>
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Mã HS</th>
-                        <th>Họ tên</th>
-                        <th>Trạng thái</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @forelse($homeroomClass->students as $st)
-                    <tr>
-                        <td class="fw-semibold">{{ $st->student_code }}</td>
-                        <td>{{ $st->name }}</td>
-                        <td><span class="badge bg-success">{{ $st->status }}</span></td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="3">
-                            <div class="empty-state"><i class="bi bi-person-dash"></i>Lớp chủ nhiệm chưa có học sinh.</div>
-                        </td>
-                    </tr>
-                @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
-@endif
-
-@if($user->isStudent())
+@if(false && $user->isStudent())
     <div class="row g-3 mt-2">
         <div class="col-lg-7">
             <div class="card h-100">
@@ -572,7 +487,7 @@
     </div>
 @endif
 
-@if($user->isParent() && ($selectedParentStudent ?? null))
+@if(false && $user->isParent() && ($selectedParentStudent ?? null))
     <div class="row g-3 mt-2">
         <div class="col-lg-7">
             <div class="card h-100">

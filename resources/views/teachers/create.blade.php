@@ -25,6 +25,16 @@
             </select>
             @error('primary_subject_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
+        <div class="col-md-4">
+            <label class="form-label">Tổ chuyên môn</label>
+            <select name="department_id" class="form-select">
+                <option value="">Chưa phân tổ</option>
+                @foreach($departments as $department)
+                    <option value="{{ $department->id }}" @selected(old('department_id') === $department->id)>{{ $department->name }}</option>
+                @endforeach
+            </select>
+            @error('department_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+        </div>
         <div class="col-md-3">
             <label class="form-label">Ngày sinh</label>
             <input type="date" name="dob" class="form-control" value="{{ old('dob') }}">

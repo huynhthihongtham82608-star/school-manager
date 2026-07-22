@@ -15,15 +15,19 @@
     ];
 @endphp
 
-<div class="page-heading">
-    <div>
-        <h5>Tài liệu học tập</h5>
-        <div class="text-muted">Thư viện tài liệu phục vụ học tập và giảng dạy.</div>
-    </div>
-</div>
+<x-page-header
+    title="Cấu hình nội dung hệ thống"
+    subtitle="Quản lý giao diện trang chủ, biên tập các bài viết tin tức, chỉnh sửa thư viện ảnh và thông tin hiển thị trên cổng thông tin nhà trường."
+>
+    @if($canManageDocuments)
+        <a class="btn btn-primary" href="#document-create-form">
+            <i class="bi bi-plus-lg me-1"></i>Viết bài mới
+        </a>
+    @endif
+</x-page-header>
 
 @if($canManageDocuments)
-    <div class="content-management">
+    <div class="content-management" id="document-create-form">
         <div class="management-card">
             <div class="management-card-header">
                 <div>
@@ -340,6 +344,59 @@
         </div>
     </div>
 @else
+    @if(auth()->user()->isStudent())
+        @php
+            $studentDocumentItems = method_exists($documents, 'items') ? $documents->items() : $documents;
+            $groupedDocuments = collect($studentDocumentItems)
+                ->groupBy(fn ($document) => $document->subject->name ?? 'Tài liệu chung');
+        @endphp
+
+        <div class="student-document-groups">
+            @forelse($groupedDocuments as $subjectName => $subjectDocuments)
+                <div class="card">
+                    <div class="card-header d-flex flex-column flex-md-row justify-content-between gap-2">
+                        <div>
+                            <div class="fw-semibold">{{ $subjectName }}</div>
+                            <div class="text-muted small">{{ $subjectDocuments->count() }} tài liệu học tập</div>
+                        </div>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        @foreach($subjectDocuments as $document)
+                            @php($detailId = 'document-detail-' . $document->id)
+                            @php($documentFileUrl = $document->fileUrl())
+                            <div class="list-group-item">
+                                <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+                                    <div>
+                                        <div class="fw-semibold">{{ $document->title }}</div>
+                                        <div class="text-muted small">
+                                            {{ $document->category ?: 'Chưa phân nhóm' }}
+                                            <span class="mx-1">•</span>
+                                            {{ $document->classRoom->name ?? 'Dùng chung' }}
+                                        </div>
+                                        <div class="small mt-1">{{ \Illuminate\Support\Str::limit($document->description ?: 'Tài liệu được nhà trường chia sẻ.', 120, '...') }}</div>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2 align-self-md-center">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}">
+                                            <i class="bi bi-eye me-1"></i>Xem nhanh
+                                        </button>
+                                        @if($documentFileUrl)
+                                            <a href="{{ $documentFileUrl }}" target="_blank" class="btn btn-primary btn-sm">
+                                                <i class="bi bi-download me-1"></i>Tải về
+                                            </a>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @empty
+                <div class="card">
+                    <div class="empty-state"><i class="bi bi-folder2-open"></i>Chưa có tài liệu học tập.</div>
+                </div>
+            @endforelse
+        </div>
+    @else
     <div class="content-grid">
         @forelse($documents as $document)
             @php($detailId = 'document-detail-' . $document->id)
@@ -368,6 +425,7 @@
             </div>
         @endforelse
     </div>
+    @endif
 
     @foreach($documents as $document)
         @php($detailId = 'document-detail-' . $document->id)

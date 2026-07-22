@@ -7,11 +7,10 @@
     $statusFilters = ['all' => 'Tất cả trạng thái'] + \App\Models\Room::STATUSES;
 @endphp
 
-<div class="page-heading">
-    <div>
-        <h5>Phòng học</h5>
-        <div class="text-muted">Quản lý dữ liệu nền phòng học dùng cho thời khóa biểu.</div>
-    </div>
+<x-page-header
+    title="Quản lý phòng học"
+    subtitle="Thiết lập cơ sở vật chất, loại phòng, sức chứa và trạng thái sử dụng cho thời khóa biểu."
+>
     <div class="d-flex align-items-center gap-2">
         @unless($readOnly)
             <a class="btn btn-primary" href="{{ route('rooms.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm phòng</a>
@@ -46,7 +45,7 @@
             </div>
         </div>
     </div>
-</div>
+</x-page-header>
 
 <div class="card">
     <div class="table-responsive">

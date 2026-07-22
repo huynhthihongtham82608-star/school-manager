@@ -7,6 +7,8 @@ use App\Models\Room;
 use App\Models\SchoolClass;
 use App\Models\SchoolYear;
 use App\Models\Semester;
+use App\Models\Subject;
+use App\Models\Teacher;
 use App\Models\TeachingAssignment;
 use App\Models\Timetable;
 use App\Models\TimetableEntry;
@@ -155,6 +157,7 @@ class TimetableController extends Controller
         $timetable = null;
         $entries = collect();
         $assignments = collect();
+        $specialSubjects = $this->specialSubjectsForTimetable();
         $cloneTargetSemesters = collect();
         $rooms = $readOnly ? Room::orderBy('name')->get() : Room::where('status', Room::STATUS_ACTIVE)->orderBy('name')->get();
 
@@ -207,6 +210,7 @@ class TimetableController extends Controller
             'timetable' => $timetable,
             'entries' => $entries,
             'assignments' => $assignments,
+            'specialSubjects' => $specialSubjects,
             'selectedYearId' => $selectedYearId,
             'selectedSemesterId' => $selectedSemesterId,
             'readOnly' => $readOnly,
@@ -236,7 +240,7 @@ class TimetableController extends Controller
             foreach ($slots as $slot) {
                 $existing = $slot['existing'];
 
-                if (! $slot['assignment']) {
+                if (! $slot['assignment'] && ! $slot['subject']) {
                     if ($existing) {
                         $this->deleteEntryOrFail($existing);
                     }
@@ -245,13 +249,15 @@ class TimetableController extends Controller
                 }
 
                 $assignment = $slot['assignment'];
+                $subject = $slot['subject'];
+                $teacher = $slot['teacher'];
                 $payload = [
-                    'assignment_id' => $assignment->id,
-                    'subject_id' => $assignment->subject_id,
-                    'teacher_id' => $assignment->teacher_id,
-                    'room' => $slot['room']?->name,
+                    'assignment_id' => $assignment?->id,
+                    'subject_id' => $subject->id,
+                    'teacher_id' => $teacher?->id,
+                    'room' => $slot['room']?->name ?: $slot['room_label'],
                     'room_id' => $slot['room']?->id,
-                    'note' => $assignment->roleLabel(),
+                    'note' => $slot['note'],
                     'status' => $slot['status'],
                     'archived_at' => $slot['status'] === TimetableEntry::STATUS_ARCHIVED ? ($existing?->archived_at ?? now()) : null,
                 ];
@@ -293,7 +299,7 @@ class TimetableController extends Controller
 
         $sourceTimetable = Timetable::where('class_id', $sourceClass->id)
             ->where('semester_id', $sourceSemester->id)
-            ->with(['entries.assignment.subject.periodNorms', 'entries.roomInfo'])
+            ->with(['entries.assignment.subject.periodNorms', 'entries.subject', 'entries.roomInfo'])
             ->first();
 
         if (! $sourceTimetable) {
@@ -311,10 +317,41 @@ class TimetableController extends Controller
             $count = 0;
             $assignmentCounts = [];
             $pendingEntries = [];
+            $pendingSpecialEntries = [];
             $pendingSlotKeys = [];
 
             foreach ($sourceTimetable->entries as $sourceEntry) {
-                if ($sourceEntry->isArchived() || ! $sourceEntry->assignment) {
+                if ($sourceEntry->isArchived()) {
+                    continue;
+                }
+
+                if (! $sourceEntry->assignment) {
+                    $subject = $sourceEntry->subject;
+
+                    if (! $subject || $subject->requiresTeachingAssignment()) {
+                        continue;
+                    }
+
+                    $sourceClass->loadMissing('homeroomTeacher');
+                    $targetTeacher = $subject->isHomeroomSubject() ? $sourceClass->homeroomTeacher : null;
+
+                    if ($subject->isHomeroomSubject() && ! $targetTeacher) {
+                        continue;
+                    }
+
+                    $existingTargetEntry = TimetableEntry::where('timetable_id', $targetTimetable->id)
+                        ->where('day_of_week', $sourceEntry->day_of_week)
+                        ->where('period', $sourceEntry->period)
+                        ->first();
+
+                    if ($sourceEntry->status === TimetableEntry::STATUS_ACTIVE) {
+                        $this->ensureTeacherEntryAvailable($targetTeacher, $targetTimetable, (int) $sourceEntry->day_of_week, (int) $sourceEntry->period, $existingTargetEntry);
+                        $this->ensureRoomAvailable($sourceEntry->roomInfo?->isActive() ? $sourceEntry->roomInfo : null, $targetTimetable, (int) $sourceEntry->day_of_week, (int) $sourceEntry->period, $existingTargetEntry);
+                    }
+
+                    $pendingSpecialEntries[] = [$sourceEntry, $subject, $targetTeacher];
+                    $pendingSlotKeys[] = $sourceEntry->day_of_week . '-' . $sourceEntry->period;
+
                     continue;
                 }
 
@@ -388,6 +425,27 @@ class TimetableController extends Controller
                 $count++;
             }
 
+            foreach ($pendingSpecialEntries as [$sourceEntry, $subject, $targetTeacher]) {
+                $room = $sourceEntry->roomInfo?->isActive() ? $sourceEntry->roomInfo->name : ($sourceEntry->room ?: ($subject->isActivitySubject() ? 'Sân trường' : null));
+
+                TimetableEntry::updateOrCreate([
+                    'timetable_id' => $targetTimetable->id,
+                    'day_of_week' => $sourceEntry->day_of_week,
+                    'period' => $sourceEntry->period,
+                ], [
+                    'assignment_id' => null,
+                    'subject_id' => $subject->id,
+                    'teacher_id' => $targetTeacher?->id,
+                    'room' => $room,
+                    'room_id' => $sourceEntry->roomInfo?->isActive() ? $sourceEntry->roomInfo->id : null,
+                    'note' => $subject->isHomeroomSubject() ? 'Sinh hoạt chủ nhiệm' : 'Hoạt động tập thể',
+                    'status' => $sourceEntry->status,
+                    'archived_at' => null,
+                ]);
+
+                $count++;
+            }
+
             AuditLogger::log('timetable_cloned', Timetable::class, (string) $targetTimetable->getKey(), 'Clone thời khóa biểu HK1 sang HK2 cùng lớp: ' . $count . ' tiết');
 
             return $count;
@@ -405,8 +463,14 @@ class TimetableController extends Controller
             abort(403);
         }
 
-        $entries = TimetableEntry::with(['timetable.classRoom', 'assignment.subject', 'subject', 'roomInfo'])
-            ->where('teacher_id', $teacherId)
+        $entries = TimetableEntry::with(['timetable.classRoom.homeroomTeacher', 'assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo'])
+            ->where(function ($query) use ($teacherId) {
+                $query->where('teacher_id', $teacherId)
+                    ->orWhere(function ($homeroomQuery) use ($teacherId) {
+                        $homeroomQuery->whereHas('subject', fn ($subject) => $subject->where('type', Subject::TYPE_HOMEROOM))
+                            ->whereHas('timetable.classRoom', fn ($class) => $class->where('homeroom_teacher_id', $teacherId));
+                    });
+            })
             ->where('status', TimetableEntry::STATUS_ACTIVE)
             ->get()
             ->sortBy(fn ($entry) => sprintf('%d-%02d', (int) $entry->day_of_week, (int) $entry->period))
@@ -441,7 +505,20 @@ class TimetableController extends Controller
             ->where('class_id', $class->id)
             ->where('status', TeachingAssignment::STATUS_ACTIVE)
             ->whereHas('teacher', fn ($query) => $query->where('work_status', \App\Models\Teacher::STATUS_WORKING))
+            ->whereHas('subject', function ($query) {
+                $query->where('type', Subject::TYPE_OFFICIAL)
+                    ->orWhereIn('type', Subject::LEGACY_SCORABLE_TYPES);
+            })
             ->orderBy('role')
+            ->get();
+    }
+
+    private function specialSubjectsForTimetable(): Collection
+    {
+        return Subject::where('status', Subject::STATUS_ACTIVE)
+            ->whereIn('type', [Subject::TYPE_HOMEROOM, Subject::TYPE_ACTIVITY])
+            ->orderByRaw("case when type = ? then 0 when type = ? then 1 else 2 end", [Subject::TYPE_ACTIVITY, Subject::TYPE_HOMEROOM])
+            ->orderBy('name')
             ->get();
     }
 
@@ -493,7 +570,10 @@ class TimetableController extends Controller
         foreach (self::DAYS as $day => $dayLabel) {
             foreach (self::PERIODS as $period) {
                 $slot = $request->input("entries.$day.$period", []);
-                $assignmentId = $slot['assignment_id'] ?? null;
+                $entryValue = $slot['entry_value'] ?? null;
+                if (! $entryValue && ! empty($slot['assignment_id'])) {
+                    $entryValue = 'assignment:' . $slot['assignment_id'];
+                }
                 $roomId = $slot['room_id'] ?? null;
                 $status = $slot['status'] ?? TimetableEntry::STATUS_ACTIVE;
 
@@ -509,17 +589,26 @@ class TimetableController extends Controller
                     ->first();
 
                 $assignment = null;
+                $subject = null;
+                $teacher = null;
                 $room = null;
-                if ($assignmentId) {
-                    $assignment = $this->validatedAssignmentForTimetable($assignmentId, $timetable);
+                $roomLabel = null;
+                $note = null;
+                if ($entryValue) {
+                    $selection = $this->resolveTimetableSelection($entryValue, $timetable);
+                    $assignment = $selection['assignment'];
+                    $subject = $selection['subject'];
+                    $teacher = $selection['teacher'];
+                    $roomLabel = $selection['room_label'];
+                    $note = $selection['note'];
                     $room = $this->validatedRoomForTimetable($roomId);
 
-                    if ($status !== TimetableEntry::STATUS_ARCHIVED) {
+                    if ($assignment && $status !== TimetableEntry::STATUS_ARCHIVED) {
                         $assignmentCounts[$assignment->id] = ($assignmentCounts[$assignment->id] ?? 0) + 1;
                     }
 
                     if ($status === TimetableEntry::STATUS_ACTIVE) {
-                        $this->ensureTeacherAvailable($assignment, $timetable, $day, $period, $existing);
+                        $this->ensureTeacherEntryAvailable($teacher, $timetable, $day, $period, $existing);
                         $this->ensureRoomAvailable($room, $timetable, $day, $period, $existing);
                     }
                 }
@@ -531,6 +620,10 @@ class TimetableController extends Controller
                     'status' => $status,
                     'existing' => $existing,
                     'assignment' => $assignment,
+                    'subject' => $subject,
+                    'teacher' => $teacher,
+                    'room_label' => $roomLabel,
+                    'note' => $note,
                 ];
             }
         }
@@ -538,6 +631,85 @@ class TimetableController extends Controller
         $this->ensureAssignmentWeeklyPeriodLimits($assignmentCounts);
 
         return $slots;
+    }
+
+    private function resolveTimetableSelection(string $entryValue, Timetable $timetable): array
+    {
+        [$type, $id] = array_pad(explode(':', $entryValue, 2), 2, null);
+
+        if (! $type || ! $id) {
+            throw ValidationException::withMessages([
+                'entry_value' => 'Môn học trong thời khóa biểu không hợp lệ.',
+            ]);
+        }
+
+        if ($type === 'assignment') {
+            $assignment = $this->validatedAssignmentForTimetable($id, $timetable);
+
+            return [
+                'assignment' => $assignment,
+                'subject' => $assignment->subject,
+                'teacher' => $assignment->teacher,
+                'room_label' => null,
+                'note' => $assignment->roleLabel(),
+            ];
+        }
+
+        if ($type !== 'subject') {
+            throw ValidationException::withMessages([
+                'entry_value' => 'Môn học trong thời khóa biểu không hợp lệ.',
+            ]);
+        }
+
+        $subject = Subject::findOrFail($id);
+
+        if ($subject->status !== Subject::STATUS_ACTIVE) {
+            throw ValidationException::withMessages([
+                'subject_id' => 'Chỉ được xếp môn học đang hoạt động.',
+            ]);
+        }
+
+        if ($subject->requiresTeachingAssignment()) {
+            throw ValidationException::withMessages([
+                'subject_id' => 'Môn chính khóa phải được phân công giảng dạy trước khi xếp thời khóa biểu.',
+            ]);
+        }
+
+        $timetable->loadMissing('classRoom.homeroomTeacher');
+        $teacher = null;
+        $roomLabel = null;
+        $note = $subject->typeLabel();
+
+        if ($subject->isHomeroomSubject()) {
+            $teacher = $timetable->classRoom?->homeroomTeacher;
+
+            if (! $teacher) {
+                throw ValidationException::withMessages([
+                    'teacher_id' => 'Lớp chưa có giáo viên chủ nhiệm nên chưa thể xếp môn Chủ nhiệm.',
+                ]);
+            }
+
+            if (! $teacher->isWorking()) {
+                throw ValidationException::withMessages([
+                    'teacher_id' => 'Giáo viên chủ nhiệm của lớp không còn đang công tác.',
+                ]);
+            }
+
+            $note = 'Sinh hoạt chủ nhiệm';
+        }
+
+        if ($subject->isActivitySubject()) {
+            $roomLabel = 'Sân trường';
+            $note = 'Hoạt động tập thể';
+        }
+
+        return [
+            'assignment' => null,
+            'subject' => $subject,
+            'teacher' => $teacher,
+            'room_label' => $roomLabel,
+            'note' => $note,
+        ];
     }
 
     private function validatedAssignmentForTimetable(string $assignmentId, Timetable $timetable): TeachingAssignment
@@ -557,6 +729,19 @@ class TimetableController extends Controller
         }
 
         $timetable->loadMissing('classRoom');
+
+        if (! $assignment->subject?->requiresTeachingAssignment()) {
+            throw ValidationException::withMessages([
+                'assignment_id' => 'Môn Chủ nhiệm hoặc Hoạt động không cần phân công giảng dạy. Hãy chọn trực tiếp môn đó trong thời khóa biểu.',
+            ]);
+        }
+
+        if (! $assignment->subject->departments()->exists()) {
+            throw ValidationException::withMessages([
+                'assignment_id' => 'Môn chính khóa phải được cấu hình Tổ chuyên môn trước khi xếp thời khóa biểu.',
+            ]);
+        }
+
         $this->ensureSubjectPeriodNormConfigured($assignment, $timetable->classRoom);
 
         return $assignment;
@@ -625,7 +810,16 @@ class TimetableController extends Controller
 
     private function ensureTeacherAvailable(TeachingAssignment $assignment, Timetable $timetable, int $day, int $period, ?TimetableEntry $currentEntry): void
     {
-        $conflict = TimetableEntry::where('teacher_id', $assignment->teacher_id)
+        $this->ensureTeacherEntryAvailable($assignment->teacher, $timetable, $day, $period, $currentEntry);
+    }
+
+    private function ensureTeacherEntryAvailable(?Teacher $teacher, Timetable $timetable, int $day, int $period, ?TimetableEntry $currentEntry): void
+    {
+        if (! $teacher) {
+            return;
+        }
+
+        $conflict = TimetableEntry::where('teacher_id', $teacher->id)
             ->where('day_of_week', $day)
             ->where('period', $period)
             ->where('status', TimetableEntry::STATUS_ACTIVE)
@@ -638,7 +832,7 @@ class TimetableController extends Controller
 
         if ($conflict) {
             throw ValidationException::withMessages([
-                'teacher_conflict' => 'Giáo viên ' . ($assignment->teacher->name ?? '') . ' đã có lịch dạy ở ' . (self::DAYS[$day] ?? $day) . ', ' . self::periodDisplayLabel($period) . '.',
+                'teacher_conflict' => 'Giáo viên ' . ($teacher->name ?? '') . ' đã có lịch dạy ở ' . (self::DAYS[$day] ?? $day) . ', ' . self::periodDisplayLabel($period) . '.',
             ]);
         }
     }

@@ -20,11 +20,6 @@ class SystemSetting extends Model
         'website',
         'principal_name',
         'default_school_year_id',
-        'ai_encouragements',
-    ];
-
-    protected $casts = [
-        'ai_encouragements' => 'array',
     ];
 
     public static function current(): self
@@ -48,19 +43,7 @@ class SystemSetting extends Model
             'website' => null,
             'principal_name' => null,
             'default_school_year_id' => null,
-            'ai_encouragements' => [],
         ];
-    }
-
-    public function activeAiEncouragements(): array
-    {
-        return collect($this->ai_encouragements ?: [])
-            ->filter(fn ($item) => is_array($item) && ($item['enabled'] ?? false) && filled($item['content'] ?? null))
-            ->pluck('content')
-            ->map(fn ($content) => trim((string) $content))
-            ->filter()
-            ->values()
-            ->all();
     }
 
     public function defaultSchoolYear()

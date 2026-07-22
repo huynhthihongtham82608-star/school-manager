@@ -19,7 +19,7 @@ class SubjectController extends Controller
         $selectedStatus = $request->query('status', 'all');
         $readOnly = $this->isHistoricalReadOnly();
 
-        $subjects = Subject::with('periodNorms')
+        $subjects = Subject::with(['periodNorms', 'departments'])
             ->when($selectedStatus !== 'all', function ($query) use ($selectedStatus) {
                 $query->where('status', $selectedStatus);
             })
@@ -55,13 +55,11 @@ class SubjectController extends Controller
 
         [$data, $periodNorms] = $this->validatedPayload($request);
 
-        $subject = DB::transaction(function () use ($data, $periodNorms) {
+        DB::transaction(function () use ($data, $periodNorms) {
             $subject = Subject::create($data);
             $this->syncPeriodNorms($subject, $periodNorms);
 
             AuditLogger::log('subject_created', Subject::class, (string) $subject->getKey(), 'Tạo môn học ' . $subject->name);
-
-            return $subject;
         });
 
         return redirect()->route('subjects.index')->with('success', 'Đã thêm môn học.');
@@ -75,7 +73,7 @@ class SubjectController extends Controller
             ]);
         }
 
-        $subject->load('periodNorms');
+        $subject->load(['periodNorms', 'departments']);
 
         return view('subjects.edit', [
             'subject' => $subject,
@@ -100,6 +98,7 @@ class SubjectController extends Controller
         DB::transaction(function () use ($subject, $data, $periodNorms, $oldStatus) {
             $subject->update($data);
             $this->syncPeriodNorms($subject, $periodNorms);
+            $this->detachDepartmentsWhenNotOfficial($subject);
 
             AuditLogger::log('subject_updated', Subject::class, (string) $subject->getKey(), 'Sửa môn học ' . $subject->name);
 
@@ -196,6 +195,12 @@ class SubjectController extends Controller
 
     private function syncPeriodNorms(Subject $subject, array $periodNorms): void
     {
+        if (! $subject->requiresTeachingAssignment()) {
+            $subject->periodNorms()->delete();
+
+            return;
+        }
+
         foreach (self::GRADE_LEVELS as $gradeLevel) {
             $value = $periodNorms[$gradeLevel] ?? null;
             $existing = $subject->periodNorms()->where('grade_level', $gradeLevel)->first();
@@ -241,6 +246,24 @@ class SubjectController extends Controller
                 SubjectPeriodNorm::class,
                 (string) $created->getKey(),
                 'Tạo định mức tiết khối ' . $gradeLevel . ' của môn ' . $subject->name . ': ' . $value . ' tiết/tuần'
+            );
+        }
+    }
+
+    private function detachDepartmentsWhenNotOfficial(Subject $subject): void
+    {
+        if ($subject->isScorable()) {
+            return;
+        }
+
+        if ($subject->departments()->exists()) {
+            $subject->departments()->detach();
+
+            AuditLogger::log(
+                'subject_department_detached',
+                Subject::class,
+                (string) $subject->getKey(),
+                'Gỡ tổ chuyên môn khỏi môn ' . $subject->name . ' vì môn không thuộc loại Chính khóa'
             );
         }
     }

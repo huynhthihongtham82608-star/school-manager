@@ -12,14 +12,16 @@
         'parent' => 'Phụ huynh',
     ];
 @endphp
-<div class="page-heading">
-    <div>
-        <h5>{{ $activeTab === 'events' ? 'Quản lý Sự kiện' : 'Quản lý Thông báo' }}</h5>
-        <div class="text-muted">{{ $activeTab === 'events' ? 'Quản lý sự kiện theo trạng thái và đối tượng tham gia.' : 'Quản lý thông báo theo trạng thái và đối tượng nhận.' }}</div>
-    </div>
-</div>
+<x-page-header
+    title="Cấu hình nội dung hệ thống"
+    subtitle="Quản lý giao diện trang chủ, biên tập các bài viết tin tức, chỉnh sửa thư viện ảnh và thông tin hiển thị trên cổng thông tin nhà trường."
+>
+    <a class="btn btn-primary" href="#content-create-form">
+        <i class="bi bi-plus-lg me-1"></i>Viết bài mới
+    </a>
+</x-page-header>
 
-<div class="content-management">
+<div class="content-management" id="content-create-form">
     @if($activeTab === 'announcements')
         <div class="management-card">
             <div class="management-card-header">

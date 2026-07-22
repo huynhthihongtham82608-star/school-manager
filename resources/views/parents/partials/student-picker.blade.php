@@ -1,10 +1,10 @@
 <script>
 (() => {
-    if (window.parentStudentPickerInitialized) {
+    if (window.systemMultiSelectPickerInitialized) {
         return;
     }
 
-    window.parentStudentPickerInitialized = true;
+    window.systemMultiSelectPickerInitialized = true;
 
     const normalizeText = (value) => (value || '')
         .toString()
@@ -21,23 +21,46 @@
         "'": '&#039;',
     }[char]));
 
+    const pickerSelector = '[data-parent-student-picker], [data-multi-select-picker]';
+
     const closeAllPickers = (except = null) => {
-        document.querySelectorAll('[data-parent-student-picker].open').forEach((picker) => {
+        document.querySelectorAll(`${pickerSelector}.open`).forEach((picker) => {
             if (picker !== except) {
                 picker.classList.remove('open');
             }
         });
     };
 
-    const initPicker = (select) => {
+    const findPicker = (select) => {
         const picker = select.nextElementSibling;
-        if (!picker || !picker.matches('[data-parent-student-picker]')) {
+        return picker && picker.matches(pickerSelector) ? picker : null;
+    };
+
+    const findElement = (picker, genericSelector, legacySelector) => {
+        return picker.querySelector(genericSelector) || picker.querySelector(legacySelector);
+    };
+
+    const initPicker = (select) => {
+        const picker = findPicker(select);
+        if (!picker || picker.dataset.initialized === 'true') {
             return;
         }
 
-        const tags = picker.querySelector('[data-parent-student-tags]');
-        const search = picker.querySelector('[data-parent-student-search]');
-        const dropdown = picker.querySelector('[data-parent-student-dropdown]');
+        picker.dataset.initialized = 'true';
+
+        const tags = findElement(picker, '[data-multi-select-tags]', '[data-parent-student-tags]');
+        const search = findElement(picker, '[data-multi-select-search]', '[data-parent-student-search]');
+        const dropdown = findElement(picker, '[data-multi-select-dropdown]', '[data-parent-student-dropdown]');
+
+        if (!tags || !search || !dropdown) {
+            return;
+        }
+
+        const isParentStudentPicker = picker.matches('[data-parent-student-picker]');
+        const placeholder = picker.dataset.placeholder || (isParentStudentPicker ? 'Chưa chọn học sinh' : 'Chưa chọn dữ liệu');
+        const emptyText = picker.dataset.emptyText || (isParentStudentPicker ? 'Không tìm thấy học sinh phù hợp.' : 'Không tìm thấy dữ liệu phù hợp.');
+        const selectedText = picker.dataset.selectedText || 'Đã chọn';
+        const maxVisibleTags = Number.parseInt(picker.dataset.maxVisibleTags || '0', 10);
         const options = Array.from(select.options).map((option) => ({
             option,
             value: option.value,
@@ -52,11 +75,12 @@
             const selected = selectedOptions();
 
             if (!selected.length) {
-                tags.innerHTML = '<span class="parent-student-placeholder">Chưa chọn học sinh</span>';
+                tags.innerHTML = `<span class="parent-student-placeholder">${escapeHtml(placeholder)}</span>`;
                 return;
             }
 
-            selected.forEach((item) => {
+            const visible = maxVisibleTags > 0 ? selected.slice(0, maxVisibleTags) : selected;
+            visible.forEach((item) => {
                 const tag = document.createElement('span');
                 tag.className = 'parent-student-tag';
                 tag.innerHTML = `
@@ -64,7 +88,8 @@
                     <button type="button" aria-label="Bỏ chọn ${escapeHtml(item.label)}">×</button>
                 `;
 
-                tag.querySelector('button').addEventListener('click', () => {
+                tag.querySelector('button').addEventListener('click', (event) => {
+                    event.stopPropagation();
                     item.option.selected = false;
                     render();
                     search.focus();
@@ -72,6 +97,15 @@
 
                 tags.appendChild(tag);
             });
+
+            const hiddenCount = selected.length - visible.length;
+            if (hiddenCount > 0) {
+                const more = document.createElement('span');
+                more.className = 'parent-student-tag';
+                more.title = selected.slice(visible.length).map((item) => item.label).join('\n');
+                more.textContent = `+${hiddenCount} mục khác`;
+                tags.appendChild(more);
+            }
         };
 
         const renderDropdown = () => {
@@ -83,7 +117,7 @@
             dropdown.innerHTML = '';
 
             if (!matched.length) {
-                dropdown.innerHTML = '<div class="parent-student-empty">Không tìm thấy học sinh phù hợp.</div>';
+                dropdown.innerHTML = `<div class="parent-student-empty">${escapeHtml(emptyText)}</div>`;
                 return;
             }
 
@@ -93,7 +127,7 @@
                 row.className = `parent-student-option${item.option.selected ? ' selected' : ''}`;
                 row.innerHTML = `
                     <span>${escapeHtml(item.label)}</span>
-                    ${item.option.selected ? '<strong>Đã chọn</strong>' : ''}
+                    ${item.option.selected ? `<strong>${escapeHtml(selectedText)}</strong>` : ''}
                 `;
 
                 row.addEventListener('click', () => {
@@ -145,6 +179,6 @@
     };
 
     document.addEventListener('click', () => closeAllPickers());
-    document.querySelectorAll('[data-parent-student-select]').forEach(initPicker);
+    document.querySelectorAll('[data-parent-student-select], [data-multi-select-picker-select]').forEach(initPicker);
 })();
 </script>

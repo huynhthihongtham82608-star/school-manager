@@ -6,11 +6,10 @@
     $gradeFilters = ['all' => 'Tất cả', '10' => 'Khối 10', '11' => 'Khối 11', '12' => 'Khối 12'];
 @endphp
 
-<div class="page-heading">
-    <div>
-        <h5>Lớp học</h5>
-        <div class="text-muted">Quản lý lớp theo năm học, khối và giáo viên chủ nhiệm.</div>
-    </div>
+<x-page-header
+    title="Quản lý lớp học"
+    subtitle="Quản lý lớp theo năm học, khối, sĩ số và phân công giáo viên chủ nhiệm."
+>
     <div class="d-flex align-items-center gap-2">
         @if(! $readOnly)
             <a class="btn btn-primary" href="{{ route('classes.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm lớp</a>
@@ -35,7 +34,7 @@
             </ul>
         </div>
     </div>
-</div>
+</x-page-header>
 
 <div class="card">
     <div class="table-responsive class-table-wrap">

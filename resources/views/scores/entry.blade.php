@@ -2,25 +2,29 @@
 @section('title', 'Nhập điểm')
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Điểm số - {{ $class->name }} / {{ $subject->name }} / {{ $semester->normalizedName() }}</h5>
-        <div class="text-muted">Điểm thường xuyên do giáo viên bộ môn nhập trực tiếp. Điểm giữa kỳ và cuối kỳ chỉ nhập trong thời gian Admin đã mở.</div>
-    </div>
+<x-page-header
+    title="Điểm số - {{ $class->name }} / {{ $subject->name }} / {{ $semester->normalizedName() }}"
+    subtitle="Giáo viên bộ môn chỉ nhập điểm vào các cột đã được Admin cấu hình và đang mở nhập."
+>
     <a href="{{ route('scores.index') }}" class="btn btn-outline-secondary">Quay lại</a>
-</div>
+</x-page-header>
 
 <div class="card mb-3">
     <div class="card-body d-flex flex-wrap gap-2">
-        @foreach($scoreTypes as $type => $meta)
-            <span class="badge {{ $meta['editable'] ? 'bg-success' : 'bg-secondary' }}" title="{{ $meta['reason'] }}">
-                {{ $meta['label'] }}: {{ $meta['editable'] ? 'Đang mở' : 'Chỉ xem' }}
+        @forelse($scoreColumns as $column)
+            @php
+                $permission = $columnPermissions[$column->id] ?? ['editable' => false, 'reason' => 'Chỉ xem'];
+            @endphp
+            <span class="badge {{ $permission['editable'] ? 'bg-success' : 'bg-secondary' }}" title="{{ $permission['reason'] }}">
+                {{ $column->name }}: {{ $permission['editable'] ? 'Đang mở' : 'Chỉ xem' }}
             </span>
-        @endforeach
+        @empty
+            <span class="badge bg-warning text-dark">Admin chưa cấu hình cột điểm cho môn, khối và năm học này.</span>
+        @endforelse
     </div>
 </div>
 
-<form method="POST" action="{{ route('scores.store') }}">
+<form method="POST" action="{{ route('scores.store') }}" data-score-entry-form>
     @csrf
     <input type="hidden" name="class_id" value="{{ $class->id }}">
     <input type="hidden" name="subject_id" value="{{ $subject->id }}">
@@ -32,22 +36,10 @@
                     <tr>
                         <th>Mã HS</th>
                         <th>Họ tên</th>
-                        @foreach($scoreTypes as $type => $meta)
+                        @foreach($scoreColumns as $column)
                             <th style="min-width: 150px;">
-                                <div>{{ $meta['label'] }}</div>
-                                @if($meta['kind'] === 'regular')
-                                    <input
-                                        type="text"
-                                        name="score_names[{{ $type }}]"
-                                        class="form-control form-control-sm mt-1"
-                                        placeholder="Tên bài kiểm tra"
-                                        @disabled(! $meta['editable'])
-                                    >
-                                @else
-                                    <div class="text-muted small mt-1">
-                                        {{ $meta['schedule']?->displayName() ?? 'Chưa có kỳ kiểm tra' }}
-                                    </div>
-                                @endif
+                                <div>{{ $column->name }}</div>
+                                <div class="text-muted small mt-1">{{ $column->typeLabel() }}</div>
                             </th>
                         @endforeach
                         <th>TB</th>
@@ -57,33 +49,43 @@
                 @forelse($students as $student)
                     @php
                         $header = $headers[$student->id] ?? null;
-                        $group = collect($scoreTypes)->mapWithKeys(fn ($meta, $type) => [
-                            $type => $header?->details?->where('type', $type)->pluck('value')->join(', '),
-                        ]);
                     @endphp
                     <tr>
                         <td class="fw-semibold">{{ $student->student_code }}</td>
                         <td>{{ $student->name }}</td>
-                        @foreach($scoreTypes as $type => $meta)
+                        @foreach($scoreColumns as $column)
+                            @php
+                                $permission = $columnPermissions[$column->id] ?? ['editable' => false, 'reason' => 'Chỉ xem'];
+                                $detail = $header?->details?->firstWhere('score_column_id', $column->id);
+                                $fieldName = "scores[{$column->id}][{$student->id}]";
+                                $fieldKey = "scores.{$column->id}.{$student->id}";
+                                $displayValue = old($fieldKey, $detail?->value !== null ? rtrim(rtrim(number_format((float) $detail->value, 1, '.', ''), '0'), '.') : '');
+                            @endphp
                             <td>
                                 <input
                                     type="text"
-                                    name="scores[{{ $student->id }}][{{ $type }}]"
-                                    class="form-control form-control-sm"
-                                    value="{{ $group[$type] }}"
-                                    placeholder="VD: 8, 9"
-                                    @disabled(! $meta['editable'])
+                                    name="{{ $fieldName }}"
+                                    class="form-control form-control-sm {{ $errors->has($fieldKey) ? 'is-invalid' : '' }}"
+                                    value="{{ $displayValue }}"
+                                    placeholder="0 - 10"
+                                    inputmode="decimal"
+                                    pattern="^(10(\.0)?|[0-9](\.[0-9])?)$"
+                                    data-score-input
+                                    @disabled(! $permission['editable'])
                                 >
-                                @unless($meta['editable'])
-                                    <div class="text-muted small mt-1">{{ $meta['reason'] }}</div>
+                                @if($errors->has($fieldKey))
+                                    <div class="invalid-feedback">{{ $errors->first($fieldKey) }}</div>
+                                @endif
+                                @unless($permission['editable'])
+                                    <div class="text-muted small mt-1">{{ $permission['reason'] }}</div>
                                 @endunless
                             </td>
                         @endforeach
-                        <td class="fw-semibold text-primary">{{ $header?->average !== null ? number_format($header->average, 2) : '-' }}</td>
+                        <td class="fw-semibold text-primary">{{ $header?->average !== null ? rtrim(rtrim(number_format($header->average, 2), '0'), '.') : '-' }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ count($scoreTypes) + 3 }}"><div class="empty-state"><i class="bi bi-person-dash"></i>Lớp chưa có học sinh.</div></td>
+                        <td colspan="{{ $scoreColumns->count() + 3 }}"><div class="empty-state"><i class="bi bi-person-dash"></i>Lớp chưa có học sinh.</div></td>
                     </tr>
                 @endforelse
                 </tbody>
@@ -98,4 +100,30 @@
         @endif
     </div>
 </form>
+
+<script>
+    document.querySelectorAll('[data-score-entry-form]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            let hasError = false;
+            form.querySelectorAll('[data-score-input]:not(:disabled)').forEach((input) => {
+                const value = input.value.trim();
+                input.setCustomValidity('');
+
+                if (value === '') {
+                    return;
+                }
+
+                if (!/^(10(\.0)?|[0-9](\.[0-9])?)$/.test(value)) {
+                    input.setCustomValidity('Điểm phải là số từ 0 đến 10 và tối đa 1 chữ số thập phân.');
+                    hasError = true;
+                }
+            });
+
+            if (hasError) {
+                event.preventDefault();
+                form.querySelector('[data-score-input]:invalid')?.reportValidity();
+            }
+        });
+    });
+</script>
 @endsection

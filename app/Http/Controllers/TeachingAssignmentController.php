@@ -10,6 +10,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\Teacher;
+use App\Models\TeacherDepartment;
 use App\Models\TeachingAssignment;
 use App\Models\Timetable;
 use App\Models\TimetableEntry;
@@ -28,16 +29,18 @@ class TeachingAssignmentController extends Controller
         $filters = [
             'class_id' => $request->query('class_id', 'all'),
             'teacher_id' => $request->query('teacher_id', 'all'),
+            'department_id' => $request->query('department_id', 'all'),
             'role' => $request->query('role', 'all'),
             'status' => $request->query('status', 'all'),
         ];
         $readOnly = $this->isHistoricalReadOnly();
 
-        $assignments = TeachingAssignment::with(['teacher.primarySubject', 'classRoom', 'subject.periodNorms', 'schoolYear', 'semester'])
+        $assignments = TeachingAssignment::with(['teacher.primarySubject.departments', 'teacher.department', 'classRoom', 'subject.periodNorms', 'subject.departments', 'schoolYear', 'semester'])
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
             ->when($filters['class_id'] !== 'all', fn ($query) => $query->where('class_id', $filters['class_id']))
             ->when($filters['teacher_id'] !== 'all', fn ($query) => $query->where('teacher_id', $filters['teacher_id']))
+            ->when($filters['department_id'] !== 'all', fn ($query) => $query->whereHas('teacher', fn ($teacher) => $teacher->where('department_id', $filters['department_id'])))
             ->when($filters['role'] !== 'all', fn ($query) => $query->where('role', $filters['role']))
             ->when($filters['status'] !== 'all', fn ($query) => $query->where('status', $filters['status']))
             ->orderBy('school_year_id')
@@ -79,7 +82,8 @@ class TeachingAssignmentController extends Controller
 
         return view('assignments.index', [
             'assignments' => $assignments,
-            'teachers' => Teacher::with('primarySubject')->where('work_status', Teacher::STATUS_WORKING)->orderBy('name')->get(),
+            'teachers' => Teacher::with(['primarySubject.departments', 'department'])->where('work_status', Teacher::STATUS_WORKING)->orderBy('name')->get(),
+            'departments' => TeacherDepartment::with('subjects')->where('status', TeacherDepartment::STATUS_ACTIVE)->orderBy('name')->get(),
             'classes' => SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
                 ->orderBy('name')
                 ->get(),
@@ -193,6 +197,7 @@ class TeachingAssignmentController extends Controller
         }
 
         $currentTeacherId = $assignment?->teacher_id;
+        $currentSubjectId = $assignment?->subject_id;
 
         return [
             'years' => $activeYear ? collect([$activeYear]) : collect(),
@@ -203,12 +208,24 @@ class TeachingAssignmentController extends Controller
                 ->orderBy('grade_level')
                 ->orderBy('name')
                 ->get(),
-            'teachers' => Teacher::with('primarySubject')
+            'departments' => TeacherDepartment::with('subjects')->where('status', TeacherDepartment::STATUS_ACTIVE)->orderBy('name')->get(),
+            'subjects' => Subject::with('departments')
+                ->where(function ($query) use ($currentSubjectId) {
+                    $query->where(function ($activeQuery) {
+                        $activeQuery->where('status', Subject::STATUS_ACTIVE)
+                            ->where(function ($typeQuery) {
+                                $typeQuery->where('type', Subject::TYPE_OFFICIAL)
+                                    ->orWhereIn('type', Subject::LEGACY_SCORABLE_TYPES);
+                            });
+                    })->when($currentSubjectId, fn ($subjectQuery) => $subjectQuery->orWhere('id', $currentSubjectId));
+                })
+                ->orderBy('name')
+                ->get(),
+            'teachers' => Teacher::with(['primarySubject.departments', 'department'])
                 ->where(function ($query) use ($currentTeacherId) {
                     $query->where('work_status', Teacher::STATUS_WORKING)
                         ->when($currentTeacherId, fn ($teacherQuery) => $teacherQuery->orWhere('id', $currentTeacherId));
                 })
-                ->whereNotNull('primary_subject_id')
                 ->orderBy('name')
                 ->get(),
         ];
@@ -218,6 +235,7 @@ class TeachingAssignmentController extends Controller
     {
         $rules = [
             'teacher_id' => ['required', 'exists:teachers,id'],
+            'subject_id' => ['required', 'exists:subjects,id'],
             'role' => ['required', Rule::in(array_keys(TeachingAssignment::ROLES))],
             'custom_role' => ['nullable', 'string', 'max:255', 'required_if:role,' . TeachingAssignment::ROLE_OTHER],
             'weekly_periods' => ['nullable', 'integer', 'min:1', 'max:20'],
@@ -237,18 +255,10 @@ class TeachingAssignmentController extends Controller
             'custom_role.required_if' => 'Vui lòng nhập vai trò khi chọn Khác.',
         ]);
 
-        $teacher = Teacher::with('primarySubject')->findOrFail($validated['teacher_id']);
-        if (! $teacher->primary_subject_id) {
-            throw ValidationException::withMessages([
-                'teacher_id' => 'Giáo viên này chưa được cấu hình môn chính.',
-            ]);
-        }
-
         $data = $assignment
             ? array_merge($assignment->only(['school_year_id', 'semester_id', 'class_id']), $validated)
             : $validated;
 
-        $data['subject_id'] = $teacher->primary_subject_id;
         $data['weekly_periods'] = $data['weekly_periods'] ?? null;
 
         $data['custom_role'] = $data['role'] === TeachingAssignment::ROLE_OTHER
@@ -294,12 +304,20 @@ class TeachingAssignmentController extends Controller
             throw ValidationException::withMessages(['subject_id' => 'Chỉ được chọn môn học đang hoạt động.']);
         }
 
-        if (! $teacher->isWorking()) {
-            throw ValidationException::withMessages(['teacher_id' => 'Chỉ được chọn giáo viên đang công tác.']);
+        if (! $subject->requiresTeachingAssignment()) {
+            throw ValidationException::withMessages([
+                'subject_id' => 'Môn ' . $subject->typeLabel() . ' không cần phân công giảng dạy. Hãy xếp trực tiếp trong thời khóa biểu.',
+            ]);
         }
 
-        if ((string) $teacher->primary_subject_id !== (string) $subject->getKey()) {
-            throw ValidationException::withMessages(['teacher_id' => 'Giáo viên chỉ được phân công đúng môn chính đã cấu hình.']);
+        if (! $subject->departments()->exists()) {
+            throw ValidationException::withMessages([
+                'subject_id' => 'Môn chính khóa phải được cấu hình Tổ chuyên môn trước khi phân công giảng dạy.',
+            ]);
+        }
+
+        if (! $teacher->isWorking()) {
+            throw ValidationException::withMessages(['teacher_id' => 'Chỉ được chọn giáo viên đang công tác.']);
         }
 
         $duplicateQuery = TeachingAssignment::where('school_year_id', $data['school_year_id'])

@@ -9,15 +9,14 @@
 @endphp
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Khởi tạo năm học mới</h5>
-        <div class="text-muted">Khởi tạo dữ liệu năm học mới từ một năm học đã kết thúc hoặc đã lưu trữ.</div>
-    </div>
+<x-page-header
+    title="Khởi tạo năm học mới"
+    subtitle="Khởi tạo dữ liệu năm học mới từ một năm học đã kết thúc hoặc đã lưu trữ."
+>
     <a href="{{ route('school-years.index') }}" class="btn btn-secondary">
         <i class="bi bi-arrow-left me-1"></i>Quay lại
     </a>
-</div>
+</x-page-header>
 
 @if(isset($result))
     <div class="card p-4 shadow-sm">

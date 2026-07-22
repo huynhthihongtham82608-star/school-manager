@@ -2,7 +2,32 @@
 @section('title', 'Soạn tin nhắn')
 
 @section('content')
-@include('messages._nav')
+<x-page-header
+    title="Hộp thư điện tử"
+    subtitle="Kênh tương tác, trao đổi thông tin chính thống giữa Nhà trường, Giáo viên và Phụ huynh học sinh."
+>
+    <a class="btn btn-outline-primary" href="{{ route('messages.inbox') }}">
+        <i class="bi bi-arrow-left me-1"></i>Quay lại hộp thư
+    </a>
+</x-page-header>
+
+@if(auth()->user()->isStudent())
+    <div class="alert alert-light border d-flex gap-2 align-items-start">
+        <i class="bi bi-info-circle text-primary mt-1"></i>
+        <div>
+            <div class="fw-semibold">Gửi thắc mắc đến giáo viên</div>
+            <div class="small text-muted">Danh sách người nhận chỉ hiển thị giáo viên bộ môn đang dạy lớp và giáo viên chủ nhiệm của bạn.</div>
+        </div>
+    </div>
+@elseif(auth()->user()->isParent())
+    <div class="alert alert-light border d-flex gap-2 align-items-start">
+        <i class="bi bi-info-circle text-primary mt-1"></i>
+        <div>
+            <div class="fw-semibold">Trao đổi với giáo viên của học sinh đang chọn</div>
+            <div class="small text-muted">Danh sách người nhận chỉ hiển thị giáo viên chủ nhiệm và giáo viên bộ môn của học sinh đang chọn trên header.</div>
+        </div>
+    </div>
+@endif
 
 <div class="card">
     <div class="card-body">

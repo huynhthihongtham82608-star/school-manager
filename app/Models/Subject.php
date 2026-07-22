@@ -69,6 +69,11 @@ class Subject extends Model
         return $this->hasMany(ScoreHeader::class);
     }
 
+    public function scoreColumns()
+    {
+        return $this->hasMany(ScoreColumn::class);
+    }
+
     public function periodNorms()
     {
         return $this->hasMany(SubjectPeriodNorm::class);
@@ -77,6 +82,12 @@ class Subject extends Model
     public function primaryTeachers()
     {
         return $this->hasMany(Teacher::class, 'primary_subject_id');
+    }
+
+    public function departments()
+    {
+        return $this->belongsToMany(TeacherDepartment::class, 'teacher_department_subject', 'subject_id', 'department_id')
+            ->withTimestamps();
     }
 
     public function periodNormForGrade(int $gradeLevel): ?SubjectPeriodNorm
@@ -103,6 +114,31 @@ class Subject extends Model
             || in_array($this->type, self::LEGACY_SCORABLE_TYPES, true);
     }
 
+    public function isOfficialSubject(): bool
+    {
+        return $this->isScorable();
+    }
+
+    public function isHomeroomSubject(): bool
+    {
+        return $this->type === self::TYPE_HOMEROOM;
+    }
+
+    public function isActivitySubject(): bool
+    {
+        return $this->type === self::TYPE_ACTIVITY;
+    }
+
+    public function requiresTeachingAssignment(): bool
+    {
+        return $this->isOfficialSubject();
+    }
+
+    public function requiresTeacherDepartment(): bool
+    {
+        return $this->isOfficialSubject();
+    }
+
     public function statusLabel(): string
     {
         return self::STATUSES[$this->status] ?? self::STATUSES[self::STATUS_ACTIVE];
@@ -127,7 +163,8 @@ class Subject extends Model
         return $this->assignments()->exists()
             || $this->timetableEntries()->exists()
             || $this->scoreHeaders()->exists()
-            || $this->primaryTeachers()->exists();
+            || $this->primaryTeachers()->exists()
+            || $this->departments()->exists();
     }
 
     public function canEditCode(): bool

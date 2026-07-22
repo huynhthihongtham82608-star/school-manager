@@ -19,9 +19,9 @@ class AttendanceRecord extends Model
 
     public const STATUSES = [
         'present' => 'Có mặt',
-        'late' => 'Đi muộn',
-        'excused' => 'Có phép',
-        'absent' => 'Không phép',
+        'late' => 'Đi muộn (M)',
+        'excused' => 'Vắng có phép (P)',
+        'absent' => 'Vắng không phép (X)',
     ];
 
     protected $fillable = [

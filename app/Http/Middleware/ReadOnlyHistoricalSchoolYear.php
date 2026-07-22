@@ -63,6 +63,13 @@ class ReadOnlyHistoricalSchoolYear
             return $next($request);
         }
 
+        if (
+            (string) $request->route()?->getName() === 'attendance.store'
+            && $request->user()?->isAdmin()
+        ) {
+            return $next($request);
+        }
+
         return back()->withErrors([
             'history_readonly' => 'Bạn đang xem dữ liệu năm học cũ ở chế độ chỉ xem. Vui lòng quay về năm học hiện hành để thực hiện thao tác thay đổi dữ liệu.',
         ]);

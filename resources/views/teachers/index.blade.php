@@ -2,13 +2,40 @@
 @section('title', 'Giáo viên')
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Giáo viên</h5>
-        <div class="text-muted">Quản lý thông tin giáo viên và tài khoản liên kết.</div>
+<x-page-header
+    title="Quản lý giáo viên"
+    subtitle="Quản lý hồ sơ nhân sự, thông tin liên lạc, chức vụ công tác và trạng thái giảng dạy của cán bộ giáo viên."
+>
+    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+        <a class="btn btn-primary" href="{{ route('teachers.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm giáo viên mới</a>
+        <div class="dropdown">
+            <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Lọc giáo viên" aria-label="Lọc giáo viên">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 320px;">
+                <form method="GET" action="{{ route('teachers.index') }}" class="d-grid gap-3">
+                    <div>
+                        <label class="form-label small">Tìm kiếm</label>
+                        <input type="search" name="q" class="form-control" value="{{ $filters['q'] }}" placeholder="Mã, họ tên, môn, tổ chuyên môn">
+                    </div>
+                    <div>
+                        <label class="form-label small">Tổ chuyên môn</label>
+                        <select name="department_id" class="form-select">
+                            <option value="all">Tất cả tổ</option>
+                            @foreach($departments as $department)
+                                <option value="{{ $department->id }}" @selected($filters['department_id'] === $department->id)>{{ $department->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ route('teachers.index') }}" class="btn btn-secondary">Xóa lọc</a>
+                        <button class="btn btn-primary">Áp dụng</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-    <a class="btn btn-primary" href="{{ route('teachers.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm giáo viên</a>
-</div>
+</x-page-header>
 
 <div class="card">
     <div class="table-responsive">
@@ -18,6 +45,7 @@
                     <th>Mã</th>
                     <th>Họ tên</th>
                     <th>Môn chính</th>
+                    <th>Tổ chuyên môn</th>
                     <th>Lớp chủ nhiệm</th>
                     <th>Trạng thái</th>
                     <th></th>
@@ -32,6 +60,7 @@
                         <div class="text-muted small">{{ $teacher->phone ?: '-' }}</div>
                     </td>
                     <td>{{ $teacher->primarySubjectName() }}</td>
+                    <td>{{ $teacher->department?->name ?? 'Chưa phân tổ' }}</td>
                     <td>
                         @php($teacherHomeroomClasses = $selectedYearId ? $teacher->homeroomClasses->where('school_year_id', $selectedYearId) : $teacher->homeroomClasses)
                         @forelse($teacherHomeroomClasses as $class)
@@ -75,7 +104,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6"><div class="empty-state"><i class="bi bi-person-badge"></i>Chưa có giáo viên.</div></td>
+                    <td colspan="7"><div class="empty-state"><i class="bi bi-person-badge"></i>Chưa có giáo viên.</div></td>
                 </tr>
             @endforelse
             </tbody>
@@ -100,6 +129,7 @@
                             <div class="teacher-profile-code">{{ $teacher->teacher_code }}</div>
                             <div class="d-flex flex-wrap gap-2 align-items-center">
                                 <span class="badge bg-light text-dark border">{{ $teacher->primarySubjectName() !== '-' ? $teacher->primarySubjectName() : 'Chưa cập nhật bộ môn' }}</span>
+                                <span class="badge bg-light text-dark border">{{ $teacher->department?->name ?? 'Chưa phân tổ' }}</span>
                                 <span class="badge {{ $teacher->workStatusBadgeClass() }}">{{ $teacher->workStatusLabel() }}</span>
                             </div>
                         </div>
@@ -129,6 +159,10 @@
                         <article>
                             <span>Trình độ</span>
                             <strong>{{ $teacher->qualification ?: '-' }}</strong>
+                        </article>
+                        <article>
+                            <span>Tổ chuyên môn</span>
+                            <strong>{{ $teacher->department?->name ?? '-' }}</strong>
                         </article>
                         <article class="wide">
                             <span>Địa chỉ</span>

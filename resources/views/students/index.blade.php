@@ -8,12 +8,11 @@
     $statusFilters = ['all' => 'Tất cả'] + \App\Models\Student::statuses();
 @endphp
 
-<div class="page-heading">
-    <div>
-        <h5>Học sinh</h5>
-        <div class="text-muted">Quản lý hồ sơ học sinh, lớp học và trạng thái học tập.</div>
-    </div>
-	    <div class="d-flex align-items-center gap-2">
+<x-page-header
+    title="Quản lý học sinh"
+    subtitle="Khởi tạo, tra cứu hồ sơ lý lịch, quản lý trạng thái học tập và thông tin liên hệ của học sinh toàn trường."
+>
+	    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
 	        @unless($readOnly)
 	            <a class="btn btn-secondary" href="{{ route('students.import-template') }}">
 	                <i class="bi bi-download me-1"></i>Tải tệp mẫu
@@ -22,7 +21,7 @@
 	                <i class="bi bi-upload me-1"></i>Nhập dữ liệu
 	            </button>
             <a class="btn btn-primary" href="{{ route('students.create') }}">
-                <i class="bi bi-plus-lg me-1"></i>Thêm học sinh
+                <i class="bi bi-plus-lg me-1"></i>Tiếp nhận học sinh mới
             </a>
         @endunless
         <div class="dropdown">
@@ -80,7 +79,7 @@
             </div>
         </div>
     </div>
-</div>
+</x-page-header>
 
 <div class="card">
     <div class="table-responsive">

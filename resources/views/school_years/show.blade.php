@@ -25,12 +25,10 @@
 @endphp
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Chi tiết năm học {{ $schoolYear->name }}</h5>
-        <div class="text-muted">Giao diện chỉ đọc, phục vụ kiểm tra dữ liệu và lịch sử thao tác của năm học.</div>
-    </div>
-</div>
+<x-page-header
+    title="Chi tiết năm học {{ $schoolYear->name }}"
+    subtitle="Giao diện chỉ đọc, phục vụ kiểm tra dữ liệu và lịch sử thao tác của năm học."
+/>
 
 <div class="school-year-tabs mb-3">
     <a href="{{ route('school-years.detail', ['school_year' => $schoolYear, 'tab' => 'overview']) }}" class="school-year-tab {{ $tab === 'overview' ? 'active' : '' }}">

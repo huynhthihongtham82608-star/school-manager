@@ -18,15 +18,12 @@
     };
 @endphp
 
-<div class="page-heading">
-    <div>
-        <h5>Lịch kiểm tra</h5>
-        <div class="text-muted">
-            {{ $canManageSchedules
-                ? 'Quản lý các kỳ kiểm tra chung của nhà trường, thời gian mở nhập điểm và ghi chú.'
-                : 'Theo dõi lịch kiểm tra phù hợp với lớp, môn học và vai trò đang đăng nhập.' }}
-        </div>
-    </div>
+<x-page-header
+    title="Lịch kiểm tra"
+    :subtitle="$canManageSchedules
+        ? 'Quản lý các kỳ kiểm tra chung của nhà trường, thời gian mở nhập điểm và ghi chú.'
+        : 'Theo dõi lịch kiểm tra phù hợp với lớp, môn học và vai trò đang đăng nhập.'"
+>
     <div class="d-flex align-items-center gap-2">
         <div class="dropdown">
             <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Bộ lọc" aria-label="Bộ lọc">
@@ -56,7 +53,7 @@
             </button>
         @endif
     </div>
-</div>
+</x-page-header>
 
 @if($canManageSchedules)
     <div class="modal fade content-modal" id="examScheduleCreateModal" tabindex="-1" aria-hidden="true">

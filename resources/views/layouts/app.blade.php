@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link href="{{ asset('css/school-ui.css') }}?v=20260714-password-center" rel="stylesheet">
+    <link href="{{ asset('css/school-ui.css') }}?v=20260722-page-header" rel="stylesheet">
 </head>
 @php
     $currentUser = auth()->user();
@@ -23,7 +23,6 @@
     $schoolTitle = $systemSetting->school_name ?: $schoolTitle;
     $schoolShortName = $systemSetting->short_name ?: 'TH';
     $schoolLogoUrl = $systemSetting->logoUrl();
-    $aiUrl = ($currentUser->isAdmin() || $currentUser->isStaff() || $currentUser->isHomeroom()) ? route('ai.run.form') : route('ai.alerts');
     $headerSchoolYears = collect();
     $headerSemesters = collect();
     $headerSchoolYear = null;
@@ -71,22 +70,56 @@
     }
 
     $roleMenuItems = [];
+    $roleMenuGroups = [];
     $addRoleItem = function (string $icon, string $label, string $url, string $active = '') use (&$roleMenuItems) {
         $roleMenuItems[] = compact('icon', 'label', 'url', 'active');
     };
+    $makeRoleItem = fn (string $icon, string $label, string $url, string|array $active = '', array $options = []) => array_merge(compact('icon', 'label', 'url', 'active'), $options);
+    $addRoleGroup = function (string $title, array $items) use (&$roleMenuGroups) {
+        $items = array_values(array_filter($items));
+
+        if ($items) {
+            $roleMenuGroups[] = compact('title', 'items');
+        }
+    };
 
     $adminMenuGroups = [];
-    $addAdminGroup = function (string $key, string $icon, string $title, array $items) use (&$adminMenuGroups) {
+    $filterAdminItems = function (array $items) use ($currentUser) {
+        return array_values(array_filter($items, function (array $item) use ($currentUser) {
+            $permission = $item['permission'] ?? null;
+
+            return ! $permission || $currentUser?->hasPermission($permission);
+        }));
+    };
+    $addAdminGroup = function (string $key, string $icon, string $title, array $items, array $subgroups = []) use (&$adminMenuGroups, $filterAdminItems) {
+        $items = $filterAdminItems($items);
+        $subgroups = collect($subgroups)
+            ->map(function (array $subgroup) use ($filterAdminItems) {
+                $subgroup['items'] = $filterAdminItems($subgroup['items'] ?? []);
+
+                return $subgroup;
+            })
+            ->filter(fn (array $subgroup) => ! empty($subgroup['items']))
+            ->values()
+            ->all();
+        $flatSubgroupItems = collect($subgroups)->flatMap(fn (array $subgroup) => $subgroup['items'])->values()->all();
+        $groupItems = $items ?: $flatSubgroupItems;
+
+        if (empty($groupItems)) {
+            return;
+        }
+
         $adminMenuGroups[] = [
             'key' => $key,
             'icon' => $icon,
             'title' => $title,
-            'items' => $items,
-            'url' => $items[0]['url'] ?? route('dashboard'),
+            'items' => $groupItems,
+            'subgroups' => $subgroups,
+            'url' => $groupItems[0]['url'] ?? route('dashboard'),
         ];
     };
 
-    $adminItem = fn (string $icon, string $label, string $url, array $active) => compact('icon', 'label', 'url', 'active');
+    $adminItem = fn (string $icon, string $label, string $url, array $active, ?string $permission = null) => compact('icon', 'label', 'url', 'active', 'permission');
 
     $matchesAdminItem = function (array $item): bool {
         if (request()->routeIs('announcements.index') && request('tab') === 'events') {
@@ -110,64 +143,92 @@
             ? route('school-years.detail', $historySchoolYear)
             : route('school-years.index');
 
-        $academicItems = [
-            $adminItem('bi-calendar-event', 'Năm học', $schoolYearMenuUrl, ['school-years.*', 'school-years*']),
-            $adminItem('bi-calendar2-week', 'Học kỳ', route('semesters.index'), ['semesters.*', 'semesters*']),
-            $adminItem('bi-building', 'Lớp học', route('classes.index'), ['classes.*', 'classes*']),
-            $adminItem('bi-door-open', 'Phòng học', route('rooms.index'), ['rooms.*', 'rooms*']),
-            $adminItem('bi-book', 'Môn học', route('subjects.index'), ['subjects.*', 'subjects*']),
-            $adminItem('bi-diagram-3', 'Phân công giảng dạy', route('assignments.index'), ['assignments.*', 'assignments*']),
-            $adminItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.manage'), ['timetable.manage', 'timetable/manage*']),
-            $adminItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), ['exam-schedules.*', 'exam-schedules*']),
+        $academicConfigItems = [
+            $adminItem('bi-calendar-event', 'Năm học', $schoolYearMenuUrl, ['school-years.*', 'school-years*'], 'academic.manage'),
+            $adminItem('bi-calendar2-week', 'Học kỳ', route('semesters.index'), ['semesters.*', 'semesters*'], 'academic.manage'),
+            $adminItem('bi-book', 'Môn học', route('subjects.index'), ['subjects.*', 'subjects*'], 'subjects.manage'),
+            $adminItem('bi-diagram-2', 'Tổ chuyên môn', route('departments.index'), ['departments.*', 'departments*'], 'departments.manage'),
+            $adminItem('bi-door-open', 'Phòng học', route('rooms.index'), ['rooms.*', 'rooms*'], 'rooms.manage'),
         ];
 
-        if ($currentUser->role === 'admin') {
-            $academicItems[] = $adminItem('bi-table', 'Điểm số', route('scores.index'), ['scores.*', 'scores*', 'grade-windows.*', 'grade-windows*']);
-            $academicItems[] = $adminItem('bi-star', 'Hạnh kiểm', route('conduct.index'), ['conduct.*', 'conduct*']);
+        $academicTeachingItems = [
+            $adminItem('bi-building', 'Lớp học', route('classes.index'), ['classes.*', 'classes*'], 'classes.manage'),
+            $adminItem('bi-diagram-3', 'Phân công giảng dạy', route('assignments.index'), ['assignments.*', 'assignments*'], 'assignments.manage'),
+            $adminItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.manage'), ['timetable.manage', 'timetable/manage*'], 'timetable.manage'),
+            $adminItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), ['exam-schedules.*', 'exam-schedules*'], 'exams.manage'),
+        ];
+
+        $academicResultItems = [
+            $adminItem('bi-person-check', 'Điểm danh', route('attendance.index'), ['attendance.*', 'attendance*'], 'attendance.view'),
+        ];
+
+        if ($currentUser->hasAnyPermission(['scores.view', 'scores.manage'])) {
+            $academicResultItems[] = $adminItem('bi-table', 'Điểm số', route('scores.index'), ['scores.*', 'scores*', 'score-columns.*', 'score-columns*', 'grade-windows.*', 'grade-windows*'], 'scores.view');
         }
 
-        $academicItems[] = $adminItem('bi-person-check', 'Điểm danh', route('attendance.index'), ['attendance.*', 'attendance*']);
+        if ($currentUser->hasAnyPermission(['conduct.view', 'conduct.manage'])) {
+            $academicResultItems[] = $adminItem('bi-star', 'Hạnh kiểm', route('conduct.index'), ['conduct.*', 'conduct*'], 'conduct.view');
+        }
+
+        $academicSubgroups = [
+            [
+                'key' => 'academic-config',
+                'icon' => 'bi-sliders',
+                'title' => 'Cấu hình hệ thống',
+                'items' => $academicConfigItems,
+            ],
+            [
+                'key' => 'academic-teaching',
+                'icon' => 'bi-easel2',
+                'title' => 'Tổ chức giảng dạy',
+                'items' => $academicTeachingItems,
+            ],
+            [
+                'key' => 'academic-results',
+                'icon' => 'bi-clipboard-data',
+                'title' => 'Quản lý kết quả',
+                'items' => $academicResultItems,
+            ],
+        ];
+
+        $academicItems = array_merge($academicConfigItems, $academicTeachingItems, $academicResultItems);
 
         $addAdminGroup('overview', 'bi-speedometer2', 'Tổng quan', [
-            $adminItem('bi-house-door', 'Bảng điều khiển', route('dashboard'), ['dashboard']),
+            $adminItem('bi-house-door', 'Bảng điều khiển', route('dashboard'), ['dashboard'], 'dashboard.view'),
         ]);
 
-        $addAdminGroup('academic', 'bi-building', 'Quản lý học vụ', $academicItems);
+        $addAdminGroup('academic', 'bi-building', 'Quản lý học vụ', $academicItems, $academicSubgroups);
 
         $addAdminGroup('users', 'bi-people', 'Quản lý người dùng', [
-            $adminItem('bi-person', 'Học sinh', route('students.index'), ['students.*', 'students*']),
-            $adminItem('bi-person-badge', 'Giáo viên', route('teachers.index'), ['teachers.*', 'teachers*']),
-            $adminItem('bi-people', 'Phụ huynh', route('parents.index'), ['parents.*', 'parents*']),
+            $adminItem('bi-person', 'Học sinh', route('students.index'), ['students.*', 'students*'], 'students.manage'),
+            $adminItem('bi-person-badge', 'Giáo viên', route('teachers.index'), ['teachers.*', 'teachers*'], 'teachers.manage'),
+            $adminItem('bi-people', 'Phụ huynh', route('parents.index'), ['parents.*', 'parents*'], 'parents.manage'),
         ]);
 
         $addAdminGroup('content', 'bi-megaphone', 'Nội dung hệ thống', [
-            $adminItem('bi-window-stack', 'Trang chủ', route('admin.home-page.index'), ['admin.home-page.*', 'admin/home-page*']),
-            $adminItem('bi-megaphone', 'Thông báo', route('announcements.index'), ['announcements.*', 'announcements*']),
-            $adminItem('bi-calendar-event', 'Sự kiện', route('events.index'), ['events.*', 'events*']),
-            $adminItem('bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), ['documents.*', 'documents*']),
+            $adminItem('bi-window-stack', 'Trang chủ', route('admin.home-page.index'), ['admin.home-page.*', 'admin/home-page*'], 'content.manage'),
+            $adminItem('bi-megaphone', 'Thông báo', route('announcements.index'), ['announcements.*', 'announcements*'], 'content.manage'),
+            $adminItem('bi-calendar-event', 'Sự kiện', route('events.index'), ['events.*', 'events*'], 'content.manage'),
+            $adminItem('bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), ['documents.*', 'documents*'], 'documents.manage'),
         ]);
 
         $addAdminGroup('communication', 'bi-chat-dots', 'Giao tiếp', [
-            $adminItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), ['messages.*', 'messages*']),
+            $adminItem('bi-inbox', 'Hộp thư đến', route('messages.inbox'), ['messages.inbox'], 'messages.manage'),
+            $adminItem('bi-send', 'Đã gửi', route('messages.sent'), ['messages.sent'], 'messages.manage'),
+            $adminItem('bi-pencil-square', 'Soạn tin', route('messages.create'), ['messages.create'], 'messages.manage'),
+            $adminItem('bi-trash3', 'Thùng rác', route('messages.trash'), ['messages.trash'], 'messages.manage'),
         ]);
 
-        $addAdminGroup('ai', 'bi-cpu', 'AI Phân tích học tập', [
-            $adminItem('bi-bar-chart-line', 'Phân tích', route('ai.run.form'), ['ai.run.form', 'ai/run']),
-            $adminItem('bi-exclamation-triangle', 'Cảnh báo', route('ai.alerts'), ['ai.alerts', 'ai/alerts']),
-            $adminItem('bi-pencil-square', 'Báo cáo AI', route('ai.reports'), ['ai.reports', 'ai/reports']),
-        ]);
-
-        if ($currentUser->role === 'admin') {
         $addAdminGroup('system', 'bi-gear', 'Hệ thống', [
-            $adminItem('bi-sliders', 'Cài đặt hệ thống', route('system.settings.edit'), ['system.settings.*', 'system/settings*']),
-            $adminItem('bi-database-down', 'Sao lưu & Khôi phục dữ liệu', route('system.backups.index'), ['system.backups.*', 'system/backups*']),
-            $adminItem('bi-shield-check', 'Nhật ký hoạt động', route('audit-logs.index'), ['audit-logs.*', 'audit-logs*']),
+            $adminItem('bi-sliders', 'Cài đặt hệ thống', route('system.settings.edit'), ['system.settings.*', 'system/settings*'], 'system.settings'),
+            $adminItem('bi-database-down', 'Sao lưu & Khôi phục dữ liệu', route('system.backups.index'), ['system.backups.*', 'system/backups*'], 'backups.manage'),
+            $adminItem('bi-shield-check', 'Nhật ký hoạt động', route('audit-logs.index'), ['audit-logs.*', 'audit-logs*'], 'audit_logs.view'),
+            $adminItem('bi-shield-lock', 'Vai trò & quyền', route('rbac-roles.index'), ['rbac-roles.*', 'rbac-roles*'], 'manage_roles'),
         ]);
-        }
 
         $reportItems = [];
-        if ($currentUser->role === 'admin') {
-            $reportItems[] = $adminItem('bi-bar-chart', 'Báo cáo', route('reports.index'), ['reports.*', 'reports*']);
+        if ($currentUser->hasPermission('reports.view')) {
+            $reportItems[] = $adminItem('bi-bar-chart', 'Báo cáo', route('reports.index'), ['reports.*', 'reports*'], 'reports.view');
         }
         if ($reportItems) {
         $addAdminGroup('reports', 'bi-graph-up', 'Báo cáo', $reportItems);
@@ -188,39 +249,58 @@
     }
 
     if ($showRoleMenu) {
-        $addRoleItem('bi-house-door', 'Trang chủ', route('dashboard'), 'dashboard');
+        if ($currentUser->isTeacher()) {
+            $addRoleItem('bi-house-door', 'Trang chủ', route('dashboard'), 'dashboard');
+
+            $teachingItems = [
+                $makeRoleItem('bi-calendar3-week', 'Thời khóa biểu & Lịch kiểm tra', route('timetable.index'), ['timetable*', 'exam-schedules*']),
+                $makeRoleItem('bi-people', 'Danh sách lớp dạy', route('teacher.classes'), 'teacher/classes*', ['query_not' => ['scope' => 'homeroom']]),
+                $makeRoleItem('bi-table', 'Nhập điểm số', route('scores.index'), 'scores*'),
+                $makeRoleItem('bi-person-check', 'Điểm danh tiết dạy', route('attendance.index', ['scope' => 'teaching']), 'attendance*', ['query_not' => ['scope' => 'homeroom']]),
+                $makeRoleItem('bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), 'documents*'),
+            ];
+
+            if ($currentUser->teacher?->leadingDepartment()?->exists()) {
+                $teachingItems[] = $makeRoleItem('bi-diagram-2', 'Tổng quan tổ chuyên môn', route('teacher.department'), 'teacher/department*');
+            }
+
+            $addRoleGroup('Giảng dạy', $teachingItems);
+
+            if ($currentUser->isHomeroom()) {
+                $addRoleGroup('Chủ nhiệm', [
+                    $makeRoleItem('bi-person-vcard', 'Hồ sơ lớp chủ nhiệm', route('teacher.classes', ['scope' => 'homeroom']), 'teacher/classes*', ['query' => ['scope' => 'homeroom']]),
+                    $makeRoleItem('bi-clipboard-data', 'Theo dõi điểm toàn lớp', route('reports.index'), 'reports*'),
+                    $makeRoleItem('bi-calendar-check', 'Điểm danh & Duyệt nghỉ học', route('attendance.index', ['scope' => 'homeroom']), 'attendance*', ['query' => ['scope' => 'homeroom']]),
+                    $makeRoleItem('bi-clipboard-check', 'Đánh giá hạnh kiểm', route('conduct.index'), 'conduct*'),
+                ]);
+            }
+
+            $addRoleGroup('Tương tác', [
+                $makeRoleItem('bi-chat-dots', 'Tin nhắn & Liên hệ phụ huynh', route('messages.inbox'), 'messages*'),
+                $makeRoleItem('bi-megaphone', 'Thông báo & Sự kiện', route('announcements.index'), ['announcements*', 'events*']),
+            ]);
+        } else {
+            $addRoleItem('bi-house-door', 'Trang chủ', route('dashboard'), 'dashboard');
+        }
+
         if ($currentUser->isStudent()) {
-            $addRoleItem('bi-bar-chart-line', 'Điểm số', route('scores.index'), 'scores*');
             $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
+            $addRoleItem('bi-bar-chart-line', 'Điểm số', route('scores.index'), 'scores*');
             $addRoleItem('bi-person-check', 'Điểm danh', route('attendance.index'), 'attendance*');
             $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('conduct.index'), 'conduct*');
             $addRoleItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), 'exam-schedules*');
             $addRoleItem('bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), 'documents*');
             $addRoleItem('bi-megaphone', 'Thông báo', route('announcements.index'), 'announcements*');
-            $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.alerts'), 'ai*');
             $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
-        } elseif ($currentUser->isHomeroom()) {
-            $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
-            $addRoleItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), 'exam-schedules*');
-            $addRoleItem('bi-people', 'Quản lý lớp chủ nhiệm', route('dashboard'), 'dashboard');
-            $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('conduct.index'), 'conduct*');
-            $addRoleItem('bi-table', 'Nhập điểm', route('scores.index'), 'scores*');
-            $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
-            $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.run.form'), 'ai*');
-        } elseif ($currentUser->isTeacher()) {
-            $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
-            $addRoleItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), 'exam-schedules*');
-            $addRoleItem('bi-table', 'Nhập điểm', route('scores.index'), 'scores*');
-            $addRoleItem('bi-people', 'Danh sách lớp', route('dashboard'), 'dashboard');
-            $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
-            $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.alerts'), 'ai*');
         } elseif ($currentUser->isParent()) {
-            $addRoleItem('bi-bar-chart-line', 'Kết quả học tập', route('dashboard'), 'dashboard');
+            $addRoleItem('bi-bar-chart-line', 'Điểm số', route('scores.index'), 'scores*');
             $addRoleItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.index'), 'timetable*');
             $addRoleItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), 'exam-schedules*');
-            $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('dashboard'), 'dashboard');
-            $addRoleItem('bi-cpu', 'AI hỗ trợ học tập', route('ai.reports'), 'ai*');
+            $addRoleItem('bi-person-check', 'Điểm danh', route('attendance.index'), 'attendance*');
+            $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('conduct.index'), 'conduct*');
+            $addRoleItem('bi-envelope-paper', 'Xin nghỉ học', route('parent.leave-requests.index'), 'parent/leave-requests*');
             $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
+            $addRoleItem('bi-megaphone', 'Thông báo', route('announcements.index'), 'announcements*');
         }
     }
 
@@ -238,50 +318,123 @@
             }
         }
     } elseif ($showRoleMenu) {
-        foreach ($roleMenuItems as $item) {
+        $searchRoleItems = collect($roleMenuGroups)
+            ->flatMap(fn ($group) => collect($group['items'])->map(fn ($item) => $item + ['group' => $group['title']]))
+            ->values();
+
+        if ($searchRoleItems->isEmpty()) {
+            $searchRoleItems = collect($roleMenuItems)->map(fn ($item) => $item + ['group' => 'Chức năng'])->values();
+        }
+
+        foreach ($searchRoleItems as $item) {
             $functionSearchItems[] = [
                 'label' => $item['label'],
-                'group' => 'Chức năng',
+                'group' => $item['group'],
                 'url' => $item['url'],
                 'icon' => $item['icon'],
                 'keywords' => $item['label'],
             ];
         }
     }
+
+    $roleItemIsActive = function (array $item): bool {
+        $patterns = (array) ($item['active'] ?? []);
+
+        foreach ($patterns as $pattern) {
+            if ($pattern && (request()->is($pattern) || request()->routeIs($pattern))) {
+                foreach (($item['query'] ?? []) as $key => $value) {
+                    if ((string) request()->query($key) !== (string) $value) {
+                        return false;
+                    }
+                }
+
+                foreach (($item['query_not'] ?? []) as $key => $value) {
+                    if ((string) request()->query($key) === (string) $value) {
+                        return false;
+                    }
+                }
+
+                foreach (($item['without_query'] ?? []) as $key) {
+                    if (request()->query->has($key)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    $visibleAdminSidebar = $showSidebar
+        && ! in_array($activeAdminGroup['key'] ?? '', ['overview', 'reports'], true);
 @endphp
-<body class="role-{{ $currentUser->role }} {{ $showSidebar ? 'has-sidebar admin-hide-duplicate-heading' : 'no-sidebar' }} {{ $historySchoolYear ? 'history-readonly' : '' }}">
-@if($showSidebar)
+<body class="role-{{ $currentUser->role }} {{ $visibleAdminSidebar ? 'has-sidebar admin-hide-duplicate-heading' : 'no-sidebar' }} {{ $historySchoolYear ? 'history-readonly' : '' }}">
+@if($visibleAdminSidebar)
 <div class="sidebar-overlay" data-sidebar-close></div>
 @elseif($showRoleMenu)
 <div class="sidebar-overlay role-menu-overlay" data-role-menu-close></div>
 @endif
 
 <div class="app-shell d-flex">
-    @if($showSidebar)
+    @if($visibleAdminSidebar)
     <aside class="admin-sidebar">
-        <div class="admin-sidebar-head">
-            @if($schoolLogoUrl)
-                <img src="{{ $schoolLogoUrl }}" alt="{{ $schoolTitle }}" class="brand-mark rounded-3 object-fit-cover">
-            @else
-                <div class="brand-mark fw-bold rounded-3">{{ $schoolShortName }}</div>
+        <nav class="admin-menu admin-submenu" aria-label="Chức năng con quản trị">
+            @if($activeAdminGroup)
+                @if($activeAdminGroup['key'] === 'academic' && ! empty($activeAdminGroup['subgroups']))
+                    @foreach($activeAdminGroup['subgroups'] as $subgroup)
+                        @php
+                            $adminSubgroupTitle = match ($subgroup['key']) {
+                                'academic-config' => 'Cấu hình hệ thống',
+                                'academic-teaching' => 'Tổ chức giảng dạy',
+                                'academic-results' => 'Quản lý kết quả',
+                                default => $subgroup['title'],
+                            };
+                            $subgroupIsActive = collect($subgroup['items'])->contains(fn ($item) => $matchesAdminItem($item));
+                        @endphp
+                        <section class="admin-menu-section {{ $subgroupIsActive ? 'is-open' : 'is-collapsed' }}" data-admin-submenu-section>
+                            <button
+                                type="button"
+                                class="admin-menu-heading admin-submenu-heading"
+                                data-admin-submenu-toggle
+                                aria-expanded="{{ $subgroupIsActive ? 'true' : 'false' }}"
+                            >
+                                <span class="admin-menu-heading-main">
+                                    <i class="bi {{ $subgroup['icon'] }}"></i>
+                                    <span>{{ $adminSubgroupTitle }}</span>
+                                </span>
+                                <i class="bi bi-chevron-down admin-menu-chevron"></i>
+                            </button>
+                            <div class="admin-menu-items">
+                                @foreach($subgroup['items'] as $item)
+                                    <a href="{{ $item['url'] }}" class="admin-nav-link {{ $matchesAdminItem($item) ? 'active' : '' }}">
+                                        <i class="bi {{ $item['icon'] }}"></i>
+                                        <span>{{ $item['label'] }}</span>
+                                    </a>
+                                @endforeach
+                            </div>
+                        </section>
+                    @endforeach
+                @else
+                    <section class="admin-menu-section">
+                        <div class="admin-menu-items">
+                            @foreach($activeAdminGroup['items'] as $item)
+                                <a href="{{ $item['url'] }}" class="admin-nav-link {{ $matchesAdminItem($item) ? 'active' : '' }}">
+                                    <i class="bi {{ $item['icon'] }}"></i>
+                                    <span>{{ $item['label'] }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
             @endif
-            <div>
-                <div class="admin-sidebar-title">{{ $schoolTitle }}</div>
-                <div class="admin-sidebar-subtitle">{{ $currentUser->display_name }}</div>
-            </div>
-        </div>
-
-        <nav class="admin-menu admin-menu-groups" aria-label="Menu quản trị">
-            @foreach($adminMenuGroups as $group)
-                <a href="{{ $group['url'] }}" class="admin-group-link {{ $activeAdminGroup && $activeAdminGroup['key'] === $group['key'] ? 'active' : '' }}">
-                    <span class="admin-group-link-main">
-                        <i class="bi {{ $group['icon'] }}"></i>
-                        <span>{{ $group['title'] }}</span>
-                    </span>
-                    <i class="bi bi-chevron-right admin-group-link-arrow"></i>
-                </a>
-            @endforeach
         </nav>
+
+        <button type="button" class="admin-sidebar-collapse" data-admin-sidebar-collapse aria-label="Thu gọn menu chức năng">
+            <i class="bi bi-layout-sidebar-inset"></i>
+            <span>Thu gọn menu</span>
+        </button>
     </aside>
     @elseif($showRoleMenu)
     <nav class="role-sidebar" aria-label="Menu chức năng">
@@ -301,16 +454,148 @@
         </div>
         <div class="role-sidebar-nav">
             @foreach($roleMenuItems as $item)
-                <a href="{{ $item['url'] }}" class="role-nav-link {{ ($loop->first && request()->routeIs('dashboard')) || (! request()->routeIs('dashboard') && (request()->is($item['active']) || request()->routeIs($item['active']))) ? 'active' : '' }}">
+                <a href="{{ $item['url'] }}" class="role-nav-link {{ $roleItemIsActive($item) ? 'active' : '' }}">
                     <i class="bi {{ $item['icon'] }}"></i>
                     <span>{{ $item['label'] }}</span>
                 </a>
             @endforeach
+
+            @if(! empty($roleMenuGroups))
+                @foreach($roleMenuGroups as $group)
+                    <?php
+                        $groupIsActive = collect($group['items'])->contains(function ($item) use ($roleItemIsActive) {
+                            return $roleItemIsActive($item);
+                        });
+                    ?>
+                    <div class="role-nav-group {{ $groupIsActive ? 'is-open' : 'is-collapsed' }}" data-role-nav-group>
+                        <button
+                            type="button"
+                            class="role-nav-group-title"
+                            data-role-group-toggle
+                            aria-expanded="{{ $groupIsActive ? 'true' : 'false' }}"
+                        >
+                            <span>{{ $group['title'] }}</span>
+                            <i class="bi bi-chevron-down role-nav-group-toggle-icon"></i>
+                        </button>
+                        <div class="role-nav-group-items">
+                            @foreach($group['items'] as $item)
+                                <a href="{{ $item['url'] }}" class="role-nav-link {{ $roleItemIsActive($item) ? 'active' : '' }}">
+                                    <i class="bi {{ $item['icon'] }}"></i>
+                                    <span>{{ $item['label'] }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+            @endif
         </div>
     </nav>
     @endif
 
     <div class="main-panel flex-grow-1">
+        @if($showSidebar)
+        <header class="topbar admin-header-stacked">
+            <div class="admin-info-row px-4 py-3 d-flex justify-content-between align-items-center">
+                <div class="admin-topbar-left d-flex align-items-center gap-2">
+                    @if(! in_array($activeAdminGroup['key'] ?? '', ['overview', 'reports'], true))
+                        <button class="btn btn-outline-secondary d-lg-none" type="button" data-sidebar-toggle aria-label="Mở menu chức năng con">
+                            <i class="bi bi-list"></i>
+                        </button>
+                    @endif
+                    <a href="{{ route('dashboard') }}" class="admin-school-heading" aria-label="{{ $schoolTitle }}">
+                        @if($schoolLogoUrl)
+                            <img src="{{ $schoolLogoUrl }}" alt="{{ $schoolTitle }}" class="admin-school-heading-logo object-fit-cover">
+                        @else
+                            <span class="admin-school-heading-logo admin-school-heading-logo-text">{{ $schoolShortName }}</span>
+                        @endif
+                        <span>{{ $schoolTitle }}</span>
+                    </a>
+                    <form class="topbar-search function-search admin-topbar-search" role="search" onsubmit="return false;" data-function-search>
+                        <i class="bi bi-search"></i>
+                        <input type="search" placeholder="Tìm kiếm..." aria-label="Tìm kiếm chức năng" autocomplete="off">
+                    </form>
+                </div>
+
+                <div class="topbar-actions d-flex align-items-center gap-3">
+                    @if($historySchoolYear)
+                        <span class="badge text-bg-warning admin-history-context-badge">
+                            Đang xem dữ liệu năm học {{ $historySchoolYear->name }}
+                        </span>
+                    @endif
+                    <form method="POST" action="{{ route('academic-context.update') }}" class="admin-period-meta admin-period-form" aria-label="Năm học và học kỳ đang làm việc">
+                        @csrf
+                        <label class="admin-period-field">
+                            <span class="visually-hidden">Năm học đang làm việc</span>
+                            <select name="school_year_id" class="admin-period-select" onchange="this.form.submit()" @disabled($headerSchoolYears->isEmpty())>
+                                @forelse($headerSchoolYears as $year)
+                                    <option value="{{ $year->id }}" @selected((string) $headerSchoolYear?->id === (string) $year->id)>{{ $year->name }}</option>
+                                @empty
+                                    <option value="">Chưa thiết lập</option>
+                                @endforelse
+                            </select>
+                        </label>
+                        <label class="admin-period-field">
+                            <span class="visually-hidden">Học kỳ hiện hành</span>
+                            <select name="semester_id" class="admin-period-select" onchange="this.form.submit()" @disabled($headerSemesters->isEmpty())>
+                                @forelse($headerSemesters as $semester)
+                                    <option value="{{ $semester->id }}" @selected((string) $headerSemester?->id === (string) $semester->id)>{{ $semester->normalizedName() }}</option>
+                                @empty
+                                    <option value="">Chưa thiết lập</option>
+                                @endforelse
+                            </select>
+                        </label>
+                    </form>
+                    <div class="dropdown">
+                        <button class="btn btn-link text-dark text-decoration-none dropdown-toggle admin-user-dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-circle"></i>
+                            <span class="admin-user-dropdown-text">
+                                <span class="admin-user-dropdown-name">{{ $currentUser->display_name }}</span>
+                                <span class="admin-user-dropdown-role">Quản trị viên</span>
+                            </span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="{{ route('profile.show') }}"><i class="bi bi-person-circle me-2"></i>Thông tin cá nhân</a></li>
+                            <li><a class="dropdown-item" href="{{ route('profile.change-password') }}"><i class="bi bi-key me-2"></i>Đổi mật khẩu</a></li>
+                            @if($currentUser->hasPermission('manage_admin_accounts'))
+                                <li><a class="dropdown-item" href="{{ route('admin-users.index') }}"><i class="bi bi-person-gear me-2"></i>Quản lý Admin</a></li>
+                            @endif
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="POST" action="{{ route('logout') }}" class="d-inline" data-logout-home>
+                                    @csrf
+                                    <button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right me-2"></i>Đăng xuất</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-primary-nav-row">
+                <nav class="admin-top-nav" aria-label="Phân hệ quản trị">
+                    @foreach($adminMenuGroups as $group)
+                        @php
+                            $groupUrl = $group['key'] === 'academic' ? route('academic.index') : $group['url'];
+                            $groupLabel = match ($group['key']) {
+                                'overview' => 'Tổng quan',
+                                'academic' => 'Học vụ',
+                                'users' => 'Người dùng',
+                                'content' => 'Nội dung',
+                                'communication' => 'Giao tiếp',
+                                'system' => 'Hệ thống',
+                                'reports' => 'Báo cáo',
+                                default => $group['title'],
+                            };
+                        @endphp
+                        <a href="{{ $groupUrl }}" class="admin-top-nav-link {{ $activeAdminGroup && $activeAdminGroup['key'] === $group['key'] ? 'active' : '' }}">
+                            <i class="bi {{ $group['icon'] }}"></i>
+                            <span>{{ $groupLabel }}</span>
+                        </a>
+                    @endforeach
+                </nav>
+            </div>
+        </header>
+        @else
         <header class="topbar px-4 py-3 d-flex justify-content-between align-items-center">
             @if($showRoleMenu)
                 <div class="role-topbar-left">
@@ -325,53 +610,49 @@
                 </div>
             @else
                 <div class="admin-topbar-left d-flex align-items-center gap-2">
-                    @if($showSidebar)
-                    <form class="topbar-search function-search" role="search" onsubmit="return false;" data-function-search>
-                        <i class="bi bi-search"></i>
-                        <input type="search" placeholder="Tìm kiếm chức năng..." aria-label="Tìm kiếm chức năng" autocomplete="off">
-                    </form>
-                    <button class="btn btn-outline-secondary d-lg-none" type="button" data-sidebar-toggle aria-label="Mở menu">
-                        <i class="bi bi-list"></i>
-                    </button>
-                    @endif
                     @unless($showSidebar)
                         <div class="page-title fs-6">@yield('title', $title ?? 'Bảng điều khiển')</div>
                     @endunless
-                    @if($showSidebar)
-                        <form method="POST" action="{{ route('academic-context.update') }}" class="admin-period-meta admin-period-form" aria-label="Năm học và học kỳ đang làm việc">
-                            @csrf
-                            <label class="admin-period-field">
-                                <span class="visually-hidden">Năm học đang làm việc</span>
-                                <select name="school_year_id" class="admin-period-select" onchange="this.form.submit()" @disabled($headerSchoolYears->isEmpty())>
-                                    @forelse($headerSchoolYears as $year)
-                                        <option value="{{ $year->id }}" @selected((string) $headerSchoolYear?->id === (string) $year->id)>{{ $year->name }}</option>
-                                    @empty
-                                        <option value="">Chưa thiết lập</option>
-                                    @endforelse
-                                </select>
-                            </label>
-                            <label class="admin-period-field">
-                                <span class="visually-hidden">Học kỳ hiện hành</span>
-                                <select name="semester_id" class="admin-period-select" onchange="this.form.submit()" @disabled($headerSemesters->isEmpty())>
-                                    @forelse($headerSemesters as $semester)
-                                        <option value="{{ $semester->id }}" @selected((string) $headerSemester?->id === (string) $semester->id)>{{ $semester->normalizedName() }}</option>
-                                    @empty
-                                        <option value="">Chưa thiết lập</option>
-                                    @endforelse
-                                </select>
-                            </label>
-                        </form>
-                        @if($historySchoolYear)
-                            <span class="badge text-bg-warning admin-history-context-badge">
-                                Đang xem dữ liệu năm học {{ $historySchoolYear->name }}
-                            </span>
-                        @endif
-                    @endif
                 </div>
             @endif
 
             <div class="topbar-actions d-flex align-items-center gap-3">
-                <span class="badge badge-role">{{ $currentUser->role }}</span>
+                @if($currentUser->isParent() && $currentUser->parentProfile)
+                    @php
+                        $headerParentChildren = $currentUser->parentProfile->students()
+                            ->with('classRoom')
+                            ->orderBy('student_code')
+                            ->get();
+                        $headerSelectedChild = $headerParentChildren->firstWhere('id', session('selected_parent_student_id'))
+                            ?: $headerParentChildren->first();
+                    @endphp
+                    <form method="POST" action="{{ route('parent.select-child') }}" class="parent-header-child-select d-flex align-items-center gap-2">
+                        @csrf
+                        <label class="small text-muted fw-semibold mb-0">Chọn học sinh</label>
+                        <select name="student_id" class="form-select form-select-sm" onchange="this.form.submit()" @disabled($headerParentChildren->isEmpty())>
+                            @forelse($headerParentChildren as $child)
+                                <option value="{{ $child->id }}" @selected(($headerSelectedChild?->id ?? null) === $child->id)>
+                                    {{ $child->student_code }} - {{ $child->name }}
+                                </option>
+                            @empty
+                                <option value="">Chưa có học sinh</option>
+                            @endforelse
+                        </select>
+                    </form>
+                @endif
+                <span class="badge badge-role">
+                    @if($currentUser->isTeacher())
+                        {{ $currentUser->isHomeroom() ? 'Giáo viên bộ môn kiêm GVCN' : 'Giáo viên bộ môn' }}
+                    @elseif($currentUser->isStudent())
+                        Học sinh
+                    @elseif($currentUser->isParent())
+                        Phụ huynh
+                    @elseif($currentUser->isAdmin())
+                        Quản trị viên
+                    @else
+                        Nhân sự
+                    @endif
+                </span>
                 <div class="dropdown">
                     <button class="btn btn-link text-dark text-decoration-none dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="bi bi-person-circle me-2"></i><span class="fw-semibold">{{ $currentUser->display_name }}</span>
@@ -379,6 +660,9 @@
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                         <li><a class="dropdown-item" href="{{ route('profile.show') }}"><i class="bi bi-person-circle me-2"></i>Thông tin cá nhân</a></li>
                         <li><a class="dropdown-item" href="{{ route('profile.change-password') }}"><i class="bi bi-key me-2"></i>Đổi mật khẩu</a></li>
+                        @if($currentUser->hasPermission('manage_admin_accounts'))
+                            <li><a class="dropdown-item" href="{{ route('admin-users.index') }}"><i class="bi bi-person-gear me-2"></i>Quản lý Admin</a></li>
+                        @endif
                         <li><hr class="dropdown-divider"></li>
                         <li>
                             <form method="POST" action="{{ route('logout') }}" class="d-inline" data-logout-home>
@@ -390,20 +674,8 @@
                 </div>
             </div>
         </header>
+        @endif
         <main class="content">
-            @if($showSidebar && $activeAdminGroup && $activeAdminGroup['key'] !== 'overview' && count($activeAdminGroup['items']) > 1)
-                <div class="admin-context-bar">
-                    <div class="admin-section-tabs" aria-label="{{ $activeAdminGroup['title'] }}">
-                        @foreach($activeAdminGroup['items'] as $item)
-                            <a href="{{ $item['url'] }}" class="admin-section-tab {{ $matchesAdminItem($item) ? 'active' : '' }}">
-                                <i class="bi {{ $item['icon'] }}"></i>
-                                <span>{{ $item['label'] }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-
             @if($showSidebar && $historySchoolYear)
                 <div class="history-readonly-banner" role="status">
                     <div class="history-readonly-banner-icon">
@@ -571,6 +843,49 @@
     })();
 
     (() => {
+        const collapseKey = 'school-manager:admin-sidebar-collapsed';
+        const collapseButton = document.querySelector('[data-admin-sidebar-collapse]');
+        const collapseIcon = collapseButton?.querySelector('i');
+
+        const setAdminSidebarCollapsed = (collapsed) => {
+            document.body.classList.toggle('admin-sidebar-collapsed', collapsed);
+            collapseButton?.setAttribute('aria-label', collapsed ? 'Mở rộng menu chức năng' : 'Thu gọn menu chức năng');
+
+            if (collapseIcon) {
+                collapseIcon.className = collapsed ? 'bi bi-layout-sidebar-inset-reverse' : 'bi bi-layout-sidebar-inset';
+            }
+        };
+
+        setAdminSidebarCollapsed(localStorage.getItem(collapseKey) === '1');
+
+        collapseButton?.addEventListener('click', () => {
+            const collapsed = !document.body.classList.contains('admin-sidebar-collapsed');
+            localStorage.setItem(collapseKey, collapsed ? '1' : '0');
+            setAdminSidebarCollapsed(collapsed);
+        });
+    })();
+
+    (() => {
+        const sections = [...document.querySelectorAll('[data-admin-submenu-section]')];
+
+        if (!sections.length) {
+            return;
+        }
+
+        const setSectionOpen = (section, isOpen) => {
+            section.classList.toggle('is-collapsed', !isOpen);
+            section.classList.toggle('is-open', isOpen);
+            section.querySelector('[data-admin-submenu-toggle]')?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        };
+
+        sections.forEach((section) => {
+            section.querySelector('[data-admin-submenu-toggle]')?.addEventListener('click', () => {
+                setSectionOpen(section, section.classList.contains('is-collapsed'));
+            });
+        });
+    })();
+
+    (() => {
         const scrollTargets = [
             ['school-manager:admin-sidebar-scroll', document.querySelector('.admin-sidebar')],
             ['school-manager:admin-menu-scroll', document.querySelector('.admin-menu')],
@@ -598,7 +913,7 @@
         window.requestAnimationFrame(restoreScroll);
         window.addEventListener('pagehide', saveScroll);
         window.addEventListener('beforeunload', saveScroll);
-        document.querySelectorAll('.admin-group-link, .admin-section-tab').forEach((link) => {
+        document.querySelectorAll('.admin-top-nav-link, .admin-group-link, .admin-section-tab, .admin-nav-link').forEach((link) => {
             link.addEventListener('click', saveScroll, { capture: true });
         });
         scrollTargets.forEach(([, element]) => {
@@ -609,7 +924,7 @@
     document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
         button.addEventListener('click', () => document.body.classList.add('sidebar-open'));
     });
-    document.querySelectorAll('[data-sidebar-close], .admin-group-link, .admin-section-tab').forEach((element) => {
+    document.querySelectorAll('[data-sidebar-close], .admin-top-nav-link, .admin-group-link, .admin-section-tab, .admin-nav-link').forEach((element) => {
         element.addEventListener('click', () => document.body.classList.remove('sidebar-open'));
     });
 
@@ -619,6 +934,48 @@
     document.querySelectorAll('[data-role-menu-close], .role-sidebar a').forEach((element) => {
         element.addEventListener('click', () => document.body.classList.remove('role-menu-open'));
     });
+
+    (() => {
+        if (!window.bootstrap?.Dropdown) {
+            return;
+        }
+
+        document.querySelectorAll('[data-academic-dropdown-toggle]').forEach((toggle) => {
+            window.bootstrap.Dropdown.getOrCreateInstance(toggle, {
+                boundary: 'viewport',
+                popperConfig(defaultConfig) {
+                    return {
+                        ...defaultConfig,
+                        strategy: 'fixed',
+                    };
+                },
+            });
+        });
+    })();
+
+    (() => {
+        const groups = [...document.querySelectorAll('[data-role-nav-group]')];
+
+        if (!groups.length) {
+            return;
+        }
+
+        const setGroupOpen = (group, isOpen) => {
+            group.classList.toggle('is-collapsed', !isOpen);
+            group.classList.toggle('is-open', isOpen);
+            group.querySelector('[data-role-group-toggle]')?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        };
+
+        groups.forEach((group) => {
+            const toggle = group.querySelector('[data-role-group-toggle]');
+
+            toggle?.addEventListener('click', () => {
+                const shouldOpen = group.classList.contains('is-collapsed');
+
+                groups.forEach((otherGroup) => setGroupOpen(otherGroup, otherGroup === group ? shouldOpen : false));
+            });
+        });
+    })();
 
     (() => {
         const chatbot = document.querySelector('[data-floating-chatbot]');

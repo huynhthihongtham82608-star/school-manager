@@ -76,10 +76,10 @@
                             @php($entry = $entries[$day.'-'.$period] ?? null)
                             <td>
                                 @if($entry)
-                                    <div class="fw-semibold">{{ $entry->assignment?->subject?->name ?? $entry->subject?->name ?? '' }}</div>
+                                    <div class="fw-semibold">{{ $entry->displaySubjectName() }}</div>
                                     <div class="text-muted small">
-                                        {{ $entry->assignment?->teacher?->name ?? $entry->teacher?->name ?? '' }}
-                                        @if($entry->displayRoom()) · Phòng {{ $entry->displayRoom() }} @endif
+                                        {{ $entry->displayTeacherName() }}
+                                        @if($entry->displayRoomLabel()) · {{ $entry->displayRoomLabel() }} @endif
                                     </div>
                                     @if($entry->status !== \App\Models\TimetableEntry::STATUS_ACTIVE)
                                         <span class="badge {{ $entry->statusBadgeClass() }}">{{ $entry->statusLabel() }}</span>

@@ -13,6 +13,7 @@ class ScoreDetail extends Model
     protected $fillable = [
         'score_header_id',
         'exam_schedule_id',
+        'score_column_id',
         'type',
         'name',
         'value',
@@ -22,6 +23,11 @@ class ScoreDetail extends Model
     public function examSchedule()
     {
         return $this->belongsTo(ExamSchedule::class);
+    }
+
+    public function scoreColumn()
+    {
+        return $this->belongsTo(ScoreColumn::class);
     }
 
     protected $casts = [

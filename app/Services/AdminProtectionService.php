@@ -6,6 +6,21 @@ use App\Models\User;
 
 class AdminProtectionService
 {
+    public static function canManageUser(?User $actor, User $target): array
+    {
+        if ($target->isSuperAdmin() && (! $actor || ! $actor->isSuperAdmin() || (string) $actor->getKey() !== (string) $target->getKey())) {
+            return [
+                'allowed' => false,
+                'message' => 'Tài khoản Quản trị tối cao được hệ thống bảo vệ, không thể chỉnh sửa bằng tài khoản quản trị phụ.',
+            ];
+        }
+
+        return [
+            'allowed' => true,
+            'message' => '',
+        ];
+    }
+
     /**
      * Check if there is at least one active admin in the system
      */
@@ -31,6 +46,10 @@ class AdminProtectionService
      */
     public static function isLastActiveAdmin(User $user): bool
     {
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
         if ($user->role !== 'admin' || !$user->is_active) {
             return false;
         }
@@ -48,7 +67,14 @@ class AdminProtectionService
     public static function validateAdminChange(User $user, array $changes): array
     {
         // Check if trying to deactivate last admin
-        if (isset($changes['is_active']) && $changes['is_active'] === 0 || $changes['is_active'] === false) {
+        if ($user->isSuperAdmin() && array_key_exists('is_active', $changes) && ! (bool) $changes['is_active']) {
+            return [
+                'allowed' => false,
+                'message' => 'Không thể khóa tài khoản Quản trị tối cao.',
+            ];
+        }
+
+        if ((isset($changes['is_active']) && $changes['is_active'] === 0) || (isset($changes['is_active']) && $changes['is_active'] === false)) {
             if (static::isLastActiveAdmin($user)) {
                 return [
                     'allowed' => false,
@@ -58,6 +84,13 @@ class AdminProtectionService
         }
 
         // Check if trying to change role of last admin
+        if ($user->isSuperAdmin() && isset($changes['role']) && $changes['role'] !== 'admin') {
+            return [
+                'allowed' => false,
+                'message' => 'Không thể thay đổi vai trò của tài khoản Quản trị tối cao.',
+            ];
+        }
+
         if (isset($changes['role']) && $changes['role'] !== 'admin') {
             if (static::isLastActiveAdmin($user)) {
                 return [
@@ -78,6 +111,13 @@ class AdminProtectionService
      */
     public static function validateAdminDeletion(User $user): array
     {
+        if ($user->isSuperAdmin()) {
+            return [
+                'allowed' => false,
+                'message' => 'Không thể xóa tài khoản Quản trị tối cao.',
+            ];
+        }
+
         if (static::isLastActiveAdmin($user)) {
             return [
                 'allowed' => false,

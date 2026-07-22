@@ -4,25 +4,21 @@
 @section('content')
 @if(auth()->user()->isStudent() || auth()->user()->isParent())
     @php
-        $conductLabels = [
-            'excellent' => 'Tốt',
-            'good' => 'Khá',
-            'average' => 'Trung bình',
-            'weak' => 'Cần cố gắng',
-        ];
+        $conductLabels = \App\Models\Conduct::LEVELS;
         $conductBadges = [
             'excellent' => 'bg-success',
             'good' => 'bg-primary',
             'average' => 'bg-warning text-dark',
             'weak' => 'bg-secondary',
         ];
+        $latestConduct = $studentConductRecords->first();
     @endphp
-    <div class="page-heading">
-        <div>
-            <h5>Hạnh kiểm</h5>
-            <div class="text-muted">Chỉ hiển thị dữ liệu hạnh kiểm của học sinh đang đăng nhập.</div>
-        </div>
-    </div>
+    <x-page-header
+        title="Hạnh kiểm"
+        :subtitle="auth()->user()->isParent()
+            ? 'Xem xếp loại hạnh kiểm và nhận xét của học sinh đang chọn.'
+            : 'Chỉ hiển thị dữ liệu hạnh kiểm của học sinh đang đăng nhập.'"
+    />
 
     <div class="card mb-3">
         <div class="card-body d-flex flex-column flex-md-row gap-3 justify-content-between">
@@ -37,7 +33,34 @@
         </div>
     </div>
 
+    @if($latestConduct)
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="student-stat-card h-100">
+                    <span class="student-stat-icon text-success"><i class="bi bi-award"></i></span>
+                    <div>
+                        <div class="student-stat-label">Xếp loại gần nhất</div>
+                        <div class="student-stat-value">
+                            <span class="badge {{ $conductBadges[$latestConduct->conduct_level] ?? 'bg-light text-dark border' }}">
+                                {{ $conductLabels[$latestConduct->conduct_level] ?? $latestConduct->conduct_level }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card h-100">
+                    <div class="card-header">Nhận xét của giáo viên chủ nhiệm</div>
+                    <div class="card-body">
+                        <p class="mb-0">{{ $latestConduct->comment ?: 'Chưa có nhận xét chi tiết.' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="card">
+        <div class="card-header">Lịch sử hạnh kiểm</div>
         <div class="table-responsive">
             <table class="table">
                 <thead>
@@ -74,12 +97,10 @@
         </div>
     </div>
 @else
-<div class="page-heading">
-    <div>
-        <h5>Nhập hạnh kiểm</h5>
-        <div class="text-muted">Chọn lớp và học kỳ để cập nhật hạnh kiểm.</div>
-    </div>
-</div>
+<x-page-header
+    title="Nhập hạnh kiểm"
+    subtitle="Chọn lớp và học kỳ để cập nhật xếp loại hạnh kiểm và nhận xét của giáo viên chủ nhiệm."
+/>
 
 <form method="GET" class="row g-3 mb-3">
     <div class="col-md-4">
@@ -123,18 +144,33 @@
                     </thead>
                     <tbody>
                     @forelse($students as $student)
-                        @php($record = $records[$student->id] ?? null)
+                        @php
+                            $record = $records[$student->id] ?? null;
+                            $selectedLevel = old("conduct.{$student->id}.conduct_level", $record?->conduct_level);
+                        @endphp
                         <tr>
                             <td class="fw-semibold">{{ $student->student_code }}</td>
                             <td>{{ $student->name }}</td>
                             <td>
                                 <select name="conduct[{{ $student->id }}][conduct_level]" class="form-select form-select-sm">
-                                    @foreach(['excellent' => 'Tốt', 'good' => 'Khá', 'average' => 'Trung bình', 'weak' => 'Yếu'] as $k => $label)
-                                        <option value="{{ $k }}" @selected($record && $record->conduct_level === $k)>{{ $label }}</option>
+                                    <option value="" @selected($selectedLevel === null || $selectedLevel === '')>Chưa xếp loại</option>
+                                    @foreach(\App\Models\Conduct::LEVELS as $k => $label)
+                                        <option value="{{ $k }}" @selected($selectedLevel === $k)>{{ $label }}</option>
                                     @endforeach
                                 </select>
                             </td>
-                            <td><input type="text" name="conduct[{{ $student->id }}][comment]" class="form-control form-control-sm" value="{{ $record?->comment }}"></td>
+                            <td>
+                                <input
+                                    type="text"
+                                    name="conduct[{{ $student->id }}][comment]"
+                                    class="form-control form-control-sm @error("conduct.{$student->id}.comment") is-invalid @enderror"
+                                    value="{{ old("conduct.{$student->id}.comment", $record?->comment) }}"
+                                    placeholder="Nhận xét bắt buộc nếu đã xếp loại"
+                                >
+                                @error("conduct.{$student->id}.comment")
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </td>
                         </tr>
                     @empty
                         <tr>

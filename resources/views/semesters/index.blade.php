@@ -2,15 +2,14 @@
 @section('title', 'Học kỳ')
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Học kỳ</h5>
-        <div class="text-muted">Quản lý học kỳ theo năm học và trạng thái sử dụng.</div>
-    </div>
+<x-page-header
+    title="Quản lý học kỳ"
+    subtitle="Cấu hình mốc thời gian bắt đầu/kết thúc các học kỳ và thiết lập thời hạn khóa sổ cổng nhập điểm."
+>
     @unless($readOnly)
         <a class="btn btn-primary" href="{{ route('semesters.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm học kỳ</a>
     @endunless
-</div>
+</x-page-header>
 
 <div class="card">
     <div class="table-responsive">

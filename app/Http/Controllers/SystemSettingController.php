@@ -18,9 +18,8 @@ class SystemSettingController extends Controller
         $schoolYears = Schema::hasTable('school_years')
             ? SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->get()
             : collect();
-        $supportsAiContent = Schema::hasColumn('system_settings', 'ai_encouragements');
 
-        return view('system.settings', compact('setting', 'schoolYears', 'supportsAiContent'));
+        return view('system.settings', compact('setting', 'schoolYears'));
     }
 
     public function update(Request $request)
@@ -37,9 +36,6 @@ class SystemSettingController extends Controller
             'website' => ['nullable', 'string', 'max:255'],
             'principal_name' => ['nullable', 'string', 'max:255'],
             'default_school_year_id' => ['nullable', 'exists:school_years,id'],
-            'ai_encouragements' => ['nullable', 'array'],
-            'ai_encouragements.*.content' => ['nullable', 'string', 'max:500'],
-            'ai_encouragements.*.enabled' => ['nullable', 'boolean'],
         ]);
 
         $setting = SystemSetting::query()->first() ?: new SystemSetting(SystemSetting::defaults());
@@ -53,27 +49,6 @@ class SystemSettingController extends Controller
         }
 
         unset($data['logo']);
-
-        if (Schema::hasColumn('system_settings', 'ai_encouragements')) {
-            $data['ai_encouragements'] = collect($request->input('ai_encouragements', []))
-                ->map(function ($item) {
-                    $content = trim((string) ($item['content'] ?? ''));
-
-                    if ($content === '') {
-                        return null;
-                    }
-
-                    return [
-                        'content' => $content,
-                        'enabled' => (bool) ($item['enabled'] ?? false),
-                    ];
-                })
-                ->filter()
-                ->values()
-                ->all();
-        } else {
-            unset($data['ai_encouragements']);
-        }
 
         $setting->fill($data)->save();
 

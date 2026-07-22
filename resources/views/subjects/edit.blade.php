@@ -24,7 +24,7 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">Loại môn</label>
-            <select name="type" class="form-select" required>
+            <select name="type" id="subjectTypeSelect" class="form-select" required>
                 @foreach(\App\Models\Subject::TYPES as $value => $label)
                     <option value="{{ $value }}" @selected(old('type', $subject->isScorable() ? \App\Models\Subject::TYPE_OFFICIAL : $subject->type) === $value)>{{ $label }}</option>
                 @endforeach
@@ -40,9 +40,16 @@
             </select>
             @error('status')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
+        <div class="col-md-6">
+            <label class="form-label">Tổ phụ trách</label>
+            <div class="form-control bg-light text-muted">
+                {{ $subject->isScorable() ? ($subject->departments->pluck('name')->join(', ') ?: 'Chưa phân tổ') : 'Không áp dụng cho môn Chủ nhiệm/Hoạt động' }}
+            </div>
+            <div class="form-text">Chỉ môn Chính khóa mới cần cấu hình tổ chuyên môn.</div>
+        </div>
     </div>
 
-    <div class="mt-4 pt-3 border-top">
+    <div id="periodNormSection" class="mt-4 pt-3 border-top {{ old('type', $subject->isScorable() ? \App\Models\Subject::TYPE_OFFICIAL : $subject->type) === \App\Models\Subject::TYPE_OFFICIAL ? '' : 'd-none' }}">
         <h6 class="fw-semibold mb-1">Định mức tiết học theo khối <span class="text-muted fw-normal">(không bắt buộc)</span></h6>
         <div class="text-muted small mb-3">Nhập số tiết mỗi tuần cho từng khối. Để trống nếu môn chưa áp dụng cho khối đó.</div>
         <div class="row g-3">
@@ -62,4 +69,21 @@
         <button class="btn btn-primary">Cập nhật</button>
     </div>
 </form>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const typeSelect = document.getElementById('subjectTypeSelect');
+    const periodSection = document.getElementById('periodNormSection');
+
+    if (!typeSelect || !periodSection) {
+        return;
+    }
+
+    const togglePeriodSection = () => {
+        periodSection.classList.toggle('d-none', typeSelect.value !== '{{ \App\Models\Subject::TYPE_OFFICIAL }}');
+    };
+
+    typeSelect.addEventListener('change', togglePeriodSection);
+    togglePeriodSection();
+});
+</script>
 @endsection

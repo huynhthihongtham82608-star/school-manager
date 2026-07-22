@@ -2,7 +2,14 @@
 @section('title', 'Chi tiết tin nhắn')
 
 @section('content')
-@include('messages._nav')
+<x-page-header
+    title="Hộp thư điện tử"
+    subtitle="Kênh tương tác, trao đổi thông tin chính thống giữa Nhà trường, Giáo viên và Phụ huynh học sinh."
+>
+    <a class="btn btn-primary" href="{{ route('messages.create') }}">
+        <i class="bi bi-pencil-square me-1"></i>Soạn tin nhắn mới
+    </a>
+</x-page-header>
 
 <div class="card">
     <div class="card-header d-flex flex-wrap justify-content-between gap-3">

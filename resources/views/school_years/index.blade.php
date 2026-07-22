@@ -2,11 +2,10 @@
 @section('title', 'Năm học')
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Năm học</h5>
-        <div class="text-muted">Quản lý năm học và trạng thái sử dụng.</div>
-    </div>
+<x-page-header
+    title="Quản lý năm học"
+    subtitle="Khai báo niên khóa mới, cấu hình thiết lập thời gian học và quản lý chuyển năm học cho học sinh."
+>
     <div class="d-flex flex-wrap justify-content-end gap-2">
         <a class="btn btn-secondary" href="{{ route('school-years.initialize.form') }}">
             <i class="bi bi-magic me-1"></i>Khởi tạo năm học mới
@@ -15,7 +14,7 @@
             <i class="bi bi-plus-lg me-1"></i>Thêm năm học
         </a>
     </div>
-</div>
+</x-page-header>
 
 <div class="card">
     <div class="table-responsive">

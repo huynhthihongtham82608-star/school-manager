@@ -70,6 +70,50 @@ class TimetableEntry extends Model
         return $this->roomInfo?->name ?: $this->room;
     }
 
+    public function displaySubjectName(): string
+    {
+        return (string) ($this->assignment?->subject?->name ?? $this->subject?->name ?? '');
+    }
+
+    public function displayTeacherName(): string
+    {
+        $subject = $this->assignment?->subject ?? $this->subject;
+
+        if ($this->assignment?->teacher?->name) {
+            return $this->assignment->teacher->name;
+        }
+
+        if ($subject?->isHomeroomSubject()) {
+            $this->loadMissing('timetable.classRoom.homeroomTeacher');
+
+            return $this->timetable?->classRoom?->homeroomTeacher?->name
+                ?: ($this->teacher?->name ?: 'Giáo viên chủ nhiệm');
+        }
+
+        if ($this->teacher?->name) {
+            return $this->teacher->name;
+        }
+
+        if ($subject?->isActivitySubject()) {
+            return 'Toàn trường';
+        }
+
+        return '';
+    }
+
+    public function displayRoomLabel(): ?string
+    {
+        $room = $this->displayRoom();
+
+        if ($room) {
+            return $room;
+        }
+
+        $subject = $this->assignment?->subject ?? $this->subject;
+
+        return $subject?->isActivitySubject() ? 'Sân trường' : null;
+    }
+
     public function sessionLabel(): string
     {
         return (int) $this->period <= 5 ? 'Buổi sáng' : 'Buổi chiều';

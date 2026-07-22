@@ -2,13 +2,12 @@
 @section('title', 'Quản lý thời khóa biểu')
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Quản lý thời khóa biểu</h5>
-        <div class="text-muted">Tạo và cập nhật lịch học từ phân công giảng dạy.</div>
-    </div>
+<x-page-header
+    title="Quản lý thời khóa biểu"
+    subtitle="Tạo và cập nhật lịch học theo lớp, buổi, tiết, giáo viên, môn học và phòng học."
+>
     <a class="btn btn-outline-secondary" href="{{ route('timetable.index') }}">Xem thời khóa biểu</a>
-</div>
+</x-page-header>
 
 <form method="GET" class="card mb-3">
     <div class="card-body">
@@ -70,9 +69,13 @@
         </div>
     @endif
 
-    @if($assignments->isEmpty())
+    @if($assignments->isEmpty() && $specialSubjects->isEmpty())
         <div class="alert alert-warning">
             Lớp này chưa có phân công giảng dạy đang hoạt động trong học kỳ đã chọn.
+        </div>
+    @elseif($assignments->isEmpty())
+        <div class="alert alert-info">
+            Lớp này chưa có phân công môn chính khóa. Bạn vẫn có thể xếp các môn Chủ nhiệm hoặc Hoạt động nếu phù hợp.
         </div>
     @endif
 
@@ -103,16 +106,30 @@
                             <td class="fw-semibold">{{ $periodLabel }}</td>
                             @foreach($days as $day => $dayLabel)
                                 @php($entry = $entries[$day.'-'.$period] ?? null)
+                                @php($selectedEntryValue = $entry ? ($entry->assignment_id ? 'assignment:'.$entry->assignment_id : ($entry->subject_id ? 'subject:'.$entry->subject_id : '')) : '')
                                 <td style="min-width: 260px;">
                                     <div class="mb-2">
-                                        <select class="form-select form-select-sm" name="entries[{{ $day }}][{{ $period }}][assignment_id]" @disabled($readOnly)>
+                                        <select class="form-select form-select-sm" name="entries[{{ $day }}][{{ $period }}][entry_value]" @disabled($readOnly)>
                                             <option value="">-- Trống --</option>
-                                            @foreach($assignments as $assignment)
-                                                @php($effectivePeriods = $assignment->effectiveWeeklyPeriods())
-                                                <option value="{{ $assignment->id }}" @selected($entry && $entry->assignment_id === $assignment->id)>
-                                                    {{ $assignment->subject->name ?? '' }} - {{ $assignment->teacher->name ?? '' }} ({{ $assignment->roleLabel() }}){{ $effectivePeriods ? ' - ' . $effectivePeriods . ' tiết/tuần, ' . mb_strtolower($assignment->weeklyPeriodSourceLabel()) : ' - chưa có định mức' }}
-                                                </option>
-                                            @endforeach
+                                            @if($assignments->isNotEmpty())
+                                                <optgroup label="Môn chính khóa đã phân công">
+                                                    @foreach($assignments as $assignment)
+                                                        @php($effectivePeriods = $assignment->effectiveWeeklyPeriods())
+                                                        <option value="assignment:{{ $assignment->id }}" @selected($selectedEntryValue === 'assignment:'.$assignment->id)>
+                                                            {{ $assignment->subject->name ?? '' }} - {{ $assignment->teacher->name ?? '' }} ({{ $assignment->roleLabel() }}){{ $effectivePeriods ? ' - ' . $effectivePeriods . ' tiết/tuần, ' . mb_strtolower($assignment->weeklyPeriodSourceLabel()) : ' - chưa có định mức' }}
+                                                        </option>
+                                                    @endforeach
+                                                </optgroup>
+                                            @endif
+                                            @if($specialSubjects->isNotEmpty())
+                                                <optgroup label="Môn chủ nhiệm / hoạt động">
+                                                    @foreach($specialSubjects as $subject)
+                                                        <option value="subject:{{ $subject->id }}" @selected($selectedEntryValue === 'subject:'.$subject->id)>
+                                                            {{ $subject->name }} - {{ $subject->typeLabel() }}{{ $subject->isHomeroomSubject() ? ' - tự lấy GVCN' : ' - không cần phân công' }}
+                                                        </option>
+                                                    @endforeach
+                                                </optgroup>
+                                            @endif
                                         </select>
                                     </div>
                                     <div class="d-flex gap-2 mb-2">
@@ -130,7 +147,10 @@
                                     </div>
                                     @if($entry)
                                         <div class="small text-muted">
-                                            {{ $entry->assignment?->teacher?->name ?? $entry->teacher?->name }}
+                                            {{ $entry->displayTeacherName() ?: 'Không có giáo viên cụ thể' }}
+                                            @if($entry->displayRoomLabel())
+                                                · {{ $entry->displayRoomLabel() }}
+                                            @endif
                                             @if($entry->status)
                                                 · {{ $entry->statusLabel() }}
                                             @endif

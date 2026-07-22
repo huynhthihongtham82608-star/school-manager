@@ -539,6 +539,47 @@ class MessageController extends Controller
                 ->get();
         }
 
+        if ($user->isStudent() && $user->student) {
+            $class = $user->student->classRoom;
+            $teacherIds = TeachingAssignment::query()
+                ->where('class_id', $user->student->class_id)
+                ->where('status', TeachingAssignment::STATUS_ACTIVE)
+                ->pluck('teacher_id')
+                ->merge($class?->homeroom_teacher_id ? [$class->homeroom_teacher_id] : [])
+                ->filter()
+                ->unique()
+                ->values();
+
+            return $query
+                ->where('role', 'teacher')
+                ->whereHas('teacher', fn (Builder $teacherQuery) => $teacherQuery->whereIn('id', $teacherIds))
+                ->get();
+        }
+
+        if ($user->isParent() && $user->parentProfile) {
+            $children = $user->parentProfile->students()
+                ->with('classRoom')
+                ->orderBy('student_code')
+                ->get();
+            $student = $children->firstWhere('id', session('selected_parent_student_id')) ?: $children->first();
+            $class = $student?->classRoom;
+            $teacherIds = $student
+                ? TeachingAssignment::query()
+                    ->where('class_id', $student->class_id)
+                    ->where('status', TeachingAssignment::STATUS_ACTIVE)
+                    ->pluck('teacher_id')
+                    ->merge($class?->homeroom_teacher_id ? [$class->homeroom_teacher_id] : [])
+                    ->filter()
+                    ->unique()
+                    ->values()
+                : collect();
+
+            return $query
+                ->where('role', 'teacher')
+                ->whereHas('teacher', fn (Builder $teacherQuery) => $teacherQuery->whereIn('id', $teacherIds))
+                ->get();
+        }
+
         return $query->whereIn('role', ['admin', 'staff', 'teacher'])->get();
     }
 

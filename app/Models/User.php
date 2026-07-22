@@ -16,12 +16,16 @@ class User extends Authenticatable
 
     protected $fillable = [
         'username',
+        'full_name',
+        'email',
+        'phone',
         'role',
         'teacher_id',
         'student_id',
         'parent_id',
         'password_hash',
         'is_active',
+        'is_super_admin',
         'force_change_password',
     ];
 
@@ -33,6 +37,7 @@ class User extends Authenticatable
     {
         return [
             'is_active' => 'boolean',
+            'is_super_admin' => 'boolean',
             'force_change_password' => 'boolean',
         ];
     }
@@ -57,8 +62,19 @@ class User extends Authenticatable
         return $this->belongsTo(ParentProfile::class, 'parent_id');
     }
 
+    public function rbacRoles()
+    {
+        return $this->belongsToMany(RbacRole::class, 'rbac_role_user', 'user_id', 'role_id')
+            ->with('permissions')
+            ->withTimestamps();
+    }
+
     public function getDisplayNameAttribute(): string
     {
+        if (trim((string) $this->full_name) !== '') {
+            return $this->full_name;
+        }
+
         if ($this->teacher) {
             return $this->teacher->name;
         }
@@ -74,6 +90,11 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return in_array($this->role, ['admin', 'staff'], true);
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return (bool) $this->is_super_admin || ($this->role === 'admin' && $this->username === 'admin');
     }
 
     public function isStaff(): bool
@@ -99,5 +120,56 @@ class User extends Authenticatable
     public function isParent(): bool
     {
         return $this->role === 'parent';
+    }
+
+    public function hasPermission(string $permission): bool
+    {
+        if (! $this->is_active) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin() || $this->role === 'admin') {
+            return true;
+        }
+
+        if (! in_array($this->role, ['staff'], true)) {
+            return false;
+        }
+
+        if (! \Illuminate\Support\Facades\Schema::hasTable('rbac_roles') || ! \Illuminate\Support\Facades\Schema::hasTable('rbac_role_user')) {
+            return true;
+        }
+
+        $roles = $this->relationLoaded('rbacRoles')
+            ? $this->rbacRoles
+            : $this->rbacRoles()->get();
+
+        $permissionKeys = $roles
+            ->filter(fn (RbacRole $role) => $role->is_active)
+            ->flatMap(fn (RbacRole $role) => $role->permissions)
+            ->pluck('key')
+            ->unique()
+            ->values();
+
+        if ($permissionKeys->contains($permission)) {
+            return true;
+        }
+
+        if (str_ends_with($permission, '.view')) {
+            return $permissionKeys->contains(str_replace('.view', '.manage', $permission));
+        }
+
+        return false;
+    }
+
+    public function hasAnyPermission(array $permissions): bool
+    {
+        foreach ($permissions as $permission) {
+            if ($this->hasPermission($permission)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -2,21 +2,27 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Rbac\PermissionCatalog;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureRole
 {
-    /**
-     * Handle an incoming request.
-     */
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
         $user = $request->user();
 
-        if (!$user || ! $this->matchesAnyRole($user, $roles)) {
-            abort(403, 'Bạn không có quyền truy cập');
+        if (! $user || ! $this->matchesAnyRole($user, $roles)) {
+            abort(403, 'Bạn không có quyền truy cập.');
+        }
+
+        if ($user->role === 'staff' && in_array('staff', $roles, true)) {
+            $permission = PermissionCatalog::routePermission($request->route()?->getName());
+
+            if ($permission && ! $user->hasPermission($permission)) {
+                abort(403, 'Bạn không có quyền thực hiện chức năng này.');
+            }
         }
 
         return $next($request);

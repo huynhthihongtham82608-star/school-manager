@@ -2,7 +2,15 @@
 @section('title', 'Hộp thư đến')
 
 @section('content')
-@include('messages._nav')
+<x-page-header
+    title="Hộp thư điện tử"
+    subtitle="Kênh tương tác, trao đổi thông tin chính thống giữa Nhà trường, Giáo viên và Phụ huynh học sinh."
+>
+    <a class="btn btn-primary" href="{{ route('messages.create') }}">
+        <i class="bi bi-pencil-square me-1"></i>Soạn tin nhắn mới
+    </a>
+</x-page-header>
+
 @include('messages._filters', ['action' => route('messages.inbox'), 'filters' => $filters, 'showStatus' => true])
 
 <div class="card">

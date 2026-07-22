@@ -2,12 +2,10 @@
 @section('title', 'Khóa nhập điểm')
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Cấu hình cửa sổ nhập điểm</h5>
-        <div class="text-muted">Mở/khóa theo lớp - môn - học kỳ.</div>
-    </div>
-</div>
+<x-page-header
+    title="Cấu hình cửa sổ nhập điểm"
+    subtitle="Thiết lập trạng thái mở hoặc khóa nhập điểm theo lớp, môn học, học kỳ và năm học."
+/>
 
 <div class="card mb-4">
     <div class="card-body">

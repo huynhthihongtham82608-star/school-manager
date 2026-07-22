@@ -7,11 +7,10 @@
     $statusFilters = ['all' => 'Tất cả trạng thái'] + \App\Models\TeachingAssignment::STATUSES;
 @endphp
 
-<div class="page-heading">
-    <div>
-        <h5>Phân công giảng dạy</h5>
-        <div class="text-muted">Phân công giáo viên theo năm học và học kỳ đang làm việc.</div>
-    </div>
+<x-page-header
+    title="Phân công giảng dạy"
+    subtitle="Liên kết giáo viên, môn học và lớp học theo năm học đang làm việc để phục vụ thời khóa biểu và nhập điểm."
+>
     <div class="d-flex align-items-center gap-2">
         @unless($readOnly)
             <a class="btn btn-primary" href="{{ route('assignments.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm phân công</a>
@@ -41,6 +40,15 @@
                         </select>
                     </div>
                     <div>
+                        <label class="form-label small">Tổ chuyên môn</label>
+                        <select name="department_id" class="form-select">
+                            <option value="all">Tất cả tổ</option>
+                            @foreach($departments as $department)
+                                <option value="{{ $department->id }}" @selected($filters['department_id'] === $department->id)>{{ $department->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
                         <label class="form-label small">Vai trò</label>
                         <select name="role" class="form-select">
                             @foreach($roleFilters as $value => $label)
@@ -64,7 +72,7 @@
             </div>
         </div>
     </div>
-</div>
+</x-page-header>
 
 <div class="card">
     <div class="table-responsive">
@@ -81,11 +89,22 @@
             </thead>
             <tbody>
             @forelse($assignments as $assignment)
-                @php($deleteCheck = $deleteChecks[(string) $assignment->getKey()] ?? ['allowed' => false, 'message' => null])
+                @php
+                    $deleteCheck = $deleteChecks[(string) $assignment->getKey()] ?? ['allowed' => false, 'message' => null];
+                    $subjectDepartments = $assignment->subject?->departments ?? collect();
+                    $teacherDepartmentId = $assignment->teacher?->department_id;
+                    $teacherOutsideDepartment = $subjectDepartments->isNotEmpty()
+                        && $teacherDepartmentId
+                        && ! $subjectDepartments->pluck('id')->contains($teacherDepartmentId);
+                @endphp
                 <tr>
                     <td>
                         <div class="fw-semibold">{{ $assignment->teacher->name ?? '-' }}</div>
-                        <div class="text-muted small">{{ $assignment->teacher->teacher_code ?? '-' }} · {{ $assignment->teacher?->primarySubjectName() ?? ($assignment->subject->name ?? '-') }}</div>
+                        <div class="text-muted small">{{ $assignment->teacher->teacher_code ?? '-' }} · {{ $assignment->subject->name ?? '-' }}</div>
+                        <div class="text-muted small">Tổ: {{ $assignment->teacher?->department?->name ?? 'Chưa phân tổ' }}</div>
+                        @if($teacherOutsideDepartment)
+                            <div class="small text-warning">Giáo viên này không thuộc tổ phụ trách môn học.</div>
+                        @endif
                     </td>
                     <td class="fw-semibold">{{ $assignment->classRoom->name ?? '-' }}</td>
                     <td>

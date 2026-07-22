@@ -10,6 +10,18 @@ class Conduct extends Model
 {
     use HasFactory, UsesUuid;
 
+    public const LEVEL_GOOD = 'excellent';
+    public const LEVEL_FAIR = 'good';
+    public const LEVEL_PASS = 'average';
+    public const LEVEL_NOT_PASS = 'weak';
+
+    public const LEVELS = [
+        self::LEVEL_GOOD => 'Tốt',
+        self::LEVEL_FAIR => 'Khá',
+        self::LEVEL_PASS => 'Đạt',
+        self::LEVEL_NOT_PASS => 'Chưa đạt',
+    ];
+
     protected $fillable = [
         'student_id',
         'class_id',
@@ -37,5 +49,10 @@ class Conduct extends Model
     public function schoolYear()
     {
         return $this->belongsTo(SchoolYear::class);
+    }
+
+    public function levelLabel(): string
+    {
+        return self::LEVELS[$this->conduct_level] ?? '-';
     }
 }

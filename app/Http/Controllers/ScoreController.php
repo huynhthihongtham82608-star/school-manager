@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ExamSchedule;
 use App\Models\SchoolClass;
 use App\Models\SchoolYear;
+use App\Models\ScoreColumn;
 use App\Models\ScoreDetail;
 use App\Models\ScoreHeader;
 use App\Models\Semester;
@@ -14,16 +14,12 @@ use App\Models\TeachingAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ScoreController extends Controller
 {
-    private const SCORE_TYPES = [
-        'oral' => ['label' => 'Miệng', 'weight' => 1, 'kind' => 'regular'],
-        'quiz' => ['label' => '15 phút', 'weight' => 1, 'kind' => 'regular'],
-        'test' => ['label' => 'Một tiết', 'weight' => 2, 'kind' => 'regular'],
-        'midterm' => ['label' => 'Giữa kỳ', 'weight' => 2, 'kind' => 'scheduled', 'exam_type' => ExamSchedule::TYPE_MIDTERM],
-        'final' => ['label' => 'Cuối kỳ', 'weight' => 3, 'kind' => 'scheduled', 'exam_type' => ExamSchedule::TYPE_FINAL_TEST],
-    ];
+    private const SCORE_PATTERN = '/^(10(\.0)?|[0-9](\.[0-9])?)$/';
 
     public function index(Request $request)
     {
@@ -37,10 +33,19 @@ class ScoreController extends Controller
         $student = null;
         $studentScores = collect();
 
-        if ($user->isStudent()) {
-            $student = $user->student?->load('classRoom');
+        if ($user->isStudent() || $user->isParent()) {
+            if ($user->isStudent()) {
+                $student = $user->student?->load('classRoom');
+            } elseif ($user->parentProfile) {
+                $children = $user->parentProfile->students()
+                    ->with('classRoom')
+                    ->orderBy('student_code')
+                    ->get();
+                $student = $children->firstWhere('id', session('selected_parent_student_id')) ?: $children->first();
+            }
+
             if ($student) {
-                $studentScores = ScoreHeader::with(['subject', 'semester.schoolYear', 'details'])
+                $studentScores = ScoreHeader::with(['subject', 'semester.schoolYear', 'details.scoreColumn'])
                     ->where('student_id', $student->id)
                     ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
                     ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
@@ -49,7 +54,7 @@ class ScoreController extends Controller
                     ->values();
             }
 
-            $detailLabels = collect(self::SCORE_TYPES)->mapWithKeys(fn ($meta, $type) => [$type => $meta['label']])->all();
+            $detailLabels = $this->detailLabels();
 
             return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'selectedYearId', 'selectedSemesterId', 'student', 'studentScores', 'detailLabels'));
         }
@@ -84,17 +89,22 @@ class ScoreController extends Controller
         $this->ensureScorableSubject($subject);
         $this->authorizeScoreView($class, $subject->id, $semester);
 
-        $students = Student::where('class_id', $class->id)->orderBy('student_code')->get();
+        $students = Student::where('class_id', $class->id)
+            ->where('status', Student::STATUS_STUDYING)
+            ->orderBy('student_code')
+            ->get();
+        $scoreColumns = $this->scoreColumnsFor($class, $subject, $semester);
         $headers = ScoreHeader::where('subject_id', $subject->id)
             ->where('semester_id', $semester->id)
             ->whereIn('student_id', $students->pluck('id'))
-            ->with('details.examSchedule')
+            ->with(['details.scoreColumn'])
             ->get()
             ->keyBy('student_id');
-        $scoreTypes = $this->scoreTypePermissions($class, $subject, $semester);
-        $canSubmitScores = collect($scoreTypes)->contains(fn ($meta) => $meta['editable']);
 
-        return view('scores.entry', compact('class', 'subject', 'semester', 'students', 'headers', 'scoreTypes', 'canSubmitScores'));
+        $columnPermissions = $this->scoreColumnPermissions($class, $subject, $semester, $scoreColumns);
+        $canSubmitScores = collect($columnPermissions)->contains(fn ($meta) => $meta['editable']);
+
+        return view('scores.entry', compact('class', 'subject', 'semester', 'students', 'headers', 'scoreColumns', 'columnPermissions', 'canSubmitScores'));
     }
 
     public function store(Request $request)
@@ -104,7 +114,6 @@ class ScoreController extends Controller
             'subject_id' => 'required|exists:subjects,id',
             'semester_id' => 'required|exists:semesters,id',
             'scores' => 'array',
-            'score_names' => 'array',
         ]);
 
         $class = SchoolClass::findOrFail($data['class_id']);
@@ -113,60 +122,79 @@ class ScoreController extends Controller
         $this->ensureScorableSubject($subject);
         $this->authorizeScoreEdit($class, $subject->id, $semester);
 
-        $scoreTypes = $this->scoreTypePermissions($class, $subject, $semester);
-        $editableTypes = collect($scoreTypes)
-            ->filter(fn ($meta) => $meta['editable'])
-            ->keys();
+        $scoreColumns = $this->scoreColumnsFor($class, $subject, $semester);
+        $columnPermissions = $this->scoreColumnPermissions($class, $subject, $semester, $scoreColumns);
+        $editableColumns = $scoreColumns->filter(fn (ScoreColumn $column) => $columnPermissions[$column->id]['editable'] ?? false);
 
-        if ($editableTypes->isEmpty()) {
-            abort(403, 'Hiện không có cột điểm nào đang được mở để nhập hoặc chỉnh sửa.');
+        if ($editableColumns->isEmpty()) {
+            abort(403, 'Hiện không có cột điểm nào đang mở để nhập hoặc chỉnh sửa.');
         }
 
-        $students = Student::where('class_id', $class->id)->get();
-        foreach ($students as $student) {
-            $inputs = $request->input("scores.{$student->id}", []);
-            $header = ScoreHeader::firstOrCreate([
-                'student_id' => $student->id,
-                'subject_id' => $subject->id,
-                'semester_id' => $semester->id,
-                'school_year_id' => $semester->school_year_id,
-            ]);
+        $students = Student::where('class_id', $class->id)
+            ->where('status', Student::STATUS_STUDYING)
+            ->get()
+            ->keyBy('id');
+        $normalizedScores = [];
+        $errors = [];
 
-            $header->details()->whereIn('type', $editableTypes->all())->delete();
+        foreach ($editableColumns as $column) {
+            foreach ($students as $student) {
+                $field = "scores.{$column->id}.{$student->id}";
+                $value = trim((string) $request->input($field, ''));
 
-            foreach ($editableTypes as $type) {
-                $meta = $scoreTypes[$type];
-                $values = $this->parseScores($inputs[$type] ?? '');
-                $scoreName = trim((string) $request->input("score_names.{$type}", ''));
-                $scoreName = $scoreName !== '' ? $scoreName : ($meta['schedule']?->displayName());
+                if ($value === '') {
+                    $normalizedScores[$column->id][$student->id] = null;
+                    continue;
+                }
 
-                foreach ($values as $value) {
+                if (! preg_match(self::SCORE_PATTERN, $value)) {
+                    $errors[$field] = 'Điểm phải là số từ 0 đến 10 và tối đa 1 chữ số thập phân.';
+                    continue;
+                }
+
+                $normalizedScores[$column->id][$student->id] = round((float) $value, 1);
+            }
+        }
+
+        if ($errors) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        DB::transaction(function () use ($students, $editableColumns, $semester, $subject, $normalizedScores) {
+            foreach ($students as $student) {
+                $header = ScoreHeader::firstOrCreate([
+                    'student_id' => $student->id,
+                    'subject_id' => $subject->id,
+                    'semester_id' => $semester->id,
+                    'school_year_id' => $semester->school_year_id,
+                ]);
+
+                foreach ($editableColumns as $column) {
+                    $value = $normalizedScores[$column->id][$student->id] ?? null;
+
+                    $header->details()
+                        ->where('score_column_id', $column->id)
+                        ->delete();
+
+                    if ($value === null) {
+                        continue;
+                    }
+
                     ScoreDetail::create([
                         'score_header_id' => $header->id,
-                        'exam_schedule_id' => $meta['schedule']?->id,
-                        'type' => $type,
-                        'name' => $scoreName,
+                        'score_column_id' => $column->id,
+                        'type' => $column->type,
+                        'name' => $column->name,
                         'value' => $value,
-                        'weight_group' => $meta['weight'],
+                        'weight_group' => $column->weight_group,
                     ]);
                 }
-            }
 
-            $this->recalculateAverage($header);
-        }
+                $this->recalculateAverage($header);
+            }
+        });
 
         return back()->with('success', 'Đã lưu điểm cho lớp.');
-    }
-
-    protected function parseScores(string $input): array
-    {
-        return collect(explode(',', $input))
-            ->map(fn ($v) => trim($v))
-            ->filter(fn ($v) => $v !== '' && is_numeric($v))
-            ->map(fn ($v) => (float) $v)
-            ->filter(fn ($v) => $v >= 0 && $v <= 10)
-            ->values()
-            ->all();
     }
 
     private function recalculateAverage(ScoreHeader $header): void
@@ -283,50 +311,37 @@ class ScoreController extends Controller
             ->exists();
     }
 
-    private function scoreTypePermissions(SchoolClass $class, Subject $subject, Semester $semester): array
+    private function scoreColumnsFor(SchoolClass $class, Subject $subject, Semester $semester): Collection
+    {
+        return ScoreColumn::where('school_year_id', $semester->school_year_id)
+            ->where('subject_id', $subject->id)
+            ->where('grade_level', (int) $class->grade_level)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function scoreColumnPermissions(SchoolClass $class, Subject $subject, Semester $semester, Collection $scoreColumns): array
     {
         $canTeacherEdit = Auth::user()->isTeacher()
             && $this->isAssignedSubjectTeacher($class, $subject->id, $semester)
             && $semester->isActive()
             && ! $this->isHistoricalReadOnly();
 
-        return collect(self::SCORE_TYPES)->mapWithKeys(function (array $meta, string $type) use ($class, $subject, $semester, $canTeacherEdit) {
-            $schedule = null;
-            $editable = false;
-            $reason = null;
+        return $scoreColumns->mapWithKeys(function (ScoreColumn $column) use ($canTeacherEdit) {
+            $editable = $canTeacherEdit && $column->isInputOpen();
+            $reason = match (true) {
+                ! $canTeacherEdit => 'Chỉ giáo viên bộ môn được phân công mới được nhập điểm.',
+                $column->isInputOpen() => 'Đang mở nhập điểm.',
+                default => $column->inputStatusLabel(),
+            };
 
-            if ($meta['kind'] === 'regular') {
-                $editable = $canTeacherEdit;
-                $reason = $editable ? 'Giáo viên bộ môn được nhập trực tiếp.' : 'Chỉ giáo viên bộ môn được nhập điểm thường xuyên.';
-            } else {
-                $schedule = $this->scoreScheduleFor($class, $subject, $semester, $meta['exam_type']);
-                $editable = $canTeacherEdit && $schedule?->isScoreInputOpen();
-                $reason = match (true) {
-                    ! $schedule => 'Admin chưa tạo kỳ kiểm tra hoặc chưa mở nhập điểm.',
-                    $schedule->isScoreInputOpen() => 'Đang mở nhập điểm.',
-                    default => $schedule->scoreInputStatusLabel(),
-                };
-            }
-
-            return [$type => [
-                ...$meta,
+            return [$column->id => [
                 'editable' => $editable,
-                'schedule' => $schedule,
                 'reason' => $reason,
             ]];
         })->all();
-    }
-
-    private function scoreScheduleFor(SchoolClass $class, Subject $subject, Semester $semester, string $examType): ?ExamSchedule
-    {
-        return ExamSchedule::where('class_id', $class->id)
-            ->where('subject_id', $subject->id)
-            ->where('semester_id', $semester->id)
-            ->where('type', $examType)
-            ->where('note', 'not like', '%"status":"canceled"%')
-            ->orderByDesc('score_input_closes_at')
-            ->orderByDesc('exam_date')
-            ->first();
     }
 
     protected function ensureScorableSubject(Subject $subject): void
@@ -334,5 +349,19 @@ class ScoreController extends Controller
         if (! $subject->isScorable()) {
             abort(403, 'Môn học này chỉ dùng trong thời khóa biểu, không nhập điểm và không tính điểm trung bình.');
         }
+    }
+
+    private function detailLabels(): array
+    {
+        return [
+            ScoreColumn::TYPE_REGULAR => ScoreColumn::TYPES[ScoreColumn::TYPE_REGULAR],
+            ScoreColumn::TYPE_MIDTERM => ScoreColumn::TYPES[ScoreColumn::TYPE_MIDTERM],
+            ScoreColumn::TYPE_FINAL => ScoreColumn::TYPES[ScoreColumn::TYPE_FINAL],
+            'oral' => 'Đánh giá thường xuyên',
+            'quiz' => 'Đánh giá thường xuyên',
+            'test' => 'Đánh giá thường xuyên',
+            'midterm' => 'Đánh giá giữa kỳ',
+            'final' => 'Đánh giá cuối kỳ',
+        ];
     }
 }

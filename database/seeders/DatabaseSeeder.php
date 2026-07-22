@@ -12,6 +12,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\Teacher;
+use App\Models\TeacherDepartment;
 use App\Models\TeachingAssignment;
 use App\Models\User;
 use App\Models\ParentProfile;
@@ -42,15 +43,34 @@ class DatabaseSeeder extends Seeder
         $van = Subject::updateOrCreate(['name' => 'Ngu van'], ['code' => 'MH002', 'credit' => 1, 'type' => Subject::TYPE_REQUIRED, 'status' => Subject::STATUS_ACTIVE, 'is_weighted' => 0]);
         $anh = Subject::updateOrCreate(['name' => 'Tieng Anh'], ['code' => 'MH003', 'credit' => 1, 'type' => Subject::TYPE_REQUIRED, 'status' => Subject::STATUS_ACTIVE, 'is_weighted' => 0]);
 
+        $departmentToan = TeacherDepartment::updateOrCreate(
+            ['code' => 'TOAN'],
+            ['name' => 'Tổ Toán', 'description' => 'Tổ chuyên môn phụ trách môn Toán.', 'status' => TeacherDepartment::STATUS_ACTIVE]
+        );
+        $departmentVan = TeacherDepartment::updateOrCreate(
+            ['code' => 'NGUVAN'],
+            ['name' => 'Tổ Ngữ văn', 'description' => 'Tổ chuyên môn phụ trách môn Ngữ văn.', 'status' => TeacherDepartment::STATUS_ACTIVE]
+        );
+        $departmentAnh = TeacherDepartment::updateOrCreate(
+            ['code' => 'TIENGANH'],
+            ['name' => 'Tổ Tiếng Anh', 'description' => 'Tổ chuyên môn phụ trách môn Tiếng Anh.', 'status' => TeacherDepartment::STATUS_ACTIVE]
+        );
+        $departmentToan->subjects()->syncWithoutDetaching([$toan->id]);
+        $departmentVan->subjects()->syncWithoutDetaching([$van->id]);
+        $departmentAnh->subjects()->syncWithoutDetaching([$anh->id]);
+
         // Teachers
         $teacherToan = Teacher::updateOrCreate(
             ['teacher_code' => 'GV001'],
-            ['name' => 'Nguyen Van Toan', 'phone' => '0901234567', 'email' => 'gvtoan@example.com', 'qualification' => 'DH', 'main_subject' => $toan->name, 'primary_subject_id' => $toan->id, 'is_homeroom' => 0]
+            ['name' => 'Nguyen Van Toan', 'phone' => '0901234567', 'email' => 'gvtoan@example.com', 'qualification' => 'DH', 'main_subject' => $toan->name, 'primary_subject_id' => $toan->id, 'department_id' => $departmentToan->id, 'is_homeroom' => 0]
         );
         $teacherGvcn = Teacher::updateOrCreate(
             ['teacher_code' => 'GV002'],
-            ['name' => 'Tran Thi Chu Nhiem', 'phone' => '0908888888', 'email' => 'gvcn@example.com', 'qualification' => 'DH', 'main_subject' => $van->name, 'primary_subject_id' => $van->id, 'is_homeroom' => 1]
+            ['name' => 'Tran Thi Chu Nhiem', 'phone' => '0908888888', 'email' => 'gvcn@example.com', 'qualification' => 'DH', 'main_subject' => $van->name, 'primary_subject_id' => $van->id, 'department_id' => $departmentVan->id, 'is_homeroom' => 1]
         );
+
+        $departmentToan->update(['leader_teacher_id' => $teacherToan->id]);
+        $departmentVan->update(['leader_teacher_id' => $teacherGvcn->id]);
 
         // Classes
         $class10a1 = SchoolClass::updateOrCreate(

@@ -28,6 +28,7 @@ class Teacher extends Model
         'qualification',
         'main_subject',
         'primary_subject_id',
+        'department_id',
         'is_homeroom',
     ];
 
@@ -66,6 +67,16 @@ class Teacher extends Model
     public function primarySubject()
     {
         return $this->belongsTo(Subject::class, 'primary_subject_id');
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(TeacherDepartment::class, 'department_id');
+    }
+
+    public function leadingDepartment()
+    {
+        return $this->hasOne(TeacherDepartment::class, 'leader_teacher_id');
     }
 
     public function primarySubjectName(): string

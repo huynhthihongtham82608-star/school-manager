@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Subject;
 use App\Models\Teacher;
+use App\Models\TeacherDepartment;
 use App\Models\User;
 use App\Services\AdminProtectionService;
 use App\Support\AuditLogger;
@@ -17,25 +18,44 @@ class TeacherController extends Controller
     public function index(Request $request)
     {
         $selectedYearId = $this->selectedSchoolYearId($request);
+        $filters = [
+            'q' => trim((string) $request->query('q')),
+            'department_id' => $request->query('department_id', 'all'),
+        ];
         $teachers = Teacher::with([
             'user',
             'primarySubject',
+            'department',
             'assignments.classRoom',
             'assignments.subject',
             'assignments.schoolYear',
             'assignments.semester',
             'homeroomClasses.schoolYear',
         ])
+            ->when($filters['q'] !== '', function ($query) use ($filters) {
+                $keyword = $filters['q'];
+                $query->where(function ($inner) use ($keyword) {
+                    $inner->where('teacher_code', 'like', '%' . $keyword . '%')
+                        ->orWhere('name', 'like', '%' . $keyword . '%')
+                        ->orWhere('phone', 'like', '%' . $keyword . '%')
+                        ->orWhere('email', 'like', '%' . $keyword . '%')
+                        ->orWhereHas('primarySubject', fn ($subject) => $subject->where('name', 'like', '%' . $keyword . '%'))
+                        ->orWhereHas('department', fn ($department) => $department->where('name', 'like', '%' . $keyword . '%'));
+                });
+            })
+            ->when($filters['department_id'] !== 'all', fn ($query) => $query->where('department_id', $filters['department_id']))
             ->orderBy('name')
             ->get();
+        $departments = TeacherDepartment::orderBy('name')->get();
 
-        return view('teachers.index', compact('teachers', 'selectedYearId'));
+        return view('teachers.index', compact('teachers', 'selectedYearId', 'departments', 'filters'));
     }
 
     public function create()
     {
         return view('teachers.create', [
             'subjects' => Subject::where('status', Subject::STATUS_ACTIVE)->orderBy('name')->get(),
+            'departments' => TeacherDepartment::where('status', TeacherDepartment::STATUS_ACTIVE)->orderBy('name')->get(),
         ]);
     }
 
@@ -64,9 +84,13 @@ class TeacherController extends Controller
     public function edit(Teacher $teacher)
     {
         return view('teachers.edit', [
-            'teacher' => $teacher->load('primarySubject'),
+            'teacher' => $teacher->load(['primarySubject', 'department']),
             'subjects' => Subject::where('status', Subject::STATUS_ACTIVE)
                 ->orWhere('id', $teacher->primary_subject_id)
+                ->orderBy('name')
+                ->get(),
+            'departments' => TeacherDepartment::where('status', TeacherDepartment::STATUS_ACTIVE)
+                ->orWhere('id', $teacher->department_id)
                 ->orderBy('name')
                 ->get(),
         ]);
@@ -76,6 +100,12 @@ class TeacherController extends Controller
     {
         $data = $this->validatedData($request, $teacher);
         $teacherData = $this->teacherPayload($data, $request);
+
+        if ($teacher->leadingDepartment && (string) $teacher->department_id !== (string) ($teacherData['department_id'] ?? null)) {
+            return back()
+                ->withInput()
+                ->withErrors(['department_id' => 'Giáo viên này đang là tổ trưởng. Vui lòng chọn tổ trưởng mới trước khi chuyển giáo viên sang tổ khác.']);
+        }
 
         $teacher->update($teacherData);
 
@@ -174,6 +204,7 @@ class TeacherController extends Controller
             'work_status' => ['required', Rule::in(array_keys(Teacher::workStatuses()))],
             'qualification' => ['nullable', 'string', 'max:255'],
             'primary_subject_id' => ['required', 'exists:subjects,id'],
+            'department_id' => ['nullable', 'exists:teacher_departments,id'],
         ]);
     }
 
@@ -195,6 +226,7 @@ class TeacherController extends Controller
             'work_status' => $data['work_status'] ?? Teacher::STATUS_WORKING,
             'qualification' => $data['qualification'] ?? null,
             'primary_subject_id' => $data['primary_subject_id'] ?? null,
+            'department_id' => $data['department_id'] ?? null,
             'main_subject' => $subject?->name,
         ];
     }

@@ -2,18 +2,17 @@
 @section('title', 'Sao lưu & Khôi phục dữ liệu')
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Sao lưu & Khôi phục dữ liệu</h5>
-        <div class="text-muted">Tạo và tải bản sao lưu database. Chức năng khôi phục đang được khóa để bảo vệ dữ liệu.</div>
-    </div>
+<x-page-header
+    title="Sao lưu & Khôi phục dữ liệu"
+    subtitle="Tạo và tải bản sao lưu database. Chức năng khôi phục đang được khóa để bảo vệ dữ liệu."
+>
     <form method="POST" action="{{ route('system.backups.store') }}">
         @csrf
         <button class="btn btn-primary" onclick="return confirm('Tạo bản sao lưu database hiện tại?')">
             <i class="bi bi-database-add me-2"></i>Tạo bản sao lưu
         </button>
     </form>
-</div>
+</x-page-header>
 
 <div class="card">
     <div class="table-responsive">

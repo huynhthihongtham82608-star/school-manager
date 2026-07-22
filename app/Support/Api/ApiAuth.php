@@ -2,7 +2,9 @@
 
 namespace App\Support\Api;
 
+use App\Models\RbacPermission;
 use App\Models\User;
+use Illuminate\Support\Facades\Schema;
 
 class ApiAuth
 {
@@ -20,6 +22,7 @@ class ApiAuth
             'is_active' => $user->is_active,
             'force_change_password' => $user->force_change_password,
             'must_change_password' => $user->force_change_password,
+            'permissions' => self::permissionKeys($user),
         ];
     }
 
@@ -44,5 +47,31 @@ class ApiAuth
         }
 
         return false;
+    }
+
+    private static function permissionKeys(User $user): array
+    {
+        if (! Schema::hasTable('rbac_permissions')) {
+            return [];
+        }
+
+        if ($user->isSuperAdmin() || $user->role === 'admin') {
+            return RbacPermission::orderBy('key')->pluck('key')->all();
+        }
+
+        if ($user->role !== 'staff' || ! Schema::hasTable('rbac_role_user')) {
+            return [];
+        }
+
+        return $user->rbacRoles()
+            ->where('rbac_roles.is_active', true)
+            ->with('permissions')
+            ->get()
+            ->flatMap(fn ($role) => $role->permissions)
+            ->pluck('key')
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
     }
 }

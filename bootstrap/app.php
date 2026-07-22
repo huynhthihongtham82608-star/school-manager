@@ -12,13 +12,20 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [
+            \App\Http\Middleware\AutoAuditWriteRequests::class,
+        ]);
+
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureRole::class,
             'no-cache' => \App\Http\Middleware\NoCacheHeaders::class,
             'force-password-change' => \App\Http\Middleware\ForcePasswordChange::class,
             'history.readonly' => \App\Http\Middleware\ReadOnlyHistoricalSchoolYear::class,
+            'permission' => \App\Http\Middleware\EnsurePermission::class,
             'api.json' => \App\Http\Middleware\ForceJsonResponse::class,
             'api.role' => \App\Http\Middleware\EnsureApiRole::class,
+            'api.permission' => \App\Http\Middleware\EnsureApiPermission::class,
+            'score.assignment' => \App\Http\Middleware\EnsureScoreAssignmentAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

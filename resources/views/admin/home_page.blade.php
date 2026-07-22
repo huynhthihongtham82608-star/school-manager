@@ -7,18 +7,20 @@
     $about = $contents->get('about');
 @endphp
 
-<div class="page-heading">
-    <div>
-        <h5>Quản lý trang chủ</h5>
-        <div class="text-muted">Cập nhật Banner, Slider, nội dung chào mừng, giới thiệu trường, hình ảnh và nội dung hiển thị trên Landing Page.</div>
-    </div>
-</div>
+<x-page-header
+    title="Cấu hình nội dung hệ thống"
+    subtitle="Quản lý giao diện trang chủ, biên tập các bài viết tin tức, chỉnh sửa thư viện ảnh và thông tin hiển thị trên cổng thông tin nhà trường."
+>
+    <a class="btn btn-primary" href="#home-page-content">
+        <i class="bi bi-plus-lg me-1"></i>Viết bài mới
+    </a>
+</x-page-header>
 
 @unless($tablesReady)
     <div class="alert alert-warning">Chưa có bảng home_page_contents. Vui lòng import SQL tạo bảng trước khi lưu nội dung.</div>
 @endunless
 
-<div class="card">
+<div class="card" id="home-page-content">
     <div class="card-header">Nội dung Trang chủ</div>
     <div class="card-body">
         <form method="POST" action="{{ route('admin.home-page.content') }}" class="row g-3">

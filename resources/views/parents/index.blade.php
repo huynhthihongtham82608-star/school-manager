@@ -2,15 +2,19 @@
 @section('title', 'Phụ huynh')
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Phụ huynh</h5>
-        <div class="text-muted">Quản lý tài khoản phụ huynh và liên kết học sinh.</div>
+<x-page-header
+    title="Quản lý tài khoản phụ huynh"
+    subtitle="Giám sát danh sách tài khoản của cha mẹ, quản lý liên kết định danh giữa phụ huynh và học sinh."
+>
+    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+        <button type="button" class="btn btn-outline-primary" onclick="window.print()">
+            <i class="bi bi-bar-chart me-1"></i>Xuất file liên kết
+        </button>
+        <a class="btn btn-primary" href="{{ route('parents.create') }}">
+            <i class="bi bi-plus-lg me-1"></i>Thêm phụ huynh
+        </a>
     </div>
-    <a class="btn btn-primary" href="{{ route('parents.create') }}">
-        <i class="bi bi-plus-lg me-1"></i>Thêm phụ huynh
-    </a>
-</div>
+</x-page-header>
 
 <div class="card">
     <div class="table-responsive">
@@ -20,7 +24,6 @@
                     <th>Mã phụ huynh</th>
                     <th>Họ tên</th>
                     <th>Quan hệ</th>
-                    <th>Số điện thoại</th>
                     <th>Học sinh</th>
                     <th>Trạng thái</th>
                     <th></th>
@@ -43,7 +46,6 @@
                         <div class="text-muted small">{{ $parent->phone ?: 'Chưa cập nhật số điện thoại' }}</div>
                     </td>
                     <td>{{ $relations ?: '-' }}</td>
-                    <td>{{ $parent->phone ?: '-' }}</td>
                     <td>
                         @forelse($studentLabels as $label)
                             <div class="small">{{ $label }}</div>
@@ -98,7 +100,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7"><div class="empty-state"><i class="bi bi-people"></i>Chưa có phụ huynh.</div></td>
+                    <td colspan="6"><div class="empty-state"><i class="bi bi-people"></i>Chưa có phụ huynh.</div></td>
                 </tr>
             @endforelse
             </tbody>

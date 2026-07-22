@@ -4,11 +4,10 @@
 @section('content')
 @php($statusFilters = ['all' => 'Tất cả'] + \App\Models\Subject::STATUSES)
 
-<div class="page-heading">
-    <div>
-        <h5>Môn học</h5>
-        <div class="text-muted">Quản lý dữ liệu nền môn học sử dụng xuyên suốt nhiều năm học.</div>
-    </div>
+<x-page-header
+    title="Quản lý môn học"
+    subtitle="Khai báo danh mục môn học chính khóa, chủ nhiệm, hoạt động và định mức tiết học theo khối."
+>
     <div class="d-flex align-items-center gap-2">
         @unless($readOnly)
             <a class="btn btn-primary" href="{{ route('subjects.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm môn</a>
@@ -33,7 +32,7 @@
             </ul>
         </div>
     </div>
-</div>
+</x-page-header>
 
 <div class="card">
     <div class="table-responsive">
@@ -44,6 +43,7 @@
                     <th>Tên môn</th>
                     <th>Hệ số môn</th>
                     <th>Loại môn</th>
+                    <th>Tổ phụ trách</th>
                     <th>Trạng thái</th>
                     <th></th>
                 </tr>
@@ -56,6 +56,13 @@
                     <td>{{ $subject->name }}</td>
                     <td>{{ $subject->credit }}</td>
                     <td>{{ $subject->typeLabel() }}</td>
+                    <td>
+                        @if($subject->isScorable())
+                            {{ $subject->departments->pluck('name')->join(', ') ?: 'Chưa phân tổ' }}
+                        @else
+                            <span class="text-muted">Không áp dụng</span>
+                        @endif
+                    </td>
                     <td><span class="badge {{ $subject->statusBadgeClass() }}">{{ $subject->statusLabel() }}</span></td>
                     <td class="text-end">
                         <div class="content-action-group justify-content-end">
@@ -98,7 +105,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6"><div class="empty-state"><i class="bi bi-book"></i>Chưa có môn học.</div></td>
+                    <td colspan="7"><div class="empty-state"><i class="bi bi-book"></i>Chưa có môn học.</div></td>
                 </tr>
             @endforelse
             </tbody>
@@ -118,25 +125,32 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="table-responsive">
-                        <table class="table mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Khối</th>
-                                    <th>Số tiết/tuần</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($gradeLevels as $gradeLevel)
-                                    @php($norm = $subject->periodNormForGrade($gradeLevel))
+                    @if($subject->requiresTeachingAssignment())
+                        <div class="table-responsive">
+                            <table class="table mb-0">
+                                <thead>
                                     <tr>
-                                        <td class="fw-semibold">Khối {{ $gradeLevel }}</td>
-                                        <td>{{ $norm?->periods_per_week ?? 'Chưa cấu hình' }}</td>
+                                        <th>Khối</th>
+                                        <th>Số tiết/tuần</th>
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    @foreach($gradeLevels as $gradeLevel)
+                                        @php($norm = $subject->periodNormForGrade($gradeLevel))
+                                        <tr>
+                                            <td class="fw-semibold">Khối {{ $gradeLevel }}</td>
+                                            <td>{{ $norm?->periods_per_week ?? 'Chưa cấu hình' }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="empty-state py-4">
+                            <i class="bi bi-calendar-event"></i>
+                            Môn {{ $subject->typeLabel() }} không áp dụng định mức tiết/tuần và không cần phân công giáo viên bộ môn.
+                        </div>
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>

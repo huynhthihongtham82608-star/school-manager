@@ -16,15 +16,14 @@
 @endphp
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Chi tiết học kỳ {{ $semester->normalizedName() }}</h5>
-        <div class="text-muted">Giao diện chỉ đọc, phục vụ kiểm tra thông tin và lịch sử thao tác.</div>
-    </div>
+<x-page-header
+    title="Chi tiết học kỳ {{ $semester->normalizedName() }}"
+    subtitle="Giao diện chỉ đọc, phục vụ kiểm tra thông tin và lịch sử thao tác."
+>
     <a href="{{ route('semesters.index', ['school_year_id' => $semester->school_year_id]) }}" class="btn btn-secondary">
         <i class="bi bi-arrow-left me-1"></i>Quay lại
     </a>
-</div>
+</x-page-header>
 
 <div class="row g-3">
     <div class="col-lg-5">

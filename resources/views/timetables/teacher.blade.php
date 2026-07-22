@@ -28,8 +28,8 @@
                     <td class="fw-semibold">{{ $dayMap[$entry->day_of_week] ?? $entry->day_of_week }}</td>
                     <td>{{ $entry->displayPeriod() }}</td>
                     <td>{{ $entry->timetable->classRoom->name ?? '' }}</td>
-                    <td>{{ $entry->assignment?->subject?->name ?? $entry->subject?->name ?? '' }}</td>
-                    <td>{{ $entry->displayRoom() ?? '-' }}</td>
+                    <td>{{ $entry->displaySubjectName() }}</td>
+                    <td>{{ $entry->displayRoomLabel() ?? '-' }}</td>
                     <td>{{ $entry->assignment?->roleLabel() ?? '-' }}</td>
                 </tr>
             @empty

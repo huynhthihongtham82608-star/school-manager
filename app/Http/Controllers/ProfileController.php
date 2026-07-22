@@ -22,11 +22,25 @@ class ProfileController extends Controller
 
         // Load role-specific data
         if ($user->isTeacher()) {
-            $data['teacher'] = $user->teacher?->load('primarySubject');
+            $data['teacher'] = $user->teacher?->load([
+                'primarySubject',
+                'assignments.classRoom',
+                'assignments.subject',
+                'assignments.semester',
+            ]);
+            $selectedYearId = $this->selectedSchoolYearId();
+            $selectedSemesterId = $this->selectedSemesterId();
+            $data['teachingAssignments'] = $data['teacher']
+                ? $data['teacher']->assignments
+                    ->when($selectedYearId, fn ($items) => $items->where('school_year_id', $selectedYearId))
+                    ->when($selectedSemesterId, fn ($items) => $items->where('semester_id', $selectedSemesterId))
+                    ->where('status', \App\Models\TeachingAssignment::STATUS_ACTIVE)
+                    ->values()
+                : collect();
         } elseif ($user->isStudent()) {
-            $data['student'] = $user->student;
+            $data['student'] = $user->student?->load('classRoom');
         } elseif ($user->isParent()) {
-            $data['parent'] = $user->parentProfile;
+            $data['parent'] = $user->parentProfile?->load(['students.classRoom']);
             if ($data['parent']) {
                 $data['children'] = $data['parent']->students;
             }
