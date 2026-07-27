@@ -97,6 +97,23 @@
         </div>
     </div>
 @else
+@php
+    $conductLabels = \App\Models\Conduct::LEVELS;
+    $conductBadgeClasses = [
+        'excellent' => 'conduct-level-badge excellent',
+        'good' => 'conduct-level-badge good',
+        'average' => 'conduct-level-badge average',
+        'weak' => 'conduct-level-badge weak',
+    ];
+    $conductSummaryMeta = [
+        'excellent' => ['icon' => 'bi-check-circle-fill', 'label' => $conductLabels['excellent'] ?? 'Tốt'],
+        'good' => ['icon' => 'bi-patch-check-fill', 'label' => $conductLabels['good'] ?? 'Khá'],
+        'average' => ['icon' => 'bi-dash-circle-fill', 'label' => $conductLabels['average'] ?? 'Đạt'],
+        'weak' => ['icon' => 'bi-exclamation-circle-fill', 'label' => $conductLabels['weak'] ?? 'Chưa đạt'],
+    ];
+    $conductCounts = collect(array_keys($conductSummaryMeta))
+        ->mapWithKeys(fn ($level) => [$level => $records->where('conduct_level', $level)->count()]);
+@endphp
 <x-page-header
     title="Nhập hạnh kiểm"
     subtitle="Chọn lớp và học kỳ để cập nhật xếp loại hạnh kiểm và nhận xét của giáo viên chủ nhiệm."
@@ -127,13 +144,23 @@
 </form>
 
 @if($selectedClass && $selectedSemester)
-    <form method="POST" action="{{ route('conduct.store') }}">
+    <div class="conduct-summary-bar mb-3">
+        @foreach($conductSummaryMeta as $level => $meta)
+            <div class="conduct-summary-card {{ $level }}">
+                <i class="bi {{ $meta['icon'] }}"></i>
+                <span>{{ $meta['label'] }}</span>
+                <strong>{{ $conductCounts[$level] ?? 0 }}</strong>
+            </div>
+        @endforeach
+    </div>
+
+    <form method="POST" action="{{ route('conduct.store') }}" data-conduct-form>
         @csrf
         <input type="hidden" name="class_id" value="{{ $selectedClass->id }}">
         <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
         <div class="card">
             <div class="table-responsive">
-                <table class="table">
+                <table class="table conduct-entry-table">
                     <thead>
                         <tr>
                             <th>Mã HS</th>
@@ -147,29 +174,45 @@
                         @php
                             $record = $records[$student->id] ?? null;
                             $selectedLevel = old("conduct.{$student->id}.conduct_level", $record?->conduct_level);
+                            $commentValue = old("conduct.{$student->id}.comment", $record?->comment);
                         @endphp
                         <tr>
                             <td class="fw-semibold">{{ $student->student_code }}</td>
                             <td>{{ $student->name }}</td>
                             <td>
-                                <select name="conduct[{{ $student->id }}][conduct_level]" class="form-select form-select-sm">
-                                    <option value="" @selected($selectedLevel === null || $selectedLevel === '')>Chưa xếp loại</option>
-                                    @foreach(\App\Models\Conduct::LEVELS as $k => $label)
-                                        <option value="{{ $k }}" @selected($selectedLevel === $k)>{{ $label }}</option>
-                                    @endforeach
-                                </select>
+                                @if($canEditConduct)
+                                    <select name="conduct[{{ $student->id }}][conduct_level]" class="form-select form-select-sm" data-conduct-level>
+                                        <option value="" @selected($selectedLevel === null || $selectedLevel === '')>Chưa xếp loại</option>
+                                        @foreach(\App\Models\Conduct::LEVELS as $k => $label)
+                                            <option value="{{ $k }}" @selected($selectedLevel === $k)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                @else
+                                    @if($selectedLevel)
+                                        <span class="{{ $conductBadgeClasses[$selectedLevel] ?? 'conduct-level-badge empty' }}">{{ $conductLabels[$selectedLevel] ?? $selectedLevel }}</span>
+                                    @else
+                                        <span class="conduct-readonly-text">Chưa xếp loại</span>
+                                    @endif
+                                @endif
                             </td>
                             <td>
-                                <input
-                                    type="text"
-                                    name="conduct[{{ $student->id }}][comment]"
-                                    class="form-control form-control-sm @error("conduct.{$student->id}.comment") is-invalid @enderror"
-                                    value="{{ old("conduct.{$student->id}.comment", $record?->comment) }}"
-                                    placeholder="Nhận xét bắt buộc nếu đã xếp loại"
-                                >
-                                @error("conduct.{$student->id}.comment")
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
+                                @if($canEditConduct)
+                                    <input
+                                        type="text"
+                                        name="conduct[{{ $student->id }}][comment]"
+                                        class="form-control form-control-sm conduct-note-input @error("conduct.{$student->id}.comment") is-invalid @enderror"
+                                        value="{{ $commentValue }}"
+                                        placeholder="Nhập nhận xét..."
+                                        data-conduct-comment
+                                    >
+                                @else
+                                    @if(trim((string) $commentValue) !== '')
+                                        <span class="conduct-comment-tooltip" tabindex="0" aria-label="{{ $commentValue }}" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-container="body" title="{{ $commentValue }}">
+                                            <i class="bi bi-journal-text"></i>
+                                            <span class="conduct-comment-bubble">{{ $commentValue }}</span>
+                                        </span>
+                                    @endif
+                                @endif
                             </td>
                         </tr>
                     @empty
@@ -182,9 +225,69 @@
             </div>
         </div>
         <div class="mt-3 text-end">
-            <button class="btn btn-primary">Lưu hạnh kiểm</button>
+            @if($canEditConduct)
+                <button class="btn btn-primary">Lưu hạnh kiểm</button>
+            @else
+                <span class="text-muted small">Bảng hạnh kiểm đang ở chế độ chỉ xem.</span>
+            @endif
         </div>
     </form>
 @endif
 @endif
+
+<script>
+    document.querySelectorAll('[data-conduct-form]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            let firstInvalid = null;
+
+            form.querySelectorAll('tbody tr').forEach((row) => {
+                const level = row.querySelector('[data-conduct-level]');
+                const comment = row.querySelector('[data-conduct-comment]');
+
+                if (!level || !comment) {
+                    return;
+                }
+
+                const isInvalid = level.value.trim() !== '' && comment.value.trim() === '';
+                comment.classList.toggle('is-invalid', isInvalid);
+
+                if (isInvalid && !firstInvalid) {
+                    firstInvalid = comment;
+                }
+            });
+
+            if (firstInvalid) {
+                event.preventDefault();
+                firstInvalid.focus();
+            }
+        });
+
+        form.querySelectorAll('[data-conduct-level], [data-conduct-comment]').forEach((field) => {
+            field.addEventListener('input', () => {
+                const row = field.closest('tr');
+                const level = row?.querySelector('[data-conduct-level]');
+                const comment = row?.querySelector('[data-conduct-comment]');
+
+                if (!level || !comment) {
+                    return;
+                }
+
+                if (level.value.trim() === '' || comment.value.trim() !== '') {
+                    comment.classList.remove('is-invalid');
+                }
+            });
+
+            field.addEventListener('change', () => field.dispatchEvent(new Event('input')));
+        });
+    });
+
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((element) => {
+        if (window.bootstrap?.Tooltip) {
+            new bootstrap.Tooltip(element, {
+                container: 'body',
+                boundary: document.body,
+            });
+        }
+    });
+</script>
 @endsection

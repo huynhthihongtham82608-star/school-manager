@@ -2,30 +2,35 @@
 @section('title', 'Thêm tổ chuyên môn')
 
 @section('content')
-<form method="POST" action="{{ route('departments.store') }}" class="card p-4 shadow-sm">
+<form method="POST" action="{{ route('departments.store') }}" class="card p-4 shadow-sm" data-academic-modal-size="2xl">
     @csrf
     <div class="row g-3">
-        <div class="col-md-3">
+        <div class="col-md-6">
             <label class="form-label">Mã tổ</label>
             <input type="text" name="code" class="form-control text-uppercase" value="{{ old('code') }}" placeholder="TOAN_TIN" required>
             @error('code')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-5">
+        <div class="col-md-6">
             <label class="form-label">Tên tổ</label>
             <input type="text" name="name" class="form-control" value="{{ old('name') }}" placeholder="Tổ Toán - Tin" required>
             @error('name')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-4">
+        <div class="col-md-6">
             <label class="form-label">Trạng thái</label>
-            <select name="status" class="form-select" required>
-                @foreach(\App\Models\TeacherDepartment::STATUSES as $value => $label)
-                    <option value="{{ $value }}" @selected(old('status', \App\Models\TeacherDepartment::STATUS_ACTIVE) === $value)>{{ $label }}</option>
-                @endforeach
-            </select>
+            <input type="hidden" name="status" value="{{ old('status', \App\Models\TeacherDepartment::STATUS_ACTIVE) }}">
+            <div>
+                <span class="academic-form-badge success"><i class="bi bi-check-circle"></i>Hoạt động</span>
+            </div>
             @error('status')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
 
-        <div class="col-md-8">
+        <div class="col-md-6">
+            <label class="form-label">Tổ trưởng</label>
+            <div class="form-control bg-light text-muted">Chọn tổ trưởng sau khi đã gán giáo viên vào tổ.</div>
+            @error('leader_teacher_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+        </div>
+
+        <div class="col-12">
             <label class="form-label">Môn phụ trách</label>
             <select class="form-select d-none" name="subject_ids[]" multiple data-multi-select-picker-select>
                 @foreach($subjects as $subject)
@@ -44,11 +49,6 @@
             @error('subject_ids.*')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
 
-        <div class="col-md-4">
-            <label class="form-label">Tổ trưởng</label>
-            <div class="form-control bg-light text-muted">Chọn tổ trưởng sau khi đã gán giáo viên vào tổ.</div>
-            @error('leader_teacher_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
         <div class="col-12">
             <label class="form-label">Mô tả</label>
             <textarea name="description" class="form-control" rows="3">{{ old('description') }}</textarea>

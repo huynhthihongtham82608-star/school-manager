@@ -84,7 +84,7 @@ class ScoreColumn extends Model
     public function inputStatusLabel(): string
     {
         if (! $this->is_active) {
-            return 'Ngưng sử dụng';
+            return 'Đã khóa nhập điểm';
         }
 
         if ($this->input_opens_at && now()->lt($this->input_opens_at->copy()->startOfDay())) {

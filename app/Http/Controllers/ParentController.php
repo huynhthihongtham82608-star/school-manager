@@ -20,15 +20,18 @@ class ParentController extends Controller
             ->orderBy('parent_code')
             ->orderBy('name')
             ->get();
+        $students = Student::with('classRoom')->orderBy('student_code')->get();
+        $nextParentCode = $this->generateParentCode();
 
-        return view('parents.index', compact('parents'));
+        return view('parents.index', compact('parents', 'students', 'nextParentCode'));
     }
 
     public function create()
     {
         $students = Student::with('classRoom')->orderBy('student_code')->get();
+        $nextParentCode = $this->generateParentCode();
 
-        return view('parents.create', compact('students'));
+        return view('parents.create', compact('students', 'nextParentCode'));
     }
 
     public function store(Request $request)

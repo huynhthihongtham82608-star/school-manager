@@ -10,6 +10,7 @@ use App\Models\ScoreHeader;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Subject;
+use App\Models\Teacher;
 use App\Models\TeachingAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -30,6 +31,7 @@ class ScoreController extends Controller
         $semesters = Semester::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->get();
         $subjects = $this->availableSubjectsFor($user, $selectedYearId, $selectedSemesterId);
         $classes = $this->availableClassesFor($user, $selectedYearId, $selectedSemesterId);
+        $teachers = collect();
         $student = null;
         $studentScores = collect();
 
@@ -60,6 +62,15 @@ class ScoreController extends Controller
         }
 
         $assignments = collect();
+        if ($user->isAdmin() || $user->isStaff()) {
+            $teachers = Teacher::orderBy('name')->get();
+            $assignments = TeachingAssignment::query()
+                ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
+                ->where('status', TeachingAssignment::STATUS_ACTIVE)
+                ->get(['teacher_id', 'class_id', 'subject_id', 'semester_id']);
+        }
+
         if ($user->isTeacher() && $user->teacher) {
             $assignments = $user->teacher->assignments()
                 ->with(['classRoom', 'subject', 'schoolYear', 'semester'])
@@ -72,7 +83,7 @@ class ScoreController extends Controller
                 ->get();
         }
 
-        return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'assignments', 'selectedYearId', 'selectedSemesterId'));
+        return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'teachers', 'assignments', 'selectedYearId', 'selectedSemesterId'));
     }
 
     public function entry(Request $request)
@@ -316,7 +327,6 @@ class ScoreController extends Controller
         return ScoreColumn::where('school_year_id', $semester->school_year_id)
             ->where('subject_id', $subject->id)
             ->where('grade_level', (int) $class->grade_level)
-            ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();

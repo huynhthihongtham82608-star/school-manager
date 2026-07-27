@@ -2,6 +2,15 @@
 @section('title', 'Sửa giáo viên')
 
 @section('content')
+<x-page-header
+    title="Chỉnh sửa hồ sơ giáo viên"
+    subtitle="Cập nhật thông tin công tác, cá nhân và liên hệ của giáo viên."
+>
+    <a href="{{ route('teachers.index') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Quay lại danh sách
+    </a>
+</x-page-header>
+
 @if($errors->has('error'))
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
         <i class="bi bi-exclamation-circle me-2"></i>{{ $errors->first('error') }}
@@ -9,93 +18,11 @@
     </div>
 @endif
 
-<form method="POST" action="{{ route('teachers.update', $teacher) }}" class="card p-4 shadow-sm">
-    @csrf
-    @method('PUT')
-    <div class="row g-3">
-        <div class="col-md-3">
-            <label class="form-label">Mã giáo viên</label>
-            <input type="text" name="teacher_code" class="form-control" value="{{ old('teacher_code', $teacher->teacher_code) }}" required>
-            @error('teacher_code')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-5">
-            <label class="form-label">Họ tên</label>
-            <input type="text" name="name" class="form-control" value="{{ old('name', $teacher->name) }}" required>
-            @error('name')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-4">
-            <label class="form-label">Môn chính</label>
-            <select name="primary_subject_id" class="form-select" required>
-                <option value="">Chọn môn chính</option>
-                @foreach($subjects as $subject)
-                    <option value="{{ $subject->id }}" @selected(old('primary_subject_id', $teacher->primary_subject_id) === $subject->id)>{{ $subject->name }}</option>
-                @endforeach
-            </select>
-            @error('primary_subject_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-4">
-            <label class="form-label">Tổ chuyên môn</label>
-            <select name="department_id" class="form-select">
-                <option value="">Chưa phân tổ</option>
-                @foreach($departments as $department)
-                    <option value="{{ $department->id }}" @selected(old('department_id', $teacher->department_id) === $department->id)>{{ $department->name }}</option>
-                @endforeach
-            </select>
-            @error('department_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Ngày sinh</label>
-            <input type="date" name="dob" class="form-control" value="{{ old('dob', $teacher->dob?->format('Y-m-d')) }}">
-            @error('dob')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Giới tính</label>
-            <select name="gender" class="form-select">
-                <option value="">Chọn giới tính</option>
-                @foreach(\App\Models\Teacher::genderLabels() as $value => $label)
-                    <option value="{{ $value }}" @selected(old('gender', $teacher->gender) === $value)>{{ $label }}</option>
-                @endforeach
-            </select>
-            @error('gender')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Ngày vào trường</label>
-            <input type="date" name="joined_at" class="form-control" value="{{ old('joined_at', $teacher->joined_at?->format('Y-m-d')) }}">
-            @error('joined_at')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Trạng thái làm việc</label>
-            <select name="work_status" class="form-select" required>
-                @foreach(\App\Models\Teacher::workStatuses() as $value => $label)
-                    <option value="{{ $value }}" @selected(old('work_status', $teacher->work_status ?: \App\Models\Teacher::STATUS_WORKING) === $value)>{{ $label }}</option>
-                @endforeach
-            </select>
-            @error('work_status')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-4">
-            <label class="form-label">Thư điện tử</label>
-            <input type="email" name="email" class="form-control" value="{{ old('email', $teacher->email) }}">
-            @error('email')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-4">
-            <label class="form-label">Số điện thoại</label>
-            <input type="text" name="phone" class="form-control" value="{{ old('phone', $teacher->phone) }}">
-            @error('phone')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-md-4">
-            <label class="form-label">Trình độ</label>
-            <input type="text" name="qualification" class="form-control" value="{{ old('qualification', $teacher->qualification) }}">
-            @error('qualification')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-        <div class="col-12">
-            <label class="form-label">Địa chỉ</label>
-            <input type="text" name="address" class="form-control" value="{{ old('address', $teacher->address) }}">
-            @error('address')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-        </div>
-    </div>
-    <div class="mt-4 d-flex justify-content-end gap-2">
-        <a href="{{ route('teachers.index') }}" class="btn btn-secondary">Hủy</a>
-        <button class="btn btn-primary">Cập nhật</button>
-    </div>
-</form>
+@include('teachers.partials.form', [
+    'action' => route('teachers.update', $teacher),
+    'teacher' => $teacher,
+    'subjects' => $subjects,
+    'departments' => $departments,
+    'nextTeacherCode' => null,
+])
 @endsection

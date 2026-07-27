@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminHomePageController;
 use App\Http\Controllers\AdminUserController;
+use App\Http\Controllers\Api\Admin\HomepageConfigController;
 use App\Http\Controllers\AcademicController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AttendanceController;
@@ -61,6 +62,8 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::get('academic', [AcademicController::class, 'index'])->name('academic.index');
         Route::get('admin/home-page', [AdminHomePageController::class, 'index'])->name('admin.home-page.index');
         Route::post('admin/home-page/content', [AdminHomePageController::class, 'saveContent'])->name('admin.home-page.content');
+        Route::get('api/admin/homepage-config', [HomepageConfigController::class, 'show'])->name('api.admin.homepage-config.show');
+        Route::match(['post', 'put'], 'api/admin/homepage-config', [HomepageConfigController::class, 'update'])->name('api.admin.homepage-config.update');
         Route::post('admin/home-page/posts', [AdminHomePageController::class, 'storePost'])->name('admin.home-page.posts.store');
         Route::post('admin/home-page/events', [AdminHomePageController::class, 'storeEvent'])->name('admin.home-page.events.store');
         Route::post('admin/home-page/documents', [AdminHomePageController::class, 'storeDocument'])->name('admin.home-page.documents.store');
@@ -100,6 +103,8 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::post('parents/{parent}/reset-password', [ParentController::class, 'resetPassword'])->name('parents.reset-password');
         Route::resource('parents', ParentController::class)->except(['show']);
         Route::resource('assignments', TeachingAssignmentController::class)->except(['show']);
+        Route::patch('score-columns/bulk-lock', [ScoreColumnController::class, 'bulkLock'])->name('score-columns.bulk-lock');
+        Route::patch('score-columns/{scoreColumn}/toggle-lock', [ScoreColumnController::class, 'toggleLock'])->name('score-columns.toggle-lock');
         Route::resource('score-columns', ScoreColumnController::class)->except(['show', 'create', 'edit']);
         Route::resource('grade-windows', GradeWindowController::class)->only(['index', 'store', 'update']);
 

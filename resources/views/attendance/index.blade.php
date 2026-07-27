@@ -12,6 +12,11 @@
         'excused' => 'bg-info',
         'absent' => 'bg-danger',
     ];
+    $inlineAttendanceStatuses = [
+        'present' => ['label' => 'Có mặt', 'code' => 'V', 'class' => 'present'],
+        'late' => ['label' => 'Đi muộn', 'code' => 'M', 'class' => 'late'],
+        'absent' => ['label' => 'Vắng mặt', 'code' => 'X', 'class' => 'absent'],
+    ];
 @endphp
 
 <x-page-header
@@ -178,7 +183,7 @@
         <div class="card mb-3">
             <div class="card-header d-flex flex-column flex-md-row justify-content-between gap-2">
                 <div>
-                    <div class="fw-semibold">{{ $isEditingSession ? 'Chỉnh sửa điểm danh' : 'Bảng điểm danh' }}</div>
+                    <div class="fw-semibold">{{ $isEditingSession ? 'Cập nhật phiên điểm danh' : 'Bảng điểm danh' }}</div>
                     <div class="text-muted small">
                         {{ $selectedClass?->name ?? 'Không rõ lớp' }} ·
                         {{ $selectedSemester?->name ?? 'Không rõ học kỳ' }} ·
@@ -221,7 +226,7 @@
                         <thead>
                             <tr>
                                 <th>Học sinh</th>
-                                <th>Trạng thái</th>
+                                <th>Trạng thái chuyên cần</th>
                                 <th>Ghi chú</th>
                             </tr>
                         </thead>
@@ -229,41 +234,55 @@
                         @forelse($students as $student)
                             @php
                                 $record = $existingRecords->get($student->id);
-                                $isLockedByApprovedLeave = ! auth()->user()->isAdmin()
-                                    && $selectedSessionType === \App\Models\AttendanceRecord::SESSION_PERIOD
-                                    && ($approvedLeaveStudentIds ?? collect())->contains($student->id);
+                                $hasApprovedLeave = ($approvedLeaveStudentIds ?? collect())->contains($student->id);
+                                $isLockedByApprovedLeave = $hasApprovedLeave || $record?->status === 'excused';
                                 $currentStatus = $isLockedByApprovedLeave
                                     ? 'excused'
                                     : old("status.{$student->id}", $record?->status ?? 'present');
                                 $leaveRequest = ($approvedLeaveRequests ?? collect())->get($student->id);
                             @endphp
-                            <tr>
+                            <tr @class(['attendance-row-locked' => $isLockedByApprovedLeave])>
                                 <td class="fw-semibold">
-                                    <div>{{ $student->student_code }}</div>
-                                    <div class="text-muted small">{{ $student->name }}</div>
+                                    <button
+                                        type="button"
+                                        class="attendance-student-link"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#studentAttendanceHistory{{ $student->id }}"
+                                    >
+                                        <span>{{ $student->student_code }}</span>
+                                        <strong>{{ $student->name }}</strong>
+                                    </button>
                                 </td>
                                 <td>
                                     @if($isLockedByApprovedLeave)
                                         <input type="hidden" name="status[{{ $student->id }}]" value="excused">
+                                        <span class="attendance-approved-badge">
+                                            <i class="bi bi-patch-check"></i>
+                                            Nghỉ có phép (P)
+                                        </span>
                                     @endif
-                                    <div class="attendance-status-group">
-                                        @foreach($statusLabels as $value => $label)
-                                            <label class="attendance-status-option">
-                                                <input
-                                                    type="radio"
-                                                    name="status[{{ $student->id }}]"
-                                                    value="{{ $value }}"
-                                                    @checked($currentStatus === $value)
-                                                    @if($value === 'present') data-attendance-present @endif
-                                                    @disabled($isLockedByApprovedLeave)
-                                                >
-                                                <span>{{ $label }}</span>
-                                            </label>
-                                        @endforeach
-                                    </div>
+                                    @unless($isLockedByApprovedLeave)
+                                        <div class="attendance-inline-actions">
+                                            @foreach($inlineAttendanceStatuses as $value => $option)
+                                                <label class="attendance-inline-option {{ $option['class'] }}">
+                                                    <input
+                                                        type="radio"
+                                                        name="status[{{ $student->id }}]"
+                                                        value="{{ $value }}"
+                                                        @checked($currentStatus === $value)
+                                                        @if($value === 'present') data-attendance-present @endif
+                                                    >
+                                                    <span>
+                                                        <strong>{{ $option['label'] }}</strong>
+                                                        <small>({{ $option['code'] }})</small>
+                                                    </span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    @endunless
                                     @if($isLockedByApprovedLeave)
                                         <div class="text-info small mt-2">
-                                            Học sinh đã có đơn nghỉ được GVCN phê duyệt. Giáo viên bộ môn không thể đổi sang vắng không phép.
+                                            Học sinh đã có đơn nghỉ được GVCN phê duyệt. Phiên điểm danh này được khóa ở trạng thái nghỉ có phép.
                                         </div>
                                     @endif
                                 </td>
@@ -291,14 +310,101 @@
                     </table>
                 </div>
 
-                <div class="card-body border-top text-end">
-                    <button class="btn btn-primary" @disabled($students->isEmpty() || ($selectedSessionType === \App\Models\AttendanceRecord::SESSION_PERIOD && ! $selectedTimetableEntry))>
+                <div class="card-body border-top attendance-save-footer">
+                    <button class="btn attendance-save-btn" @disabled($students->isEmpty() || ($selectedSessionType === \App\Models\AttendanceRecord::SESSION_PERIOD && ! $selectedTimetableEntry))>
                         <i class="bi bi-save"></i>
-                        Lưu điểm danh
+                        Lưu kết quả điểm danh
                     </button>
                 </div>
             </form>
         </div>
+
+        @foreach($students as $student)
+            @php
+                $studentHistoryRows = ($attendanceDetailRows ?? collect())
+                    ->where('student_id', $student->id)
+                    ->whereIn('status', ['late', 'excused', 'absent'])
+                    ->values();
+                $studentHistorySummary = [
+                    'excused' => $studentHistoryRows->where('status', 'excused')->count(),
+                    'absent' => $studentHistoryRows->where('status', 'absent')->count(),
+                    'late' => $studentHistoryRows->where('status', 'late')->count(),
+                ];
+            @endphp
+            <div class="modal fade content-modal attendance-history-modal" id="studentAttendanceHistory{{ $student->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div class="attendance-history-title">
+                                <h5 class="modal-title">LỊCH SỬ CHUYÊN CẦN HỌC SINH</h5>
+                                <div>{{ $student->student_code }} · {{ $student->name }}</div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="attendance-history-kpi-grid">
+                                <article>
+                                    <span>Nghỉ có phép</span>
+                                    <strong>{{ $studentHistorySummary['excused'] }}</strong>
+                                    <small>buổi</small>
+                                </article>
+                                <article>
+                                    <span>Nghỉ không phép</span>
+                                    <strong>{{ $studentHistorySummary['absent'] }}</strong>
+                                    <small>buổi</small>
+                                </article>
+                                <article>
+                                    <span>Đi muộn</span>
+                                    <strong>{{ $studentHistorySummary['late'] }}</strong>
+                                    <small>lần</small>
+                                </article>
+                            </div>
+
+                            <div class="attendance-history-table-wrap mt-3">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Ngày</th>
+                                            <th>Tiết vắng</th>
+                                            <th>Môn học</th>
+                                            <th>Lý do / Ghi chú</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    @forelse($studentHistoryRows as $historyRecord)
+                                        <tr>
+                                            <td class="fw-semibold">{{ $historyRecord->attendance_date?->format('d/m/Y') ?: '-' }}</td>
+                                            <td>
+                                                @if($historyRecord->status === 'late')
+                                                    Đi muộn
+                                                @else
+                                                    {{ $historyRecord->session_type === \App\Models\AttendanceRecord::SESSION_PERIOD ? ($historyRecord->timetableEntry?->displayPeriod() ?? $historyRecord->session_label) : 'Theo ngày' }}
+                                                @endif
+                                            </td>
+                                            <td>{{ $historyRecord->timetableEntry?->subject?->name ?? '-' }}</td>
+                                            <td class="whitespace-normal break-words">{{ $historyRecord->note ?: '-' }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="4">
+                                                <div class="empty-state py-4">
+                                                    <i class="bi bi-calendar-check"></i>
+                                                    Chưa có lịch sử vắng hoặc đi muộn trong phạm vi đang chọn.
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng lịch sử chuyên cần</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endforeach
     @endif
 
     @if(($weeklyMatrix['enabled'] ?? false) && $selectedClass)
@@ -341,7 +447,9 @@
                                 <div class="text-muted small">{{ $row['student']->name }}</div>
                             </td>
                             @foreach(($weeklyMatrix['days'] ?? collect()) as $day)
-                                @php($cell = $row['cells'][$day->toDateString()] ?? ['excused' => 0, 'absent' => 0, 'late' => 0, 'total' => 0])
+                                @php
+                                    $cell = $row['cells'][$day->toDateString()] ?? ['excused' => 0, 'absent' => 0, 'late' => 0, 'total' => 0];
+                                @endphp
                                 <td class="text-center">
                                     @if($cell['total'] <= 0)
                                         <span class="text-muted">-</span>
@@ -434,15 +542,27 @@
                     <th>Đi muộn</th>
                     <th>Vắng có phép</th>
                     <th>Vắng không phép</th>
-                    <th class="text-end">Thao tác</th>
                 </tr>
             </thead>
             <tbody>
             @forelse($attendanceSessions as $session)
-                <tr>
+                @php
+                    $lateRecords = $session->records->where('status', 'late')->values();
+                    $excusedRecords = $session->records->where('status', 'excused')->values();
+                    $absentRecords = $session->records->where('status', 'absent')->values();
+                    $bulkModalId = 'attendanceBulkEdit' . $session->key;
+                    $expandRowId = 'attendanceExpand' . $session->key;
+                    $canAdjustSession = $canManageAttendance && $session->school_year_id && $session->semester_id && $session->class_id;
+                @endphp
+                <tr class="attendance-expand-trigger" data-attendance-expand-row data-target="#{{ $expandRowId }}" tabindex="0" role="button" aria-expanded="false">
                     <td>
-                        <div class="fw-semibold">{{ $session->class_name }}</div>
-                        <div class="text-muted small">{{ $session->school_year_name }} · {{ $session->semester_name }}</div>
+                        <div class="d-flex align-items-start gap-2">
+                            <span class="attendance-expand-arrow" aria-hidden="true">▸</span>
+                            <div>
+                                <div class="fw-semibold">{{ $session->class_name }}</div>
+                                <div class="text-muted small">{{ $session->school_year_name }} · {{ $session->semester_name }}</div>
+                            </div>
+                        </div>
                     </td>
                     <td>{{ optional($session->date)->format('d/m/Y') }}</td>
                     <td>
@@ -454,39 +574,52 @@
                     <td><span class="badge bg-warning text-dark">{{ $session->late }}</span></td>
                     <td><span class="badge bg-info">{{ $session->excused }}</span></td>
                     <td><span class="badge bg-danger">{{ $session->absent }}</span></td>
-                    <td class="text-end">
-                        <button
-                            type="button"
-                            class="content-action-btn icon-only detail"
-                            data-bs-toggle="modal"
-                            data-bs-target="#attendanceDetail{{ $session->key }}"
-                            title="Xem chi tiết"
-                            aria-label="Xem chi tiết"
-                        >
-                            <i class="bi bi-eye"></i>
-                        </button>
-                        @if($canManageAttendance && $session->school_year_id && $session->semester_id && $session->class_id)
-                            <a
-                                href="{{ route('attendance.index', [
-                                    'school_year_id' => $session->school_year_id,
-                                    'semester_id' => $session->semester_id,
-                                    'class_id' => $session->class_id,
-                                    'date' => optional($session->date)->toDateString(),
-                                    'attendance_type' => $session->session_type,
-                                    'timetable_entry_id' => $session->timetable_entry_id,
-                                ]) }}"
-                                class="content-action-btn icon-only edit"
-                                title="Chỉnh sửa"
-                                aria-label="Chỉnh sửa"
-                            >
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                        @endif
+                </tr>
+                <tr id="{{ $expandRowId }}" class="attendance-expand-detail d-none">
+                    <td colspan="8">
+                        <div class="attendance-expand-panel">
+                            <section>
+                                <h6><span class="attendance-dot late"></span>Học sinh đi muộn</h6>
+                                <div class="attendance-quick-list">
+                                    @forelse($lateRecords as $record)
+                                        <span class="attendance-quick-badge late">{{ $record->student->name ?? 'Không rõ' }} · {{ $record->student->student_code ?? '-' }}</span>
+                                    @empty
+                                        <span class="attendance-empty-note">Không có học sinh đi muộn</span>
+                                    @endforelse
+                                </div>
+                            </section>
+                            <section>
+                                <h6><span class="attendance-dot absent"></span>Học sinh vắng mặt</h6>
+                                <div class="attendance-quick-list">
+                                    @forelse($excusedRecords as $record)
+                                        <span class="attendance-quick-badge excused">P · {{ $record->student->name ?? 'Không rõ' }} · {{ $record->student->student_code ?? '-' }}</span>
+                                    @empty
+                                    @endforelse
+                                    @forelse($absentRecords as $record)
+                                        <span class="attendance-quick-badge absent">X · {{ $record->student->name ?? 'Không rõ' }} · {{ $record->student->student_code ?? '-' }}</span>
+                                    @empty
+                                    @endforelse
+                                    @if($excusedRecords->isEmpty() && $absentRecords->isEmpty())
+                                        <span class="attendance-empty-note">🎉 Lớp sĩ số đầy đủ, không có học sinh vắng</span>
+                                    @endif
+                                </div>
+                            </section>
+                            <section class="attendance-expand-shortcut">
+                                @if($canAdjustSession)
+                                    <button type="button" class="attendance-adjust-btn" data-bs-toggle="modal" data-bs-target="#{{ $bulkModalId }}" data-attendance-stop>
+                                        <i class="bi bi-pencil-square"></i>
+                                        Điều chỉnh dữ liệu điểm danh ngày này
+                                    </button>
+                                @else
+                                    <span class="attendance-empty-note">Không đủ thông tin để điều chỉnh phiên này.</span>
+                                @endif
+                            </section>
+                        </div>
                     </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9">
+                    <td colspan="8">
                         <div class="empty-state">
                             <i class="bi bi-person-check"></i>
                             Chưa có dữ liệu điểm danh.
@@ -504,69 +637,91 @@
 @endif
 
 @foreach($attendanceSessions as $session)
-    <div class="modal fade content-modal" id="attendanceDetail{{ $session->key }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <div>
-                        <div class="modal-kicker">Chi tiết điểm danh</div>
-                        <h5 class="modal-title">{{ $session->class_name }} · {{ optional($session->date)->format('d/m/Y') }}</h5>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-4">
-                            <div class="text-muted small">Năm học</div>
-                            <div class="fw-semibold">{{ $session->school_year_name }}</div>
+    @php
+        $bulkModalId = 'attendanceBulkEdit' . $session->key;
+        $canAdjustSession = $canManageAttendance && $session->school_year_id && $session->semester_id && $session->class_id;
+    @endphp
+    @if($canAdjustSession)
+        <div class="modal fade content-modal attendance-bulk-modal" id="{{ $bulkModalId }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <form method="POST" action="{{ route('attendance.store') }}">
+                        @csrf
+                        <input type="hidden" name="school_year_id" value="{{ $session->school_year_id }}">
+                        <input type="hidden" name="semester_id" value="{{ $session->semester_id }}">
+                        <input type="hidden" name="class_id" value="{{ $session->class_id }}">
+                        <input type="hidden" name="attendance_date" value="{{ optional($session->date)->toDateString() }}">
+                        <input type="hidden" name="attendance_type" value="{{ $session->session_type }}">
+                        <input type="hidden" name="timetable_entry_id" value="{{ $session->timetable_entry_id }}">
+                        <div class="modal-header">
+                            <div class="attendance-history-title">
+                                <h5 class="modal-title">ĐIỀU CHỈNH DỮ LIỆU ĐIỂM DANH</h5>
+                                <div>{{ $session->class_name }} · {{ optional($session->date)->format('d/m/Y') }} · {{ $session->session_label }}</div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                         </div>
-                        <div class="col-md-4">
-                            <div class="text-muted small">Học kỳ</div>
-                            <div class="fw-semibold">{{ $session->semester_name }}</div>
+                        <div class="modal-body">
+                            <div class="table-responsive attendance-bulk-table">
+                                <table class="table align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Học sinh</th>
+                                            <th>Trạng thái chuyên cần</th>
+                                            <th>Ghi chú</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($session->records as $record)
+                                            @php
+                                                $student = $record->student;
+                                                $isExcusedLocked = $record->status === 'excused';
+                                            @endphp
+                                            <tr @class(['attendance-row-locked' => $isExcusedLocked])>
+                                                <td>
+                                                    <div class="fw-semibold">{{ $student->student_code ?? 'Không rõ' }}</div>
+                                                    <div class="text-muted small">{{ $student->name ?? 'Không rõ' }}</div>
+                                                </td>
+                                                <td>
+                                                    @if($isExcusedLocked)
+                                                        <input type="hidden" name="status[{{ $record->student_id }}]" value="excused">
+                                                        <span class="attendance-approved-badge"><i class="bi bi-patch-check"></i>Nghỉ có phép (P)</span>
+                                                    @else
+                                                        <div class="attendance-inline-actions">
+                                                            @foreach($inlineAttendanceStatuses as $value => $option)
+                                                                <label class="attendance-inline-option {{ $option['class'] }}">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="status[{{ $record->student_id }}]"
+                                                                        value="{{ $value }}"
+                                                                        @checked($record->status === $value)
+                                                                    >
+                                                                    <span>
+                                                                        <strong>{{ $option['label'] }}</strong>
+                                                                        <small>({{ $option['code'] }})</small>
+                                                                    </span>
+                                                                </label>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <input name="note[{{ $record->student_id }}]" class="form-control" value="{{ $record->note }}" placeholder="Ghi chú nếu có" @readonly($isExcusedLocked)>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="text-muted small">Số học sinh</div>
-                            <div class="fw-semibold">{{ $session->total }}</div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                            <button class="btn attendance-save-btn"><i class="bi bi-save"></i>Lưu điều chỉnh</button>
                         </div>
-                        <div class="col-md-12">
-                            <div class="text-muted small">Phiên điểm danh</div>
-                            <div class="fw-semibold">{{ $session->session_label }}</div>
-                        </div>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Mã học sinh</th>
-                                    <th>Họ tên</th>
-                                    <th>Trạng thái</th>
-                                    <th>Ghi chú</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            @foreach($session->records as $record)
-                                <tr>
-                                    <td class="fw-semibold">{{ $record->student->student_code ?? 'Không rõ' }}</td>
-                                    <td>{{ $record->student->name ?? 'Không rõ' }}</td>
-                                    <td>
-                                        <span class="badge {{ $statusBadge[$record->status] ?? 'bg-secondary' }}">
-                                            {{ $record->statusLabel() }}
-                                        </span>
-                                    </td>
-                                    <td>{{ $record->note ?: 'Không có' }}</td>
-                                </tr>
-                            @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    </form>
                 </div>
             </div>
         </div>
-    </div>
+    @endif
 @endforeach
 
 @foreach(($pendingLeaveRequests ?? collect()) as $requestItem)
@@ -622,6 +777,37 @@
             document.querySelectorAll('[data-attendance-present]:not(:disabled)').forEach((input) => {
                 input.checked = true;
             });
+        });
+    });
+
+    document.querySelectorAll('[data-attendance-expand-row]').forEach((row) => {
+        const toggleRow = () => {
+            const target = document.querySelector(row.dataset.target);
+            if (! target) {
+                return;
+            }
+
+            const isOpening = target.classList.contains('d-none');
+            target.classList.toggle('d-none', ! isOpening);
+            row.classList.toggle('is-open', isOpening);
+            row.setAttribute('aria-expanded', isOpening ? 'true' : 'false');
+        };
+
+        row.addEventListener('click', (event) => {
+            if (event.target.closest('a, button, input, select, textarea, label')) {
+                return;
+            }
+
+            toggleRow();
+        });
+
+        row.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') {
+                return;
+            }
+
+            event.preventDefault();
+            toggleRow();
         });
     });
 </script>

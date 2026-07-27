@@ -65,7 +65,7 @@
                     <td>{{ $class->currentStudentCount() }} / {{ $class->maxCapacity() }}</td>
                     <td><span class="badge {{ $class->statusBadgeClass() }}">{{ $class->statusLabel() }}</span></td>
                     <td class="text-end">
-                        <div class="content-action-group justify-content-end">
+                        <div class="content-action-group justify-content-end" data-action-synced="true">
                             @if(! $readOnly && $class->canEdit())
                                 <a href="{{ route('classes.edit', $class) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
                                     <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
@@ -75,70 +75,53 @@
                                 <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
                                     <i class="bi bi-three-dots-vertical"></i>
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
+                                <ul class="dropdown-menu dropdown-menu-end content-action-menu class-action-menu">
                                     <li>
-                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#classStudents{{ $class->id }}">
-                                            <i class="bi bi-people me-2"></i>Xem danh sách học sinh
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#classDetail{{ $class->id }}">
+                                            <i class="bi bi-eye"></i>Xem chi tiết & Học sinh
                                         </button>
                                     </li>
                                     @if(! $readOnly)
-                                        @if($class->canEdit())
-                                            <li>
-                                                <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#assignStudents{{ $class->id }}">
-                                                    <i class="bi bi-person-plus me-2"></i>Phân học sinh vào lớp
-                                                </button>
-                                            </li>
-                                            <li><hr class="dropdown-divider"></li>
-                                        @endif
                                         <li>
                                             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#transferStudents{{ $class->id }}">
-                                                <i class="bi bi-arrow-left-right me-2"></i>Chuyển học sinh sang lớp khác
+                                                <i class="bi bi-arrow-left-right"></i>Chuyển lớp học sinh
                                             </button>
                                         </li>
-                                        @if(! $class->isActive() && ! $class->isArchived())
-                                            <li>
-                                                <form action="{{ route('classes.activate', $class) }}" method="POST">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <button type="submit" class="dropdown-item">
-                                                        <i class="bi bi-check-circle me-2"></i>Kích hoạt
-                                                    </button>
-                                                </form>
-                                            </li>
-                                        @endif
                                         @if($class->canLock() && ! $class->isLocked())
                                             <li>
-                                                <form action="{{ route('classes.lock', $class) }}" method="POST">
+                                                <form action="{{ route('classes.lock', $class) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn khóa lớp học này?');">
                                                     @csrf
                                                     @method('PATCH')
                                                     <button type="submit" class="dropdown-item">
-                                                        <i class="bi bi-lock me-2"></i>Khóa
+                                                        <i class="bi bi-lock"></i>Khóa / Lưu trữ lớp
                                                     </button>
                                                 </form>
                                             </li>
-                                        @endif
-                                        @if($class->canArchive())
+                                        @elseif($class->canArchive())
                                             <li>
-                                                <form action="{{ route('classes.archive', $class) }}" method="POST">
+                                                <form action="{{ route('classes.archive', $class) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn lưu trữ lớp học này?');">
                                                     @csrf
                                                     @method('PATCH')
                                                     <button type="submit" class="dropdown-item">
-                                                        <i class="bi bi-archive me-2"></i>Lưu trữ
+                                                        <i class="bi bi-archive"></i>Khóa / Lưu trữ lớp
                                                     </button>
                                                 </form>
                                             </li>
+                                        @else
+                                            <li><span class="dropdown-item text-muted"><i class="bi bi-lock"></i>Khóa / Lưu trữ lớp</span></li>
                                         @endif
                                         @if($deleteCheck['allowed'])
-                                            <li><hr class="dropdown-divider"></li>
                                             <li>
-                                                <form action="{{ route('classes.destroy', $class) }}" method="POST">
+                                                <form action="{{ route('classes.destroy', $class) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn xóa lớp học này? Hành động này không thể hoàn tác.');">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="bi bi-trash me-2"></i>Xóa
+                                                    <button type="submit" class="dropdown-item danger">
+                                                        <i class="bi bi-trash"></i>Xóa lớp
                                                     </button>
                                                 </form>
                                             </li>
+                                        @else
+                                            <li><span class="dropdown-item text-muted"><i class="bi bi-trash"></i>Xóa lớp</span></li>
                                         @endif
                                     @else
                                         <li><span class="dropdown-item text-muted">Chỉ xem</span></li>
@@ -171,53 +154,85 @@
         $availableTransferClasses = $transferClasses->reject(fn ($targetClass) => (string) $targetClass->getKey() === (string) $class->getKey())->values();
     @endphp
 
-    <div class="modal fade content-modal" id="classStudents{{ $class->id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal fade content-modal class-detail-modal" id="classDetail{{ $class->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
-                    <div>
-                        <h5 class="modal-title">Danh sách học sinh - {{ $class->name }}</h5>
-                        <div class="text-muted small">
-                            {{ $class->schoolYear->name ?? '' }}
+                    <div class="class-detail-header">
+                        <div class="class-detail-identity">
+                            <h5 class="modal-title">LỚP {{ \Illuminate\Support\Str::upper($class->name) }}</h5>
+                            <div>Năm học: {{ $class->schoolYear->name ?? '-' }}</div>
                         </div>
-                        <div class="text-muted small">Niên khóa: {{ $cohortSummary }}</div>
+                        <span class="badge {{ $class->statusBadgeClass() }}">{{ $class->statusLabel() }}</span>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    <button type="button" class="btn-close ms-3" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Mã học sinh</th>
-                                    <th>Họ tên</th>
-                                    <th>Ngày sinh</th>
-                                    <th>Giới tính</th>
-                                    <th>Trạng thái</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            @forelse($currentStudents as $student)
-                                <tr>
-                                    <td class="fw-semibold">{{ $student->student_code }}</td>
-                                    <td>{{ $student->name }}</td>
-                                    <td>{{ $student->dob?->format('d/m/Y') ?? '-' }}</td>
-                                    <td>{{ $student->genderLabel() }}</td>
-                                    <td><span class="badge {{ $student->statusBadgeClass() }}">{{ $student->statusLabel() }}</span></td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="5">
-                                        <div class="empty-state"><i class="bi bi-people"></i>Chưa có học sinh trong lớp.</div>
-                                    </td>
-                                </tr>
-                            @endforelse
-                            </tbody>
-                        </table>
-                    </div>
+                    <section class="class-detail-section">
+                        <h6>Thông tin bộ khung lớp học</h6>
+                        <div class="class-detail-info-grid">
+                            <article>
+                                <span>Giáo viên chủ nhiệm</span>
+                                <strong>{{ $class->homeroomTeacher->name ?? '-' }}</strong>
+                            </article>
+                            <article>
+                                <span>Phòng học cố định</span>
+                                <strong>-</strong>
+                            </article>
+                            <article>
+                                <span>Sĩ số hiện tại</span>
+                                <strong>{{ $class->currentStudentCount() }} / {{ $class->maxCapacity() }} học sinh</strong>
+                            </article>
+                            <article>
+                                <span>Niên khóa</span>
+                                <strong>{{ $cohortSummary }}</strong>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section class="class-detail-section mt-3">
+                        <div class="class-student-title-row">
+                            <h6>Danh sách học sinh chính thức</h6>
+                            @if(! $readOnly && $class->canEdit())
+                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#assignStudents{{ $class->id }}">
+                                    <i class="bi bi-person-plus me-1"></i>Xếp học sinh vào lớp
+                                </button>
+                            @endif
+                        </div>
+                        <div class="table-responsive class-detail-table-wrap">
+                            <table class="table class-detail-table">
+                                <thead>
+                                    <tr>
+                                        <th>Mã HS</th>
+                                        <th>Họ tên</th>
+                                        <th>Ngày sinh</th>
+                                        <th>Giới tính</th>
+                                        <th>Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                @forelse($currentStudents as $student)
+                                    <tr>
+                                        <td class="fw-semibold">{{ $student->student_code }}</td>
+                                        <td>{{ $student->name }}</td>
+                                        <td>{{ $student->dob?->format('d/m/Y') ?? '-' }}</td>
+                                        <td>{{ $student->genderLabel() }}</td>
+                                        <td><span class="badge {{ $student->statusBadgeClass() }}">{{ $student->statusLabel() }}</span></td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5">
+                                            <div class="empty-state"><i class="bi bi-people"></i>Chưa có học sinh trong lớp.</div>
+                                        </td>
+                                    </tr>
+                                @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng hồ sơ lớp học</button>
                 </div>
             </div>
         </div>

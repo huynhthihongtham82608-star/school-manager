@@ -1,10 +1,18 @@
 @extends('layouts.app')
-@section('title', 'Nhập điểm')
+@section('title', auth()->user()->isAdmin() || auth()->user()->isStaff() ? 'Quản lý bảng điểm tập trung' : 'Nhập điểm số')
 
 @section('content')
+@php
+    $isScoreAdmin = auth()->user()->isAdmin() || auth()->user()->isStaff();
+@endphp
+
 <x-page-header
-    title="Điểm số - {{ $class->name }} / {{ $subject->name }} / {{ $semester->normalizedName() }}"
-    subtitle="Giáo viên bộ môn chỉ nhập điểm vào các cột đã được Admin cấu hình và đang mở nhập."
+    :title="$isScoreAdmin
+        ? 'Bảng điểm tập trung - ' . $class->name . ' / ' . $subject->name . ' / ' . $semester->normalizedName()
+        : 'Nhập điểm số - ' . $class->name . ' / ' . $subject->name . ' / ' . $semester->normalizedName()"
+    :subtitle="$isScoreAdmin
+        ? 'Chế độ giám sát chỉ xem. Admin tra cứu điểm số toàn trường, không nhập hoặc sửa điểm trực tiếp tại màn hình này.'
+        : 'Giáo viên bộ môn chỉ nhập điểm vào các cột điểm do Admin cấu hình và đang mở nhập.'"
 >
     <a href="{{ route('scores.index') }}" class="btn btn-outline-secondary">Quay lại</a>
 </x-page-header>
@@ -24,12 +32,25 @@
     </div>
 </div>
 
+@if($isScoreAdmin)
+    <div class="score-permission-alert mb-3">
+        <i class="bi bi-shield-check me-1"></i>
+        Chế độ quản trị: bảng điểm đang ở trạng thái chỉ xem để phục vụ tra cứu, giám sát và đối soát dữ liệu.
+    </div>
+@endif
+
 <form method="POST" action="{{ route('scores.store') }}" data-score-entry-form>
     @csrf
     <input type="hidden" name="class_id" value="{{ $class->id }}">
     <input type="hidden" name="subject_id" value="{{ $subject->id }}">
     <input type="hidden" name="semester_id" value="{{ $semester->id }}">
     <div class="card score-sheet">
+        @unless($isScoreAdmin)
+            <div class="score-permission-alert">
+                <i class="bi bi-lightbulb me-1"></i>
+                Lưu ý: Hệ thống chỉ mở quyền nhập/sửa điểm cho Giáo viên bộ môn được phân công giảng dạy lớp và môn học này trong thời hạn quy định.
+            </div>
+        @endunless
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead>
@@ -62,23 +83,23 @@
                                 $displayValue = old($fieldKey, $detail?->value !== null ? rtrim(rtrim(number_format((float) $detail->value, 1, '.', ''), '0'), '.') : '');
                             @endphp
                             <td>
-                                <input
-                                    type="text"
-                                    name="{{ $fieldName }}"
-                                    class="form-control form-control-sm {{ $errors->has($fieldKey) ? 'is-invalid' : '' }}"
-                                    value="{{ $displayValue }}"
-                                    placeholder="0 - 10"
-                                    inputmode="decimal"
-                                    pattern="^(10(\.0)?|[0-9](\.[0-9])?)$"
-                                    data-score-input
-                                    @disabled(! $permission['editable'])
-                                >
-                                @if($errors->has($fieldKey))
-                                    <div class="invalid-feedback">{{ $errors->first($fieldKey) }}</div>
+                                @if($isScoreAdmin)
+                                    <span class="score-readonly-value {{ $displayValue === '' ? 'empty' : '' }}">{{ $displayValue !== '' ? $displayValue : '-' }}</span>
+                                @else
+                                    <input
+                                        type="text"
+                                        name="{{ $fieldName }}"
+                                        class="form-control form-control-sm {{ $errors->has($fieldKey) ? 'is-invalid' : '' }}"
+                                        value="{{ $displayValue }}"
+                                        inputmode="decimal"
+                                        pattern="^(10(\.0)?|[0-9](\.[0-9])?)$"
+                                        data-score-input
+                                        @disabled(! $permission['editable'])
+                                    >
+                                    @if($errors->has($fieldKey))
+                                        <div class="invalid-feedback">{{ $errors->first($fieldKey) }}</div>
+                                    @endif
                                 @endif
-                                @unless($permission['editable'])
-                                    <div class="text-muted small mt-1">{{ $permission['reason'] }}</div>
-                                @endunless
                             </td>
                         @endforeach
                         <td class="fw-semibold text-primary">{{ $header?->average !== null ? rtrim(rtrim(number_format($header->average, 2), '0'), '.') : '-' }}</td>
@@ -93,14 +114,17 @@
         </div>
     </div>
     <div class="mt-3 text-end">
-        @if($canSubmitScores)
+        @if(! $isScoreAdmin && $canSubmitScores)
             <button class="btn btn-primary">Lưu điểm</button>
-        @else
+        @elseif(! $isScoreAdmin)
             <span class="text-muted">Bạn đang ở chế độ chỉ xem hoặc chưa có cột điểm nào được mở.</span>
+        @else
+            <span class="text-muted">Admin đang xem bảng điểm ở chế độ giám sát, không có thao tác lưu điểm.</span>
         @endif
     </div>
 </form>
 
+@unless($isScoreAdmin)
 <script>
     document.querySelectorAll('[data-score-entry-form]').forEach((form) => {
         form.addEventListener('submit', (event) => {
@@ -126,4 +150,5 @@
         });
     });
 </script>
+@endunless
 @endsection

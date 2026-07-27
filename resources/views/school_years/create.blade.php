@@ -3,14 +3,14 @@
 
 @section('content')
 <h5 class="mb-3">Thêm năm học</h5>
-<form method="POST" action="{{ route('school-years.store') }}" class="card p-4 shadow-sm" data-school-year-form data-active-year="{{ $activeYear?->name }}">
+<form method="POST" action="{{ route('school-years.store') }}" class="card p-4 shadow-sm" data-school-year-form data-active-year="{{ $activeYear?->name }}" data-academic-modal-size="xl">
     @csrf
     <input type="hidden" name="confirm_activation" value="0" data-confirm-activation>
 
     <div class="row g-3">
-        <div class="col-md-4">
+        <div class="col-12">
             <label class="form-label">Năm học</label>
-            <div class="d-flex align-items-center gap-2">
+            <div class="academic-year-range">
                 <input type="number" name="start_year" value="{{ old('start_year') }}" class="form-control" min="1900" max="2100" placeholder="2025" required data-start-year>
                 <span class="fw-bold text-muted">-</span>
                 <input type="number" name="end_year" value="{{ old('end_year') }}" class="form-control" min="1901" max="2101" placeholder="2026" required data-end-year>
@@ -25,11 +25,17 @@
             <label class="form-label">Ngày kết thúc</label>
             <input type="date" name="end_date" value="{{ old('end_date') }}" class="form-control" data-end-date>
         </div>
-        <div class="col-12">
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="is_active" value="1" id="is_active" @checked(old('is_active'))>
-                <label class="form-check-label" for="is_active">Đặt làm năm học hiện hành</label>
+        <div class="col-md-6">
+            <label class="form-label">Trạng thái</label>
+            <div>
+                <span class="academic-form-badge neutral"><i class="bi bi-circle"></i>Chưa hoạt động</span>
             </div>
+        </div>
+        <div class="col-12">
+            <label class="academic-check-card" for="is_active">
+                <input class="form-check-input" type="checkbox" name="is_active" value="1" id="is_active" @checked(old('is_active'))>
+                <span>Đặt làm năm học hiện hành</span>
+            </label>
             <div class="form-text">Năm học mới ban đầu ở trạng thái chưa hoạt động.</div>
         </div>
     </div>

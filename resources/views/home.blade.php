@@ -51,7 +51,8 @@
                     <div class="col-lg-5">
                         <div class="hero-panel">
                             @if(!empty($banner['image_url']))
-                                <img src="{{ $banner['image_url'] }}" alt="Banner trường học">
+                                @php($bannerImageSrc = \Illuminate\Support\Str::startsWith($banner['image_url'], ['http://', 'https://']) ? $banner['image_url'] : asset(ltrim($banner['image_url'], '/')))
+                                <img src="{{ $bannerImageSrc }}" alt="Banner trường học">
                             @else
                                 <div class="hero-illustration">
                                     <i class="bi bi-mortarboard"></i>

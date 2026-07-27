@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', $activeTab === 'events' ? 'Quản lý Sự kiện' : 'Quản lý Thông báo')
 
 @section('content')
@@ -16,75 +16,89 @@
     title="Cấu hình nội dung hệ thống"
     subtitle="Quản lý giao diện trang chủ, biên tập các bài viết tin tức, chỉnh sửa thư viện ảnh và thông tin hiển thị trên cổng thông tin nhà trường."
 >
-    <a class="btn btn-primary" href="#content-create-form">
-        <i class="bi bi-plus-lg me-1"></i>Viết bài mới
-    </a>
+    @if($activeTab === 'announcements')
+        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#announcement-create-modal">
+            <i class="bi bi-plus-lg me-1"></i>Thêm thông báo
+        </button>
+    @else
+        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#event-create-modal">
+            <i class="bi bi-plus-lg me-1"></i>Thêm sự kiện
+        </button>
+    @endif
 </x-page-header>
 
 <div class="content-management" id="content-create-form">
     @if($activeTab === 'announcements')
-        <div class="management-card">
-            <div class="management-card-header">
-                <div>
-                    <h6>Thêm thông báo</h6>
-                    <p>Tạo tin tức hoặc thông báo công bố cho người dùng.</p>
+        <div class="modal fade content-modal content-create-modal" id="announcement-create-modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <form method="POST" action="{{ route('announcements.store') }}">
+                        @csrf
+                        <div class="modal-header">
+                            <div class="content-modal-section-title">
+                                <h5 class="modal-title">Thêm thông báo</h5>
+                                <p>Tạo tin tức hoặc thông báo công bố cho người dùng trong hệ thống.</p>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="content-form-grid">
+                                <div class="content-form-field">
+                                    <label class="form-label">Tiêu đề</label>
+                                    <input type="text" name="title" class="form-control" required>
+                                </div>
+                                <div class="content-form-field">
+                                    <label class="form-label">Ngày đăng</label>
+                                    <input type="datetime-local" name="published_at" class="form-control">
+                                </div>
+                                <div class="content-form-field">
+                                    <label class="form-label">Loại</label>
+                                    <select name="type" class="form-select" required>
+                                        <option value="announcement">Thông báo</option>
+                                        <option value="news">Tin tức</option>
+                                    </select>
+                                </div>
+                                <div class="content-form-field">
+                                    <label class="form-label">Trạng thái</label>
+                                    <div class="content-status-toggle">
+                                        <label class="form-check">
+                                            <input type="radio" name="is_published" value="0" class="form-check-input" checked>
+                                            <span class="form-check-label">Bản nháp</span>
+                                        </label>
+                                        <label class="form-check">
+                                            <input type="radio" name="is_published" value="1" class="form-check-input">
+                                            <span class="form-check-label">Công bố</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="content-form-field full">
+                                    <label class="form-label">Tóm tắt</label>
+                                    <textarea name="summary" rows="2" class="form-control"></textarea>
+                                </div>
+                                <div class="content-form-field full">
+                                    <label class="form-label">Nội dung</label>
+                                    <textarea name="content" class="form-control content-textarea-large" rows="6"></textarea>
+                                </div>
+                                <div class="content-form-field full">
+                                    <label class="form-label">Đối tượng nhận</label>
+                                    <div class="content-target-panel" data-target-role-group>
+                                        @foreach($roleOptions as $roleValue => $roleLabel)
+                                            <label class="form-check">
+                                                <input type="checkbox" name="target_roles[]" value="{{ $roleValue }}" class="form-check-input" data-target-role="{{ $roleValue }}" @checked($roleValue === 'all')>
+                                                <span class="form-check-label">{{ $roleLabel }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                            <button type="submit" class="btn btn-primary">Lưu thông báo</button>
+                        </div>
+                    </form>
                 </div>
             </div>
-            <form method="POST" action="{{ route('announcements.store') }}" class="row g-3">
-                @csrf
-                <div class="col-md-3">
-                    <label class="form-label">Loại</label>
-                    <select name="type" class="form-select" required>
-                        <option value="announcement">Thông báo</option>
-                        <option value="news">Tin tức</option>
-                    </select>
-                </div>
-                <div class="col-md-5">
-                    <label class="form-label">Tiêu đề</label>
-                    <input type="text" name="title" class="form-control" required>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Ngày đăng</label>
-                    <input type="datetime-local" name="published_at" class="form-control">
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Tóm tắt</label>
-                    <input type="text" name="summary" class="form-control">
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Nội dung</label>
-                    <textarea name="content" class="form-control" rows="5"></textarea>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Trạng thái</label>
-                    <div class="target-role-grid">
-                        <label class="form-check">
-                            <input type="radio" name="is_published" value="0" class="form-check-input" checked>
-                            <span class="form-check-label"> Bản nháp</span>
-                        </label>
-                        <label class="form-check">
-                            <input type="radio" name="is_published" value="1" class="form-check-input">
-                            <span class="form-check-label"> Công bố</span>
-                        </label>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Đối tượng nhận</label>
-                    <div class="target-role-grid" data-target-role-group>
-                        @foreach($roleOptions as $roleValue => $roleLabel)
-                            <label class="form-check">
-                                <input type="checkbox" name="target_roles[]" value="{{ $roleValue }}" class="form-check-input" data-target-role="{{ $roleValue }}" @checked($roleValue === 'all')>
-                                <span class="form-check-label">{{ $roleLabel }}</span>
-                            </label>
-                        @endforeach
-                    </div>
-                </div>
-                <div class="col-12 text-end">
-                    <button type="submit" class="btn btn-primary content-submit-btn">
-                        <i class="bi bi-plus-circle"></i> Thêm thông báo
-                    </button>
-                </div>
-            </form>
         </div>
 
         <div class="management-card">
@@ -103,7 +117,7 @@
                             <th>Ngày đăng</th>
                             <th>Nội dung rút gọn</th>
                             <th>Trạng thái</th>
-                            <th class="text-end">Thao tác</th>
+                            <th class="text-end action-column-header" aria-label="Thao tác"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -114,10 +128,10 @@
                             $editId = 'post-edit-' . $loop->index;
                         @endphp
                         <tr>
-                            <td class="fw-semibold">{{ $post->title }}</td>
+                            <td class="fw-semibold content-break-cell">{{ $post->title }}</td>
                             <td>{{ $post->type === 'news' ? 'Tin tức' : 'Thông báo' }}</td>
                             <td>{{ optional($post->published_at)->format('d/m/Y H:i') ?: 'Đang cập nhật' }}</td>
-                            <td>{{ \Illuminate\Support\Str::limit($postText ?: 'Chưa có nội dung.', 90, '......') }}</td>
+                            <td class="content-break-cell">{{ \Illuminate\Support\Str::limit($postText ?: 'Chưa có nội dung.', 90, '......') }}</td>
                             <td>
                                 <span class="content-status {{ $post->is_published ? 'published' : 'draft' }}">
                                     {{ $post->is_published ? ' Công bố' : ' Bản nháp' }}
@@ -125,19 +139,26 @@
                             </td>
                             <td>
                                 <div class="content-action-group justify-content-end">
-                                    <button type="button" class="content-action-btn icon-only detail" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}" title="Xem chi tiết" aria-label="Xem chi tiết">
-                                        <i class="bi bi-eye"></i><span class="visually-hidden">Xem chi tiết</span>
-                                    </button>
                                     <button type="button" class="content-action-btn icon-only edit" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa">
                                         <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                     </button>
-                                    <form method="POST" action="{{ route('announcements.destroy', $post) }}">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="content-action-btn icon-only delete" title="Xóa" aria-label="Xóa" data-bs-toggle="tooltip">
-                                            <i class="bi bi-trash"></i><span class="visually-hidden">Xóa</span>
+                                    <div class="dropdown">
+                                        <button type="button" class="content-action-btn icon-only more" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" title="Thao tác khác" aria-label="Thao tác khác">
+                                            <i class="bi bi-three-dots-vertical"></i>
                                         </button>
-                                    </form>
+                                        <div class="dropdown-menu dropdown-menu-end content-action-menu">
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}">
+                                                <i class="bi bi-eye"></i>Xem chi tiết
+                                            </button>
+                                            <form method="POST" action="{{ route('announcements.destroy', $post) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="dropdown-item danger">
+                                                    <i class="bi bi-trash"></i>Xóa bỏ
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -266,15 +287,20 @@
             @endif
         </div>
     @else
-        <div class="management-card">
-            <div class="management-card-header">
+        <div class="modal fade content-modal content-create-modal event-create-modal" id="event-create-modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+            <div class="modal-header">
                 <div>
                     <h6>Thêm sự kiện</h6>
                     <p>Tạo sự kiện để hiển thị trên hệ thống và Trang chủ.</p>
                 </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ÄÃ³ng"></button>
             </div>
-            <form method="POST" action="{{ route('events.store') }}" class="row g-3">
+            <form method="POST" action="{{ route('events.store') }}">
                 @csrf
+                <div class="modal-body">
+                    <div class="row g-3 event-form-grid">
                 <div class="col-md-6">
                     <label class="form-label">Tên sự kiện</label>
                     <input type="text" name="title" class="form-control" required>
@@ -319,12 +345,17 @@
                         @endforeach
                     </div>
                 </div>
-                <div class="col-12 text-end">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button>
                     <button type="submit" class="btn btn-primary content-submit-btn">
-                        <i class="bi bi-plus-circle"></i> Thêm sự kiện
+                        <i class="bi bi-plus-circle"></i> Lưu sự kiện
                     </button>
                 </div>
             </form>
+                </div>
+            </div>
         </div>
 
         <div class="management-card">
@@ -343,7 +374,7 @@
                             <th>Địa điểm</th>
                             <th>Mô tả rút gọn</th>
                             <th>Trạng thái</th>
-                            <th class="text-end">Thao tác</th>
+                            <th class="text-end action-column-header" aria-label="Thao tác"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -354,10 +385,10 @@
                             $editId = 'event-edit-' . $loop->index;
                         @endphp
                         <tr>
-                            <td class="fw-semibold">{{ $event->title }}</td>
+                            <td class="content-break-cell event-title-cell">{{ $event->title }}</td>
                             <td>{{ optional($event->starts_at)->format('d/m/Y H:i') ?: 'Đang cập nhật' }}</td>
                             <td>{{ $event->location ?: 'Đang cập nhật' }}</td>
-                            <td>{{ \Illuminate\Support\Str::limit($eventText ?: 'Chưa có mô tả.', 90, '......') }}</td>
+                            <td class="content-break-cell">{{ \Illuminate\Support\Str::limit($eventText ?: 'Chưa có mô tả.', 90, '......') }}</td>
                             <td>
                                 <span class="content-status {{ $event->is_published ? 'published' : 'draft' }}">
                                     {{ $event->is_published ? ' Công bố' : ' Bản nháp' }}
@@ -365,19 +396,26 @@
                             </td>
                             <td>
                                 <div class="content-action-group justify-content-end">
-                                    <button type="button" class="content-action-btn icon-only detail" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}" title="Xem chi tiết" aria-label="Xem chi tiết">
-                                        <i class="bi bi-eye"></i><span class="visually-hidden">Xem chi tiết</span>
-                                    </button>
                                     <button type="button" class="content-action-btn icon-only edit" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa">
                                         <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                     </button>
-                                    <form method="POST" action="{{ route('events.destroy', $event) }}">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="content-action-btn icon-only delete" title="Xóa" aria-label="Xóa" data-bs-toggle="tooltip">
-                                            <i class="bi bi-trash"></i><span class="visually-hidden">Xóa</span>
+                                    <div class="dropdown">
+                                        <button type="button" class="content-action-btn icon-only more" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" title="Thao tác khác" aria-label="Thao tác khác">
+                                            <i class="bi bi-three-dots-vertical"></i>
                                         </button>
-                                    </form>
+                                        <div class="dropdown-menu dropdown-menu-end content-action-menu">
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}">
+                                                <i class="bi bi-eye"></i>Xem chi tiết
+                                            </button>
+                                            <form method="POST" action="{{ route('events.destroy', $event) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="dropdown-item danger">
+                                                    <i class="bi bi-trash"></i>Xóa bỏ
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -510,3 +548,4 @@
     @endif
 </div>
 @endsection
+

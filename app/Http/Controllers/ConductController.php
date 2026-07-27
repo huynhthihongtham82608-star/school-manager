@@ -50,14 +50,22 @@ class ConductController extends Controller
             ]);
         }
 
-        $classes = SchoolClass::with('schoolYear')
-            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
-            ->get();
+        $classesQuery = SchoolClass::with('schoolYear')
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId));
 
-        if ($user->isHomeroom()) {
-            $teacherId = optional($user->teacher)->id;
-            $classes = $classes->where('homeroom_teacher_id', $teacherId);
+        if ($user->isTeacher() && $user->teacher && ! ($user->isAdmin() || $user->isStaff())) {
+            $teacherId = $user->teacher->id;
+            $assignedClassIds = $user->teacher->assignments()
+                ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                ->pluck('class_id');
+            $homeroomClassIds = $user->teacher->homeroomClasses()
+                ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                ->pluck('id');
+
+            $classesQuery->whereIn('id', $assignedClassIds->merge($homeroomClassIds)->unique()->values());
         }
+
+        $classes = $classesQuery->orderBy('grade_level')->orderBy('name')->get();
 
         $semesters = Semester::with('schoolYear')
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
@@ -66,6 +74,7 @@ class ConductController extends Controller
         $selectedSemester = $selectedSemesterId ? $semesters->firstWhere('id', $selectedSemesterId) : null;
         $students = collect();
         $records = collect();
+        $canEditConduct = false;
 
         if ($request->filled('class_id') && $selectedSemesterId) {
             $request->validate([
@@ -74,7 +83,10 @@ class ConductController extends Controller
 
             $selectedClass = SchoolClass::find($request->input('class_id'));
             $selectedSemester = Semester::find($selectedSemesterId);
-            $this->authorizeHomeroom($selectedClass);
+            $this->authorizeConductView($selectedClass);
+            $canEditConduct = $this->canEditConduct($selectedClass)
+                && $selectedSemester?->isActive()
+                && ! $this->isHistoricalReadOnly();
 
             $students = Student::where('class_id', $selectedClass->id)->orderBy('student_code')->get();
             $records = Conduct::where('class_id', $selectedClass->id)
@@ -83,7 +95,7 @@ class ConductController extends Controller
                 ->keyBy('student_id');
         }
 
-        return view('conduct.index', compact('classes', 'semesters', 'selectedClass', 'selectedSemester', 'students', 'records', 'selectedYearId'));
+        return view('conduct.index', compact('classes', 'semesters', 'selectedClass', 'selectedSemester', 'students', 'records', 'selectedYearId', 'canEditConduct'));
     }
 
     public function store(Request $request)
@@ -98,7 +110,7 @@ class ConductController extends Controller
 
         $class = SchoolClass::findOrFail($data['class_id']);
         $semester = Semester::findOrFail($data['semester_id']);
-        $this->authorizeHomeroom($class);
+        $this->authorizeConductEdit($class);
 
         if (! $semester->isActive()) {
             abort(403, 'Học kỳ không ở trạng thái Hoạt động nên không thể nhập hoặc chỉnh sửa hạnh kiểm.');
@@ -151,18 +163,44 @@ class ConductController extends Controller
         return back()->with('success', 'Đã lưu hạnh kiểm');
     }
 
-    protected function authorizeHomeroom(SchoolClass $class): void
+    protected function authorizeConductView(SchoolClass $class): void
     {
         $user = Auth::user();
 
-        if ($user->isAdmin()) {
+        if ($user->isAdmin() || $user->isStaff()) {
             return;
         }
 
-        if ($user->isHomeroom() && optional($user->teacher)->id === $class->homeroom_teacher_id) {
+        if ($user->isTeacher() && $user->teacher) {
+            $teacherId = $user->teacher->id;
+
+            if ((string) $teacherId === (string) $class->homeroom_teacher_id) {
+                return;
+            }
+
+            if ($class->assignments()->where('teacher_id', $teacherId)->exists()) {
+                return;
+            }
+        }
+
+        abort(403, 'Không có quyền xem hạnh kiểm của lớp này.');
+    }
+
+    protected function authorizeConductEdit(SchoolClass $class): void
+    {
+        if ($this->canEditConduct($class)) {
             return;
         }
 
-        abort(403, 'Chỉ GVCN hoặc admin được nhập hạnh kiểm');
+        abort(403, 'Chỉ giáo viên chủ nhiệm của lớp mới được nhập hoặc chỉnh sửa hạnh kiểm.');
+    }
+
+    private function canEditConduct(SchoolClass $class): bool
+    {
+        $user = Auth::user();
+
+        return $user->isHomeroom()
+            && $user->teacher
+            && (string) $user->teacher->id === (string) $class->homeroom_teacher_id;
     }
 }

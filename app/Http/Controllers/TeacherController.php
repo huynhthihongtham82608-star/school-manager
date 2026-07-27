@@ -47,8 +47,10 @@ class TeacherController extends Controller
             ->orderBy('name')
             ->get();
         $departments = TeacherDepartment::orderBy('name')->get();
+        $subjects = Subject::orderBy('name')->get();
+        $nextTeacherCode = $this->nextTeacherCode();
 
-        return view('teachers.index', compact('teachers', 'selectedYearId', 'departments', 'filters'));
+        return view('teachers.index', compact('teachers', 'selectedYearId', 'departments', 'subjects', 'filters', 'nextTeacherCode'));
     }
 
     public function create()
@@ -56,6 +58,7 @@ class TeacherController extends Controller
         return view('teachers.create', [
             'subjects' => Subject::where('status', Subject::STATUS_ACTIVE)->orderBy('name')->get(),
             'departments' => TeacherDepartment::where('status', TeacherDepartment::STATUS_ACTIVE)->orderBy('name')->get(),
+            'nextTeacherCode' => $this->nextTeacherCode(),
         ]);
     }
 
@@ -189,7 +192,7 @@ class TeacherController extends Controller
     {
         return $request->validate([
             'teacher_code' => [
-                'required',
+                $teacher ? 'required' : 'nullable',
                 'string',
                 Rule::unique('teachers', 'teacher_code')->ignore($teacher?->id),
                 Rule::unique('users', 'username')->ignore($teacher?->user?->id),
@@ -215,7 +218,7 @@ class TeacherController extends Controller
             : null;
 
         return [
-            'teacher_code' => $data['teacher_code'],
+            'teacher_code' => $data['teacher_code'] ?? $this->nextTeacherCode(),
             'name' => $data['name'],
             'dob' => $data['dob'] ?? null,
             'gender' => $data['gender'] ?? null,
@@ -229,5 +232,18 @@ class TeacherController extends Controller
             'department_id' => $data['department_id'] ?? null,
             'main_subject' => $subject?->name,
         ];
+    }
+
+    private function nextTeacherCode(): string
+    {
+        $maxNumber = Teacher::query()
+            ->where('teacher_code', 'like', 'GV%')
+            ->pluck('teacher_code')
+            ->map(function ($code) {
+                return preg_match('/^GV(\d+)$/', (string) $code, $matches) ? (int) $matches[1] : 0;
+            })
+            ->max() ?? 0;
+
+        return 'GV' . str_pad((string) ($maxNumber + 1), 3, '0', STR_PAD_LEFT);
     }
 }

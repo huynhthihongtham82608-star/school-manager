@@ -1,5 +1,5 @@
-@extends('layouts.app')
-@section('title', 'Duyệt đơn nghỉ học')
+﻿@extends('layouts.app')
+@section('title', 'Duyá»‡t Ä‘Æ¡n nghá»‰ há»c')
 
 @section('content')
 @php
@@ -8,8 +8,8 @@
 
 <div class="page-heading">
     <div>
-        <h5>Duyệt đơn nghỉ học</h5>
-        <div class="text-muted">Giáo viên chủ nhiệm duyệt đơn nghỉ học do phụ huynh gửi.</div>
+        <h5>Duyá»‡t Ä‘Æ¡n nghá»‰ há»c</h5>
+        <div class="text-muted">GiÃ¡o viÃªn chá»§ nhiá»‡m duyá»‡t Ä‘Æ¡n nghá»‰ há»c do phá»¥ huynh gá»­i.</div>
     </div>
 </div>
 
@@ -17,7 +17,7 @@
     <div class="card-body">
         <form method="GET" class="d-flex flex-wrap gap-2 align-items-end">
             <div>
-                <label class="form-label">Trạng thái</label>
+                <label class="form-label">Tráº¡ng thÃ¡i</label>
                 <select name="status" class="form-select">
                     @foreach(['pending', 'approved', 'rejected'] as $value)
                         <option value="{{ $value }}" @selected($status === $value)>{{ $statusLabels[$value] ?? $value }}</option>
@@ -26,7 +26,7 @@
             </div>
             <button class="btn btn-primary">
                 <i class="bi bi-search"></i>
-                Lọc
+                Lá»c
             </button>
         </form>
     </div>
@@ -37,13 +37,13 @@
         <table class="table align-middle">
             <thead>
                 <tr>
-                    <th>Học sinh</th>
-                    <th>Lớp</th>
-                    <th>Ngày nghỉ</th>
-                    <th>Phụ huynh</th>
-                    <th>Lý do</th>
-                    <th>Trạng thái</th>
-                    <th class="text-end">Thao tác</th>
+                    <th>Há»c sinh</th>
+                    <th>Lá»›p</th>
+                    <th>NgÃ y nghá»‰</th>
+                    <th>Phá»¥ huynh</th>
+                    <th>LÃ½ do</th>
+                    <th>Tráº¡ng thÃ¡i</th>
+                    <th class="text-end">Thao tÃ¡c</th>
                 </tr>
             </thead>
             <tbody>
@@ -64,10 +64,10 @@
                     <td class="text-end">
                         @if($requestItem->status === \App\Models\ParentLeaveRequest::STATUS_PENDING)
                             <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#approveLeave{{ $requestItem->id }}">
-                                Phê duyệt
+                                PhÃª duyá»‡t
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectLeave{{ $requestItem->id }}">
-                                Không duyệt
+                                KhÃ´ng duyá»‡t
                             </button>
                         @else
                             <span class="text-muted small">{{ $requestItem->reviewed_at?->format('d/m/Y H:i') }}</span>
@@ -77,7 +77,7 @@
             @empty
                 <tr>
                     <td colspan="7">
-                        <div class="empty-state"><i class="bi bi-envelope-paper"></i>Không có đơn xin nghỉ học phù hợp.</div>
+                        <div class="empty-state"><i class="bi bi-envelope-paper"></i>KhÃ´ng cÃ³ Ä‘Æ¡n xin nghá»‰ há»c phÃ¹ há»£p.</div>
                     </td>
                 </tr>
             @endforelse
@@ -98,20 +98,20 @@
                         @method('PATCH')
                         <div class="modal-header">
                             <div>
-                                <div class="modal-kicker">Đơn nghỉ học</div>
-                                <h5 class="modal-title">Phê duyệt đơn</h5>
+                                <div class="modal-kicker">ÄÆ¡n nghá»‰ há»c</div>
+                                <h5 class="modal-title">PhÃª duyá»‡t Ä‘Æ¡n</h5>
                             </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ÄÃ³ng"></button>
                         </div>
                         <div class="modal-body">
-                            <p class="mb-2">Phê duyệt đơn nghỉ ngày <strong>{{ $requestItem->leave_date?->format('d/m/Y') }}</strong> của <strong>{{ $requestItem->student?->name }}</strong>.</p>
-                            <div class="alert alert-info small">Sau khi phê duyệt, hệ thống sẽ tự cập nhật điểm danh các tiết trong ngày thành “Có phép”.</div>
-                            <label class="form-label">Ghi chú</label>
-                            <textarea name="homeroom_note" class="form-control" rows="3" placeholder="Ghi chú nếu có"></textarea>
+                            <p class="mb-2">PhÃª duyá»‡t Ä‘Æ¡n nghá»‰ ngÃ y <strong>{{ $requestItem->leave_date?->format('d/m/Y') }}</strong> cá»§a <strong>{{ $requestItem->student?->name }}</strong>.</p>
+                            <div class="alert alert-info small">Sau khi phÃª duyá»‡t, há»‡ thá»‘ng sáº½ tá»± cáº­p nháº­t Ä‘iá»ƒm danh cÃ¡c tiáº¿t trong ngÃ y thÃ nh â€œCÃ³ phÃ©pâ€.</div>
+                            <label class="form-label">Ghi chÃº</label>
+                            <textarea name="homeroom_note" class="form-control" rows="3" placeholder="Ghi chÃº náº¿u cÃ³"></textarea>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                            <button class="btn btn-success">Phê duyệt</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Há»§y</button>
+                            <button class="btn btn-success">PhÃª duyá»‡t</button>
                         </div>
                     </form>
                 </div>
@@ -126,18 +126,18 @@
                         @method('PATCH')
                         <div class="modal-header">
                             <div>
-                                <div class="modal-kicker">Đơn nghỉ học</div>
-                                <h5 class="modal-title">Không duyệt đơn</h5>
+                                <div class="modal-kicker">ÄÆ¡n nghá»‰ há»c</div>
+                                <h5 class="modal-title">KhÃ´ng duyá»‡t Ä‘Æ¡n</h5>
                             </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ÄÃ³ng"></button>
                         </div>
                         <div class="modal-body">
-                            <label class="form-label">Lý do không duyệt</label>
+                            <label class="form-label">LÃ½ do khÃ´ng duyá»‡t</label>
                             <textarea name="homeroom_note" class="form-control" rows="3" required></textarea>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                            <button class="btn btn-danger">Không duyệt</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Há»§y</button>
+                            <button class="btn btn-danger">KhÃ´ng duyá»‡t</button>
                         </div>
                     </form>
                 </div>

@@ -2,10 +2,10 @@
 @section('title', 'Thêm học kỳ')
 
 @section('content')
-<form method="POST" action="{{ route('semesters.store') }}" class="card p-4 shadow-sm">
+<form method="POST" action="{{ route('semesters.store') }}" class="card p-4 shadow-sm" data-academic-modal-size="xl">
     @csrf
     <div class="row g-3">
-        <div class="col-md-4">
+        <div class="col-md-6">
             <label class="form-label">Tên học kỳ</label>
             <select name="name" class="form-select" required>
                 @foreach($termOptions as $value => $label)
@@ -14,7 +14,7 @@
             </select>
             @error('name')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-5">
+        <div class="col-md-6">
             <label class="form-label">Năm học</label>
             <select name="school_year_id" class="form-select" required>
                 @foreach($years as $year)
@@ -23,9 +23,11 @@
             </select>
             @error('school_year_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-3">
+        <div class="col-md-6">
             <label class="form-label">Trạng thái ban đầu</label>
-            <div class="form-control bg-light">Bản nháp</div>
+            <div>
+                <span class="academic-form-badge warning"><i class="bi bi-pencil-square"></i>Bản nháp</span>
+            </div>
         </div>
     </div>
     <div class="form-actions mt-4">

@@ -96,6 +96,7 @@
                     $teacherOutsideDepartment = $subjectDepartments->isNotEmpty()
                         && $teacherDepartmentId
                         && ! $subjectDepartments->pluck('id')->contains($teacherDepartmentId);
+                    $detailId = 'assignmentDetailModal' . $assignment->id;
                 @endphp
                 <tr>
                     <td>
@@ -108,7 +109,9 @@
                     </td>
                     <td class="fw-semibold">{{ $assignment->classRoom->name ?? '-' }}</td>
                     <td>
-                        @php($period = $periodProgress[(string) $assignment->getKey()] ?? ['standard' => 0, 'expected' => 0, 'scheduled' => 0, 'percent' => 0, 'badge_class' => 'bg-light text-muted border', 'progress_class' => 'bg-warning', 'label' => 'Chưa cấu hình định mức'])
+                        @php
+                            $period = $periodProgress[(string) $assignment->getKey()] ?? ['standard' => 0, 'expected' => 0, 'scheduled' => 0, 'percent' => 0, 'badge_class' => 'bg-light text-muted border', 'progress_class' => 'bg-warning', 'label' => 'Chưa cấu hình định mức'];
+                        @endphp
                         @if($period['expected'] > 0)
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <span class="badge {{ $period['badge_class'] }}">{{ $period['label'] }}</span>
@@ -130,34 +133,41 @@
                     <td>{{ $assignment->roleLabel() }}</td>
                     <td><span class="badge {{ $assignment->statusBadgeClass() }}">{{ $assignment->statusLabel() }}</span></td>
                     <td class="text-end">
-                        <div class="content-action-group justify-content-end">
+                        <div class="content-action-group justify-content-end" data-action-synced="true">
                             @unless($readOnly)
                                 <a href="{{ route('assignments.edit', $assignment) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
                                     <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                 </a>
-                                <div class="dropdown">
-                                    <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
-                                        <i class="bi bi-three-dots-vertical"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
+                            @else
+                                <span class="text-muted small">Chỉ xem</span>
+                            @endunless
+                            <div class="dropdown">
+                                <button type="button" class="content-action-btn icon-only dropdown-toggle-clean more" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end content-action-menu">
+                                    <li>
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}">
+                                            <i class="bi bi-eye"></i>Xem chi tiết
+                                        </button>
+                                    </li>
+                                    @unless($readOnly)
                                         @if($deleteCheck['allowed'])
                                             <li>
                                                 <form action="{{ route('assignments.destroy', $assignment) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa phân công này? Hành động này không thể hoàn tác.');">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="bi bi-trash me-2"></i>Xóa
+                                                    <button type="submit" class="dropdown-item danger">
+                                                        <i class="bi bi-trash"></i>Xóa bỏ
                                                     </button>
                                                 </form>
                                             </li>
                                         @else
                                             <li><span class="dropdown-item text-muted">{{ $deleteCheck['message'] ?? 'Đã phát sinh dữ liệu' }}</span></li>
                                         @endif
-                                    </ul>
-                                </div>
-                            @else
-                                <span class="text-muted small">Chỉ xem</span>
-                            @endunless
+                                    @endunless
+                                </ul>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -170,4 +180,77 @@
         </table>
     </div>
 </div>
+
+@foreach($assignments as $assignment)
+    @php
+        $assignmentPeriod = $periodProgress[(string) $assignment->getKey()] ?? ['standard' => 0, 'expected' => 0, 'scheduled' => 0];
+        $assignmentDepartments = $assignment->subject?->departments?->pluck('name')->filter()->join(', ');
+        $assignmentStatusLabel = $assignment->status === \App\Models\TeachingAssignment::STATUS_ACTIVE ? 'Đã kích hoạt' : $assignment->statusLabel();
+    @endphp
+    <div class="modal fade content-modal assignment-detail-modal academic-detail-center-modal" id="assignmentDetailModal{{ $assignment->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="academic-detail-header">
+                        <div class="academic-detail-identity">
+                            <h5 class="modal-title">CHI TIẾT PHÂN CÔNG GIẢNG DẠY</h5>
+                            <div>Niên khóa: {{ $assignment->schoolYear->name ?? '-' }} | {{ $assignment->semester?->normalizedName() ?? $assignment->semester?->name ?? '-' }}</div>
+                        </div>
+                        <span class="badge {{ $assignment->statusBadgeClass() }}">{{ $assignmentStatusLabel }}</span>
+                    </div>
+                    <button type="button" class="btn-close ms-3" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <section class="academic-detail-section">
+                        <h6>Thông tin đối tượng liên kết</h6>
+                        <div class="academic-detail-grid">
+                            <article>
+                                <span>Lớp học</span>
+                                <strong>{{ $assignment->classRoom->name ?? '-' }}</strong>
+                            </article>
+                            <article>
+                                <span>Môn học</span>
+                                <strong>{{ $assignment->subject->name ?? '-' }}</strong>
+                            </article>
+                            <article>
+                                <span>Giáo viên giảng dạy</span>
+                                <strong>{{ $assignment->teacher->name ?? '-' }}</strong>
+                            </article>
+                            <article>
+                                <span>Tổ chuyên môn liên kết</span>
+                                <strong>{{ $assignmentDepartments ?: '-' }}</strong>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section class="academic-detail-section mt-3">
+                        <h6>Định mức tiết dạy & Ghi chú</h6>
+                        <div class="assignment-detail-note-box">
+                            <div class="assignment-period-row">
+                                <span>Số tiết/tuần</span>
+                                <strong>
+                                    @if($assignment->hasWeeklyPeriodOverride())
+                                        {{ $assignment->weekly_periods }} tiết/tuần
+                                    @else
+                                        Sử dụng định mức mặc định của môn học
+                                    @endif
+                                </strong>
+                            </div>
+                            <div class="assignment-period-sub">
+                                Định mức hiệu lực: {{ $assignmentPeriod['expected'] ?: '-' }} tiết/tuần · Đã xếp: {{ $assignmentPeriod['scheduled'] ?? 0 }}/{{ $assignmentPeriod['expected'] ?: '-' }} tiết
+                            </div>
+                            <div class="assignment-detail-flat-note">
+                                <span>Ghi chú</span>
+                                <p>{{ trim((string) $assignment->note) !== '' ? $assignment->note : '-' }}</p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng cửa sổ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endforeach
 @endsection

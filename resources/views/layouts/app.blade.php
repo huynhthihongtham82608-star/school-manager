@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -12,7 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link href="{{ asset('css/school-ui.css') }}?v=20260722-page-header" rel="stylesheet">
+    <link href="{{ asset('css/school-ui.css') }}?v=20260727-academic-interactions" rel="stylesheet">
 </head>
 @php
     $currentUser = auth()->user();
@@ -691,6 +692,23 @@
                 </div>
             @endif
 
+            @if(request()->routeIs('messages.*'))
+                <x-page-header
+                    title="Hộp thư điện tử"
+                    subtitle="Kênh tương tác, trao đổi thông tin chính thống giữa Nhà trường, Giáo viên và Phụ huynh học sinh."
+                >
+                    @if(request()->routeIs('messages.create'))
+                        <a class="btn btn-outline-primary" href="{{ route('messages.inbox') }}">
+                            <i class="bi bi-arrow-left me-1"></i>Quay lại hộp thư
+                        </a>
+                    @else
+                        <a class="btn btn-primary" href="{{ route('messages.create') }}">
+                            <i class="bi bi-pencil-square me-1"></i>Soạn tin nhắn mới
+                        </a>
+                    @endif
+                </x-page-header>
+            @endif
+
             @include('partials.flash')
             @yield('content')
         </main>
@@ -744,18 +762,61 @@
     </section>
 </div>
 @endif
+<div class="modal fade content-modal academic-crud-modal" id="academicCrudModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-kicker" data-academic-crud-kicker>Biểu mẫu học vụ</div>
+                    <h5 class="modal-title" data-academic-crud-title>Thông tin dữ liệu</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body" data-academic-crud-body>
+                <div class="academic-interaction-loading">
+                    <span class="spinner-border text-primary" aria-hidden="true"></span>
+                    <span>Đang tải biểu mẫu...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade content-modal academic-detail-modal" id="academicDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-kicker">Chi tiết học vụ</div>
+                    <h5 class="modal-title" data-academic-detail-title>Thông tin chi tiết</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body" data-academic-detail-body>
+                <div class="academic-interaction-loading">
+                    <span class="spinner-border text-primary" aria-hidden="true"></span>
+                    <span>Đang tải dữ liệu...</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng hồ sơ</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade content-modal" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <div>
                     <div class="modal-kicker">Xác nhận xóa</div>
-                    <h5 class="modal-title">Bạn có chắc chắn muốn xóa dữ liệu này không?</h5>
+                    <h5 class="modal-title">Bạn có chắc chắn muốn xóa dữ liệu này?</h5>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-0 text-muted">Hành động này không thể hoàn tác.</p>
+                <p class="mb-0 text-muted">Hành động này không thể hoàn tác!</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
@@ -1437,6 +1498,214 @@
                 || header.querySelector('button, a, input, select, textarea');
         };
 
+        const normalizeActionHeaders = () => {
+            document.querySelectorAll('.content table.table thead th').forEach((header) => {
+                const label = normalizeText(header.innerText);
+                if (label === 'thao tac') {
+                    header.textContent = '';
+                    header.setAttribute('aria-label', 'Thao tác');
+                    header.classList.add('text-end', 'action-column-header');
+                }
+            });
+        };
+
+        const isDeleteForm = (form) => {
+            const method = (form.querySelector('input[name="_method"]')?.value || form.method || '').toUpperCase();
+            return method === 'DELETE';
+        };
+
+        const makeMenuItem = (element, type = 'default') => {
+            element.classList.remove('content-action-btn', 'icon-only', 'detail', 'edit', 'delete', 'more', 'dropdown-toggle-clean', 'btn', 'btn-sm', 'btn-outline-secondary', 'btn-outline-danger');
+            element.classList.add('dropdown-item');
+            if (type === 'danger') {
+                element.classList.add('danger');
+                element.classList.remove('text-danger');
+            }
+
+            return element;
+        };
+
+        const ensureActionDropdown = (group) => {
+            let dropdown = group.querySelector(':scope > .dropdown');
+            if (!dropdown) {
+                dropdown = document.createElement('div');
+                dropdown.className = 'dropdown';
+                dropdown.innerHTML = `
+                    <button type="button" class="content-action-btn icon-only more" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" title="Thao tác khác" aria-label="Thao tác khác">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end content-action-menu"></div>
+                `;
+                group.appendChild(dropdown);
+            }
+
+            const toggle = dropdown.querySelector('[data-bs-toggle="dropdown"]');
+            toggle?.classList.add('content-action-btn', 'icon-only', 'more');
+            toggle?.classList.remove('detail', 'edit', 'delete');
+            if (toggle && !toggle.querySelector('.bi-three-dots-vertical')) {
+                toggle.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+            }
+            toggle?.setAttribute('data-bs-boundary', 'viewport');
+
+            let menu = dropdown.querySelector('.dropdown-menu');
+            if (!menu) {
+                menu = document.createElement('div');
+                menu.className = 'dropdown-menu dropdown-menu-end';
+                dropdown.appendChild(menu);
+            }
+            if (menu.tagName === 'UL') {
+                const replacement = document.createElement('div');
+                replacement.className = menu.className;
+                while (menu.firstChild) {
+                    replacement.appendChild(menu.firstChild);
+                }
+                menu.replaceWith(replacement);
+                menu = replacement;
+            }
+            menu.classList.add('content-action-menu');
+
+            return { dropdown, menu };
+        };
+
+        const normalizeActionGroups = () => {
+            document.querySelectorAll('.content-action-group').forEach((group) => {
+                if (group.dataset.actionSynced === 'true') {
+                    return;
+                }
+
+                group.classList.add('justify-content-end');
+
+                const edit = group.querySelector(':scope > .content-action-btn.edit, :scope > a.content-action-btn[href*="/edit"], :scope > button.content-action-btn[data-bs-target*="Edit"], :scope > button.content-action-btn[data-bs-target*="edit"]');
+                if (edit) {
+                    edit.classList.add('content-action-btn', 'icon-only', 'edit');
+                    edit.classList.remove('more', 'delete', 'detail');
+                }
+
+                const { menu } = ensureActionDropdown(group);
+
+                group.querySelectorAll(':scope > .content-action-btn.detail, :scope > button.content-action-btn[data-bs-target*="Detail"], :scope > button.content-action-btn[data-bs-target*="detail"], :scope > a.content-action-btn[href*="/detail"], :scope > a.content-action-btn[href*="/show"]').forEach((detail) => {
+                    if (detail.closest('.dropdown')) {
+                        return;
+                    }
+
+                    makeMenuItem(detail);
+                    const text = normalizeText(detail.innerText);
+                    if (!text || !text.includes('xem')) {
+                        detail.innerHTML = '<i class="bi bi-eye"></i>Xem chi tiết';
+                    }
+                    menu.prepend(detail);
+                });
+
+                group.querySelectorAll(':scope > form').forEach((form) => {
+                    if (!isDeleteForm(form) || form.closest('.dropdown')) {
+                        return;
+                    }
+
+                    const button = form.querySelector('button');
+                    if (button) {
+                        makeMenuItem(button, 'danger');
+                        button.innerHTML = '<i class="bi bi-trash"></i>Xóa bỏ';
+                        if (!form.getAttribute('onsubmit')) {
+                            form.setAttribute('onsubmit', "return confirm('Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!')");
+                        }
+                    }
+                    menu.appendChild(form);
+                });
+
+                menu.querySelectorAll('.dropdown-item').forEach((item) => {
+                    const text = normalizeText(item.innerText);
+                    if (text === 'xoa' || text === 'xoa bo' || item.classList.contains('text-danger')) {
+                        item.classList.add('danger');
+                        item.classList.remove('text-danger');
+                        if (text === 'xoa') {
+                            item.innerHTML = '<i class="bi bi-trash"></i>Xóa bỏ';
+                        }
+                    }
+                    if (text.includes('xem chi tiet')) {
+                        item.innerHTML = '<i class="bi bi-eye"></i>Xem chi tiết';
+                    }
+                });
+
+                const hasDetailItem = [...menu.querySelectorAll('.dropdown-item')]
+                    .some((item) => normalizeText(item.innerText).includes('xem chi tiet'));
+
+                if (!hasDetailItem) {
+                    const firstCell = group.closest('tr')?.cells?.[0];
+                    const summary = firstCell?.innerText?.trim() || 'Dữ liệu';
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'dropdown-item';
+                    item.innerHTML = '<i class="bi bi-eye"></i>Xem chi tiết';
+                    item.addEventListener('click', () => {
+                        const modal = document.getElementById('academicDetailModal');
+                        const title = modal?.querySelector('[data-academic-detail-title]');
+                        const body = modal?.querySelector('[data-academic-detail-body]');
+                        if (!modal || !body || !window.bootstrap) {
+                            return;
+                        }
+                        if (title) {
+                            title.textContent = 'Thông tin chi tiết';
+                        }
+                        body.innerHTML = `<div class="content-detail-list"><div><dt>Dữ liệu</dt><dd>${summary.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]))}</dd></div></div>`;
+                        bootstrap.Modal.getOrCreateInstance(modal).show();
+                    });
+                    menu.prepend(item);
+                }
+
+                group.dataset.actionSynced = 'true';
+            });
+        };
+
+        const openCenteredDetailModal = async (url) => {
+            const modalElement = document.getElementById('academicDetailModal');
+            const title = modalElement?.querySelector('[data-academic-detail-title]');
+            const body = modalElement?.querySelector('[data-academic-detail-body]');
+
+            if (!modalElement || !body || !window.bootstrap) {
+                window.location.href = url;
+                return;
+            }
+
+            if (title) {
+                title.textContent = 'Thông tin chi tiết';
+            }
+            body.innerHTML = `
+                <div class="academic-interaction-loading">
+                    <span class="spinner-border text-primary" aria-hidden="true"></span>
+                    <span>Đang tải dữ liệu...</span>
+                </div>
+            `;
+            bootstrap.Modal.getOrCreateInstance(modalElement).show();
+
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                });
+
+                if (!response.ok) {
+                    throw new Error('Không thể tải dữ liệu.');
+                }
+
+                const html = await response.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const loadedTitle = doc.querySelector('.page-header h1, .page-heading h5, h1, h5, title')?.textContent?.trim();
+                const content = doc.querySelector('.content') || doc.querySelector('main') || doc.body;
+                const clone = content.cloneNode(true);
+                clone.querySelectorAll('script, .page-header, .page-heading, .form-actions, .admin-table-tools').forEach((element) => element.remove());
+
+                if (title) {
+                    title.textContent = loadedTitle || 'Thông tin chi tiết';
+                }
+                body.innerHTML = '';
+                body.appendChild(clone);
+            } catch (error) {
+                body.innerHTML = `<div class="alert alert-danger mb-0">${error.message || 'Không thể tải dữ liệu.'}</div>`;
+            }
+        };
+
         const enhanceTable = (table) => {
             if (table.dataset.adminEnhanced === 'true') {
                 return;
@@ -1462,9 +1731,12 @@
             const wrapper = table.closest('.table-responsive');
             const insertionTarget = wrapper || table;
             const parent = insertionTarget.parentElement;
+            const skipAutoToolbar = table.hasAttribute('data-no-auto-toolbar');
 
             if (!dataRows.length) {
-                createAdminToolbar(parent, insertionTarget);
+                if (!skipAutoToolbar) {
+                    createAdminToolbar(parent, insertionTarget);
+                }
                 table.dataset.adminEnhanced = 'true';
                 return;
             }
@@ -1491,7 +1763,7 @@
                 body.appendChild(noResultsRow);
             }
 
-            if (parent && !parent.querySelector(':scope > .admin-table-tools')) {
+            if (!skipAutoToolbar && parent && !parent.querySelector(':scope > .admin-table-tools')) {
                 const toolbar = document.createElement('div');
                 toolbar.className = 'admin-table-tools';
                 toolbar.innerHTML = `
@@ -1561,9 +1833,518 @@
             table.dataset.adminEnhanced = 'true';
         };
 
+        normalizeActionHeaders();
+        normalizeActionGroups();
         document.querySelectorAll('.content table.table').forEach(enhanceTable);
+
+        document.addEventListener('click', (event) => {
+            const link = event.target.closest('.content-action-menu a.dropdown-item[href]');
+            if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                return;
+            }
+
+            const label = normalizeText(link.textContent || link.getAttribute('title') || '');
+            if (!label.includes('xem chi tiet')) {
+                return;
+            }
+
+            const url = new URL(link.href, window.location.href);
+            if (url.origin !== window.location.origin) {
+                return;
+            }
+
+            event.preventDefault();
+            openCenteredDetailModal(url.href);
+        });
     })();
     @endif
+
+    (() => {
+        const academicRouteFragments = [
+            '/school-years',
+            '/semesters',
+            '/subjects',
+            '/departments',
+            '/rooms',
+            '/classes',
+            '/assignments',
+            '/exam-schedules',
+            '/timetable',
+            '/scores',
+            '/conduct',
+            '/attendance'
+        ];
+
+        const crudModalElement = document.getElementById('academicCrudModal');
+        const crudModalTitle = crudModalElement?.querySelector('[data-academic-crud-title]');
+        const crudModalKicker = crudModalElement?.querySelector('[data-academic-crud-kicker]');
+        const crudModalBody = crudModalElement?.querySelector('[data-academic-crud-body]');
+        const crudModal = crudModalElement && window.bootstrap ? new bootstrap.Modal(crudModalElement) : null;
+        const detailModalElement = document.getElementById('academicDetailModal');
+        const detailModalTitle = detailModalElement?.querySelector('[data-academic-detail-title]');
+        const detailModalBody = detailModalElement?.querySelector('[data-academic-detail-body]');
+        const detailModal = detailModalElement && window.bootstrap ? new bootstrap.Modal(detailModalElement) : null;
+
+        const normalizeText = (value) => (value || '')
+            .toString()
+            .toLocaleLowerCase('vi')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const isAcademicUrl = (url) => {
+            try {
+                const parsed = new URL(url, window.location.href);
+                return parsed.origin === window.location.origin
+                    && academicRouteFragments.some((fragment) => parsed.pathname.includes(fragment));
+            } catch (_) {
+                return false;
+            }
+        };
+
+        const loadingHtml = (label) => `
+            <div class="academic-interaction-loading">
+                <span class="spinner-border text-primary" aria-hidden="true"></span>
+                <span>${label}</span>
+            </div>
+        `;
+
+        const fetchDocument = async (url) => {
+            const response = await fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                throw new Error('Không thể tải dữ liệu.');
+            }
+
+            const html = await response.text();
+            return new DOMParser().parseFromString(html, 'text/html');
+        };
+
+        const normalizeModalForm = (form) => {
+            form.classList.remove('card', 'shadow-sm', 'p-4');
+            form.classList.add('academic-modal-form');
+            form.querySelectorAll('.form-actions a, .form-actions button[type="button"]').forEach((element) => {
+                if (element.matches('a')) {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'btn btn-secondary';
+                    button.dataset.bsDismiss = 'modal';
+                    button.textContent = 'Hủy';
+                    element.replaceWith(button);
+                } else {
+                    element.setAttribute('data-bs-dismiss', 'modal');
+                }
+            });
+
+            let footer = form.querySelector('.form-actions');
+            if (!footer) {
+                footer = [...form.children]
+                    .reverse()
+                    .find((element) => element.matches?.('div') && element.querySelector?.('button, a.btn'));
+
+                if (footer) {
+                    footer.classList.add('form-actions');
+                }
+            }
+
+            if (footer) {
+                footer.querySelectorAll('a.btn').forEach((element) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'btn btn-secondary';
+                    button.dataset.bsDismiss = 'modal';
+                    button.textContent = 'Hủy';
+                    element.replaceWith(button);
+                });
+
+                const submit = footer.querySelector('button[type="submit"], button:not([type])');
+                submit?.classList.remove('btn-outline-primary');
+                submit?.classList.add('btn-primary');
+                if (submit) {
+                    submit.textContent = 'Lưu kết quả';
+                }
+            }
+        };
+
+        const findBusinessForm = (doc) => {
+            const content = doc.querySelector('.content') || doc.querySelector('main') || doc.body;
+            const forms = [...content.querySelectorAll('form')];
+
+            return forms.find((form) => {
+                const method = (form.getAttribute('method') || 'GET').toUpperCase();
+                const action = form.getAttribute('action') || '';
+
+                return method !== 'GET'
+                    && !form.matches('[data-function-search], [data-logout-home]')
+                    && !form.closest('.app-header, .admin-account-menu, .floating-chatbot, .modal, .dropdown-menu')
+                    && !action.includes('/logout')
+                    && !action.includes('/chatbot')
+                    && !action.includes('/academic-context');
+            }) || null;
+        };
+
+        const initSchoolYearFields = (root) => {
+            root.querySelectorAll('[data-school-year-form]').forEach((form) => {
+                if (form.dataset.modalInitialized === 'true') {
+                    return;
+                }
+
+                form.dataset.modalInitialized = 'true';
+                const startYearInput = form.querySelector('[data-start-year]');
+                const endYearInput = form.querySelector('[data-end-year]');
+                const startDateInput = form.querySelector('[data-start-date]');
+                const endDateInput = form.querySelector('[data-end-date]');
+                const activeInput = form.querySelector('input[name="is_active"]');
+                const confirmInput = form.querySelector('[data-confirm-activation]');
+                const activeYear = form.dataset.activeYear || '';
+                let startDateTouched = Boolean(startDateInput?.value);
+                let endDateTouched = Boolean(endDateInput?.value);
+
+                const padYear = (value) => String(value).padStart(4, '0');
+                const syncYears = () => {
+                    const startYear = Number.parseInt(startYearInput?.value || '', 10);
+                    if (!Number.isNaN(startYear) && endYearInput && (!endYearInput.value || Number.parseInt(endYearInput.value, 10) !== startYear + 1)) {
+                        endYearInput.value = String(startYear + 1);
+                    }
+                    syncDates();
+                };
+
+                const syncDates = () => {
+                    const startYear = Number.parseInt(startYearInput?.value || '', 10);
+                    const endYear = Number.parseInt(endYearInput?.value || '', 10);
+
+                    if (Number.isNaN(startYear) || Number.isNaN(endYear)) {
+                        return;
+                    }
+
+                    if (!startDateTouched && startDateInput) {
+                        startDateInput.value = `${padYear(startYear)}-08-01`;
+                    }
+
+                    if (!endDateTouched && endDateInput) {
+                        endDateInput.value = `${padYear(endYear)}-05-31`;
+                    }
+                };
+
+                startYearInput?.addEventListener('input', syncYears);
+                endYearInput?.addEventListener('input', syncDates);
+                startDateInput?.addEventListener('input', () => startDateTouched = true);
+                endDateInput?.addEventListener('input', () => endDateTouched = true);
+
+                form.addEventListener('submit', (event) => {
+                    if (!activeInput?.checked || !activeYear || confirmInput?.value === '1') {
+                        return;
+                    }
+
+                    const accepted = window.confirm(`Đang có năm học hiện hành. Bạn có muốn chuyển sang năm học mới không?`);
+                    if (accepted && confirmInput) {
+                        confirmInput.value = '1';
+                        return;
+                    }
+
+                    event.preventDefault();
+                });
+
+                syncDates();
+            });
+        };
+
+        const initSubjectTypeToggle = (root) => {
+            const typeSelect = root.querySelector('#subjectTypeSelect, [name="type"]');
+            const periodSection = root.querySelector('#periodNormSection');
+            if (!typeSelect || !periodSection) {
+                return;
+            }
+
+            const toggle = () => {
+                const officialValue = '{{ \App\Models\Subject::TYPE_OFFICIAL }}';
+                periodSection.classList.toggle('d-none', typeSelect.value !== officialValue);
+            };
+
+            typeSelect.addEventListener('change', toggle);
+            toggle();
+        };
+
+        const initAssignmentFields = (root) => {
+            const teacherSelect = root.querySelector('[data-assignment-teacher]');
+            const subjectSelect = root.querySelector('[data-assignment-subject-select]');
+            const departmentFilter = root.querySelector('[data-assignment-department-filter]');
+            const departmentWarning = root.querySelector('[data-assignment-department-warning]');
+            const subjectDepartmentsText = root.querySelector('[data-assignment-subject-departments]');
+
+            if (!teacherSelect || !subjectSelect) {
+                return;
+            }
+
+            const selectedSubjectDepartmentIds = () => {
+                const selected = subjectSelect.selectedOptions?.[0];
+                return (selected?.dataset?.departments || '').split(',').filter(Boolean);
+            };
+
+            const updateSubjectDepartmentText = () => {
+                const selected = subjectSelect.selectedOptions?.[0];
+                const names = selected?.dataset?.departmentNames || '';
+                if (subjectDepartmentsText) {
+                    subjectDepartmentsText.textContent = names
+                        ? `Tổ phụ trách: ${names}`
+                        : 'Môn học này chưa được gán tổ phụ trách.';
+                }
+            };
+
+            const warnIfTeacherOutsideDepartment = () => {
+                const teacher = teacherSelect.selectedOptions?.[0];
+                const teacherDepartment = teacher?.dataset?.department || '';
+                const subjectDepartments = selectedSubjectDepartmentIds();
+                const shouldWarn = subjectDepartments.length > 0
+                    && Boolean(teacher?.value)
+                    && (!teacherDepartment || !subjectDepartments.includes(teacherDepartment));
+
+                departmentWarning?.classList.toggle('d-none', !shouldWarn);
+            };
+
+            const filterTeachers = () => {
+                const departmentId = departmentFilter?.value || '';
+                [...teacherSelect.options].forEach((option) => {
+                    option.hidden = Boolean(departmentId) && option.value && option.dataset.department !== departmentId;
+                });
+
+                if (teacherSelect.selectedOptions[0]?.hidden) {
+                    teacherSelect.value = '';
+                }
+
+                warnIfTeacherOutsideDepartment();
+            };
+
+            const syncDepartmentFromSubject = () => {
+                updateSubjectDepartmentText();
+                const subjectDepartments = selectedSubjectDepartmentIds();
+
+                if (subjectDepartments.length === 1 && departmentFilter) {
+                    departmentFilter.value = subjectDepartments[0];
+                }
+
+                filterTeachers();
+            };
+
+            subjectSelect.addEventListener('change', syncDepartmentFromSubject);
+            teacherSelect.addEventListener('change', warnIfTeacherOutsideDepartment);
+            departmentFilter?.addEventListener('change', filterTeachers);
+            syncDepartmentFromSubject();
+        };
+
+        const initMultiSelectPickers = (root) => {
+            const normalizeText = (value) => (value || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+            const escapeHtml = (value) => (value || '').replace(/[&<>"']/g, (char) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;',
+            }[char]));
+
+            root.querySelectorAll('[data-multi-select-picker-select]').forEach((select) => {
+                const picker = select.nextElementSibling;
+                if (!picker || !picker.matches('[data-multi-select-picker]') || picker.dataset.initialized === 'true') {
+                    return;
+                }
+
+                picker.dataset.initialized = 'true';
+                const tags = picker.querySelector('[data-multi-select-tags]');
+                const search = picker.querySelector('[data-multi-select-search]');
+                const dropdown = picker.querySelector('[data-multi-select-dropdown]');
+                if (!tags || !search || !dropdown) {
+                    return;
+                }
+
+                const placeholder = picker.dataset.placeholder || 'Chưa chọn dữ liệu';
+                const emptyText = picker.dataset.emptyText || 'Không tìm thấy dữ liệu phù hợp.';
+                const selectedText = picker.dataset.selectedText || 'Đã chọn';
+                const maxVisibleTags = Number.parseInt(picker.dataset.maxVisibleTags || '0', 10);
+                const options = [...select.options].map((option) => ({
+                    option,
+                    value: option.value,
+                    label: option.textContent.replace(/\s+/g, ' ').trim(),
+                    searchText: normalizeText(option.textContent),
+                }));
+
+                const render = () => {
+                    const selected = options.filter((item) => item.option.selected);
+                    tags.innerHTML = '';
+                    dropdown.innerHTML = '';
+
+                    if (!selected.length) {
+                        tags.innerHTML = `<span class="parent-student-placeholder">${escapeHtml(placeholder)}</span>`;
+                    } else {
+                        const visible = maxVisibleTags > 0 ? selected.slice(0, maxVisibleTags) : selected;
+                        visible.forEach((item) => {
+                            const tag = document.createElement('span');
+                            tag.className = 'parent-student-tag';
+                            tag.innerHTML = `<span>${escapeHtml(item.label)}</span><button type="button" aria-label="Bỏ chọn">×</button>`;
+                            tag.querySelector('button').addEventListener('click', (event) => {
+                                event.stopPropagation();
+                                item.option.selected = false;
+                                render();
+                            });
+                            tags.appendChild(tag);
+                        });
+                        if (selected.length > visible.length) {
+                            const more = document.createElement('span');
+                            more.className = 'parent-student-tag';
+                            more.title = selected.slice(visible.length).map((item) => item.label).join('\n');
+                            more.textContent = `+${selected.length - visible.length} mục khác`;
+                            tags.appendChild(more);
+                        }
+                    }
+
+                    const keyword = normalizeText(search.value);
+                    const matched = options.filter((item) => !keyword || item.searchText.includes(keyword)).slice(0, 80);
+                    if (!matched.length) {
+                        dropdown.innerHTML = `<div class="parent-student-empty">${escapeHtml(emptyText)}</div>`;
+                        return;
+                    }
+
+                    matched.forEach((item) => {
+                        const row = document.createElement('button');
+                        row.type = 'button';
+                        row.className = `parent-student-option${item.option.selected ? ' selected' : ''}`;
+                        row.innerHTML = `<span>${escapeHtml(item.label)}</span>${item.option.selected ? `<strong>${escapeHtml(selectedText)}</strong>` : ''}`;
+                        row.addEventListener('click', () => {
+                            item.option.selected = !item.option.selected;
+                            search.value = '';
+                            picker.classList.add('open');
+                            render();
+                            search.focus();
+                        });
+                        dropdown.appendChild(row);
+                    });
+                };
+
+                picker.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    document.querySelectorAll('[data-multi-select-picker].open').forEach((item) => item !== picker && item.classList.remove('open'));
+                    picker.classList.add('open');
+                    search.focus();
+                });
+                search.addEventListener('focus', () => picker.classList.add('open'));
+                search.addEventListener('input', render);
+                render();
+            });
+        };
+
+        const initInjectedForm = (root) => {
+            initSchoolYearFields(root);
+            initSubjectTypeToggle(root);
+            initAssignmentFields(root);
+            initMultiSelectPickers(root);
+            root.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((element) => new bootstrap.Tooltip(element));
+        };
+
+        const inferModalSize = (url, form) => {
+            if (form?.dataset?.academicModalSize) {
+                return form.dataset.academicModalSize;
+            }
+
+            return ['/school-years', '/semesters', '/rooms'].some((fragment) => url.includes(fragment))
+                ? 'xl'
+                : '2xl';
+        };
+
+        const openCrudModal = async (url) => {
+            if (!crudModal || !crudModalBody) {
+                window.location.href = url;
+                return;
+            }
+
+            crudModalBody.innerHTML = loadingHtml('Đang tải biểu mẫu...');
+            crudModalTitle.textContent = 'Thông tin dữ liệu';
+            crudModalKicker.textContent = url.includes('/edit') ? 'Chỉnh sửa dữ liệu' : 'Thêm mới dữ liệu';
+            crudModal.show();
+
+            try {
+                crudModalElement.classList.remove('academic-modal-xl', 'academic-modal-2xl');
+                const doc = await fetchDocument(url);
+                const title = doc.querySelector('.page-header h1, .page-heading h5, h1, h5, title')?.textContent?.trim();
+                const form = findBusinessForm(doc);
+
+                if (!form) {
+                    throw new Error('Không tìm thấy biểu mẫu.');
+                }
+
+                const modalSize = inferModalSize(url, form);
+                crudModalElement.classList.add(modalSize === 'xl' ? 'academic-modal-xl' : 'academic-modal-2xl');
+                normalizeModalForm(form);
+                const normalizedTitle = title || (url.includes('/edit') ? 'Chỉnh sửa dữ liệu' : 'Thêm mới dữ liệu');
+                crudModalTitle.textContent = url.includes('/edit')
+                    ? normalizedTitle.replace(/^Sửa\s+/i, 'Chỉnh sửa ')
+                    : normalizedTitle;
+                crudModalBody.innerHTML = '';
+                crudModalBody.appendChild(form);
+                initInjectedForm(crudModalBody);
+            } catch (error) {
+                crudModalBody.innerHTML = `<div class="alert alert-danger mb-0">${error.message || 'Không thể tải biểu mẫu.'}</div>`;
+            }
+        };
+
+        const openDetailModal = async (url) => {
+            if (!detailModal || !detailModalBody) {
+                window.location.href = url;
+                return;
+            }
+
+            detailModalBody.innerHTML = loadingHtml('Đang tải dữ liệu...');
+            detailModalTitle.textContent = 'Thông tin chi tiết';
+            detailModal.show();
+
+            try {
+                const doc = await fetchDocument(url);
+                const title = doc.querySelector('.page-header h1, .page-heading h5, h1, h5, title')?.textContent?.trim();
+                const content = doc.querySelector('.content') || doc.querySelector('main') || doc.body;
+                const clone = content.cloneNode(true);
+                clone.querySelectorAll('script, .page-header, .page-heading, .form-actions').forEach((element) => element.remove());
+
+                detailModalTitle.textContent = title || 'Thông tin chi tiết';
+                detailModalBody.innerHTML = '';
+                detailModalBody.appendChild(clone);
+            } catch (error) {
+                detailModalBody.innerHTML = `<div class="alert alert-danger mb-0">${error.message || 'Không thể tải dữ liệu.'}</div>`;
+            }
+        };
+
+        document.addEventListener('click', (event) => {
+            const link = event.target.closest('a[href]');
+            if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                return;
+            }
+
+            const href = link.href;
+            if (!isAcademicUrl(href)) {
+                return;
+            }
+
+            const linkLabel = normalizeText(link.textContent || link.getAttribute('title') || link.getAttribute('aria-label') || '');
+            const isCrudFormLink = href.includes('/create') || href.includes('/edit');
+            const isDetailLink = href.includes('/detail')
+                || href.includes('/show')
+                || linkLabel.includes('xem chi tiet');
+
+            if (!isCrudFormLink && !isDetailLink) {
+                return;
+            }
+
+            event.preventDefault();
+            if (isCrudFormLink) {
+                openCrudModal(href);
+            } else {
+                openDetailModal(href);
+            }
+        });
+    })();
 
     (() => {
         const modalElement = document.getElementById('deleteConfirmModal');

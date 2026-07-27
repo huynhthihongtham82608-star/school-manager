@@ -30,7 +30,7 @@ class StudentController extends Controller
         $selectedGender = $request->query('gender', 'all');
         $readOnly = $this->isHistoricalReadOnly();
 
-        $students = Student::with(['classRoom.schoolYear', 'schoolYear', 'user'])
+        $students = Student::with(['classRoom.schoolYear', 'schoolYear', 'user', 'parents'])
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->when(in_array($selectedGrade, ['10', '11', '12'], true), function ($query) use ($selectedGrade) {
                 $query->whereHas('classRoom', fn ($classQuery) => $classQuery->where('grade_level', $selectedGrade));
@@ -241,7 +241,7 @@ class StudentController extends Controller
             ]);
         }
 
-        $student->load(['classRoom.schoolYear', 'schoolYear']);
+        $student->load(['classRoom.schoolYear', 'schoolYear', 'parents']);
         $data = $this->formData();
 
         if ($student->classRoom && ! $data['classes']->contains('id', $student->class_id)) {
@@ -271,6 +271,11 @@ class StudentController extends Controller
         }
 
         $student->update($data);
+
+        $parentData = $this->validatedOptionalParentData($request);
+        if ($parentData['phone'] !== null) {
+            $this->syncParentForStudent($student, $parentData);
+        }
 
         AuditLogger::log('student_updated', Student::class, (string) $student->getKey(), 'Cập nhật học sinh ' . $student->name);
 
@@ -437,6 +442,30 @@ class StudentController extends Controller
             'relation' => $request->input('parent_relation'),
             'name' => $request->input('parent_name'),
             'phone' => $request->input('parent_phone'),
+        ];
+    }
+
+    private function validatedOptionalParentData(Request $request): array
+    {
+        $validated = $request->validate([
+            'parent_name' => ['nullable', 'string', 'max:255'],
+            'parent_relation' => ['nullable', Rule::in(array_keys(ParentProfile::relationLabels()))],
+            'parent_phone' => ['nullable', 'string', 'max:50'],
+            'parent_address' => ['nullable', 'string', 'max:255'],
+        ], [], [
+            'parent_name' => 'họ tên phụ huynh',
+            'parent_relation' => 'quan hệ',
+            'parent_phone' => 'số điện thoại phụ huynh',
+            'parent_address' => 'địa chỉ phụ huynh',
+        ]);
+
+        $phone = trim((string) ($validated['parent_phone'] ?? ''));
+
+        return [
+            'address' => $request->input('parent_address'),
+            'relation' => $request->input('parent_relation') ?: ParentProfile::RELATION_GUARDIAN,
+            'name' => trim((string) ($validated['parent_name'] ?? '')) ?: 'Phụ huynh của ' . ($request->input('name') ?: 'học sinh'),
+            'phone' => $phone !== '' ? $phone : null,
         ];
     }
 

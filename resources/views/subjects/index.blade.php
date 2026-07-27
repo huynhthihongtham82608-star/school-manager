@@ -2,7 +2,9 @@
 @section('title', 'Môn học')
 
 @section('content')
-@php($statusFilters = ['all' => 'Tất cả'] + \App\Models\Subject::STATUSES)
+@php
+    $statusFilters = ['all' => 'Tất cả'] + \App\Models\Subject::STATUSES;
+@endphp
 
 <x-page-header
     title="Quản lý môn học"
@@ -50,7 +52,10 @@
             </thead>
             <tbody>
             @forelse($subjects as $subject)
-                @php($canDelete = $subject->canDelete())
+                @php
+                    $canDelete = $subject->canDelete();
+                    $detailId = 'subjectDetailModal' . $subject->id;
+                @endphp
                 <tr>
                     <td class="fw-semibold">{{ $subject->code }}</td>
                     <td>{{ $subject->name }}</td>
@@ -77,8 +82,8 @@
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li>
-                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#subjectNormModal{{ $subject->id }}">
-                                            <i class="bi bi-clock-history me-2"></i>Xem định mức tiết
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}">
+                                            <i class="bi bi-eye me-2"></i>Xem chi tiết
                                         </button>
                                     </li>
                                     @unless($readOnly)
@@ -89,7 +94,7 @@
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="bi bi-trash me-2"></i>Xóa
+                                                        <i class="bi bi-trash me-2"></i>Xóa bỏ
                                                     </button>
                                                 </form>
                                             </li>
@@ -114,49 +119,81 @@
 </div>
 
 @foreach($subjects as $subject)
-    <div class="modal fade" id="subjectNormModal{{ $subject->id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade content-modal subject-detail-modal" id="subjectDetailModal{{ $subject->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <div>
-                        <h5 class="modal-title">Định mức tiết học</h5>
-                        <div class="text-muted small">{{ $subject->code }} - {{ $subject->name }}</div>
+                    <div class="subject-detail-header">
+                        <div class="subject-detail-identity">
+                            <h5 class="modal-title">{{ $subject->name }}</h5>
+                            <div>Mã môn: {{ $subject->code }}</div>
+                        </div>
+                        <span class="badge {{ $subject->statusBadgeClass() }}">{{ $subject->statusLabel() }}</span>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    <button type="button" class="btn-close ms-3" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
-                    @if($subject->requiresTeachingAssignment())
-                        <div class="table-responsive">
-                            <table class="table mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Khối</th>
-                                        <th>Số tiết/tuần</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                    <section class="subject-detail-section">
+                        <h6>Thông tin quản lý môn học</h6>
+                        <div class="subject-detail-info-grid">
+                            <div>
+                                <span>Loại môn</span>
+                                <strong>{{ $subject->typeLabel() }}</strong>
+                            </div>
+                            <div>
+                                <span>Hệ số môn</span>
+                                <strong>{{ $subject->credit }}</strong>
+                            </div>
+                            <div class="wide">
+                                <span>Tổ phụ trách</span>
+                                <strong>
+                                    @if($subject->isScorable())
+                                        {{ $subject->departments->pluck('name')->join(', ') ?: '-' }}
+                                    @else
+                                        Không áp dụng
+                                    @endif
+                                </strong>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="subject-detail-section mt-3">
+                        <h6>Định mức phân bổ tiết học theo khối</h6>
+                        @if($subject->requiresTeachingAssignment())
+                            <div class="subject-detail-norm-box">
+                                <div class="subject-norm-grid">
                                     @foreach($gradeLevels as $gradeLevel)
-                                        @php($norm = $subject->periodNormForGrade($gradeLevel))
-                                        <tr>
-                                            <td class="fw-semibold">Khối {{ $gradeLevel }}</td>
-                                            <td>{{ $norm?->periods_per_week ?? 'Chưa cấu hình' }}</td>
-                                        </tr>
+                                        @php
+                                            $norm = $subject->periodNormForGrade($gradeLevel);
+                                        @endphp
+                                        <div class="subject-norm-card">
+                                            <div>Khối {{ $gradeLevel }}</div>
+                                            <strong>{{ $norm?->periods_per_week ?? '-' }}</strong>
+                                            <span>{{ $norm ? 'tiết/tuần' : 'Chưa cấu hình' }}</span>
+                                        </div>
                                     @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @else
-                        <div class="empty-state py-4">
-                            <i class="bi bi-calendar-event"></i>
-                            Môn {{ $subject->typeLabel() }} không áp dụng định mức tiết/tuần và không cần phân công giáo viên bộ môn.
-                        </div>
-                    @endif
+                                </div>
+                            </div>
+                        @else
+                            <div class="subject-detail-norm-box">
+                                <div class="subject-norm-grid">
+                                    @foreach($gradeLevels as $gradeLevel)
+                                        <div class="subject-norm-card empty">
+                                            <div>Khối {{ $gradeLevel }}</div>
+                                            <strong>-</strong>
+                                            <span>Không áp dụng</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                                <div class="text-muted mt-3">
+                                    Môn {{ $subject->typeLabel() }} không tính điểm, không áp dụng định mức tiết/tuần và không cần phân công giáo viên bộ môn.
+                                </div>
+                            </div>
+                        @endif
+                    </section>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                    @unless($readOnly)
-                        <a href="{{ route('subjects.edit', $subject) }}" class="btn btn-primary">Cấu hình định mức tiết</a>
-                    @endunless
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng hồ sơ môn học</button>
                 </div>
             </div>
         </div>

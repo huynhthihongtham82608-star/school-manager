@@ -10,9 +10,9 @@
         <button type="button" class="btn btn-outline-primary" onclick="window.print()">
             <i class="bi bi-bar-chart me-1"></i>Xuất file liên kết
         </button>
-        <a class="btn btn-primary" href="{{ route('parents.create') }}">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#parentCreateModal">
             <i class="bi bi-plus-lg me-1"></i>Thêm phụ huynh
-        </a>
+        </button>
     </div>
 </x-page-header>
 
@@ -55,23 +55,23 @@
                     </td>
                     <td>
                         @if($parent->user?->is_active)
-                            <span class="badge bg-success">Đang hoạt động</span>
+                            <span class="badge bg-success">Hoạt động</span>
                         @else
                             <span class="badge bg-secondary">Chưa kích hoạt</span>
                         @endif
                     </td>
                     <td class="text-end">
                         <div class="content-action-group justify-content-end">
-                            <a class="content-action-btn icon-only edit" href="{{ route('parents.edit', $parent) }}" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
+                            <button type="button" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="modal" data-bs-target="#parentEdit{{ $parent->id }}">
                                 <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
-                            </a>
+                            </button>
                             <div class="dropdown">
                                 <button class="content-action-btn icon-only" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
                                     <i class="bi bi-three-dots-vertical"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li>
-                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#parentDetailModal{{ $parent->id }}">
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#parentDetail{{ $parent->id }}">
                                             <i class="bi bi-eye me-2"></i>Xem chi tiết
                                         </button>
                                     </li>
@@ -85,7 +85,7 @@
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
-                                        <form method="POST" action="{{ route('parents.destroy', $parent) }}">
+                                        <form method="POST" action="{{ route('parents.destroy', $parent) }}" onsubmit="return confirm('Bạn có chắc muốn xóa phụ huynh này? Hành động này không thể hoàn tác.');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="dropdown-item text-danger">
@@ -108,6 +108,28 @@
     </div>
 </div>
 
+<div class="modal fade student-form-modal parent-form-modal" id="parentCreateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title">Thêm phụ huynh mới</h5>
+                    <div class="text-muted small">Nhập thông tin tài khoản, liên hệ và liên kết học sinh.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <?php echo $__env->make('parents.partials.form', [
+                    'action' => route('parents.store'),
+                    'parent' => null,
+                    'students' => $students,
+                    'nextParentCode' => $nextParentCode,
+                ], \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?>
+            </div>
+        </div>
+    </div>
+</div>
+
 @foreach($parents as $parent)
     @php
         $relations = $parent->students
@@ -115,42 +137,75 @@
             ->filter()
             ->unique()
             ->implode(', ');
+        $isActive = (bool) $parent->user?->is_active;
     @endphp
-    <div class="modal fade" id="parentDetailModal{{ $parent->id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+
+    <div class="modal fade student-form-modal parent-form-modal" id="parentEdit{{ $parent->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
-                        <h5 class="modal-title">{{ $parent->name }}</h5>
-                        <div class="text-muted small">{{ $parent->parent_code ?: 'Chưa có mã phụ huynh' }}</div>
+                        <h5 class="modal-title">Chỉnh sửa thông tin phụ huynh</h5>
+                        <div class="text-muted small">{{ $parent->parent_code ?: 'Chưa có mã' }} - {{ $parent->name }}</div>
                     </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="info-item">
-                                <div class="info-label">Quan hệ</div>
-                                <div class="info-value">{{ $relations ?: '-' }}</div>
+                    <?php echo $__env->make('parents.partials.form', [
+                        'action' => route('parents.update', $parent),
+                        'parent' => $parent,
+                        'students' => $students,
+                        'nextParentCode' => $nextParentCode,
+                    ], \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade content-modal profile-detail-modal parent-detail-modal" id="parentDetail{{ $parent->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header parent-drawer-top">
+                    <div>
+                        <div class="parent-drawer-kicker">Hồ sơ phụ huynh</div>
+                        <h5 class="modal-title" id="parentDetailLabel{{ $parent->id }}">Xem chi tiết</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="parent-drawer-header">
+                        <div class="parent-drawer-left">
+                            <div class="parent-drawer-avatar">P</div>
+                            <div class="parent-drawer-identity">
+                                <h5>{{ $parent->name }}</h5>
+                                <div>Mã số: {{ $parent->parent_code ?: '-' }}</div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="info-item">
-                                <div class="info-label">Số điện thoại</div>
-                                <div class="info-value">{{ $parent->phone ?: '-' }}</div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="info-item">
-                                <div class="info-label">Địa chỉ</div>
-                                <div class="info-value">{{ $parent->address ?: '-' }}</div>
-                            </div>
-                        </div>
+                        <span class="parent-drawer-status badge {{ $isActive ? 'bg-success' : 'bg-secondary' }}">{{ $isActive ? 'Hoạt động' : 'Chưa kích hoạt' }}</span>
                     </div>
 
-                    <div class="mt-4">
-                        <h6 class="fw-bold mb-3">Học sinh liên kết</h6>
+                    <div class="profile-detail-section-title">
+                        <h6>Thông tin liên hệ</h6>
+                    </div>
+                    <div class="parent-drawer-grid">
+                        <article>
+                            <span>Quan hệ</span>
+                            <strong class="{{ $relations ? '' : 'text-muted fw-normal' }}">{{ $relations ?: '-' }}</strong>
+                        </article>
+                        <article>
+                            <span>Số điện thoại</span>
+                            <strong class="{{ $parent->phone ? '' : 'text-muted fw-normal' }}">{{ $parent->phone ?: '-' }}</strong>
+                        </article>
+                        <article class="wide">
+                            <span>Địa chỉ</span>
+                            <strong class="{{ $parent->address ? '' : 'text-muted fw-normal' }}">{{ $parent->address ?: '-' }}</strong>
+                        </article>
+                    </div>
+
+                    <div class="parent-linked-box">
+                        <div class="parent-linked-title"><i class="bi bi-people"></i> Con em đang theo học</div>
                         <div class="table-responsive">
-                            <table class="table table-sm">
+                            <table class="table table-sm parent-linked-table">
                                 <thead>
                                     <tr>
                                         <th>Mã học sinh</th>
@@ -176,10 +231,23 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng hồ sơ</button>
                 </div>
             </div>
         </div>
     </div>
 @endforeach
+
+@include('parents.partials.student-picker')
+
+@if($errors->any() && old('_parent_form_modal'))
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var modalElement = document.getElementById(@json(old('_parent_form_modal')));
+            if (modalElement && window.bootstrap) {
+                bootstrap.Modal.getOrCreateInstance(modalElement).show();
+            }
+        });
+    </script>
+@endif
 @endsection

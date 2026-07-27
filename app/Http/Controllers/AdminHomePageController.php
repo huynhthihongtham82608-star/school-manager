@@ -8,7 +8,11 @@ use App\Models\SchoolEvent;
 use App\Models\SchoolPost;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AdminHomePageController extends Controller
 {
@@ -31,24 +35,30 @@ class AdminHomePageController extends Controller
 
         $data = $request->validate([
             'banner_title' => ['nullable', 'string', 'max:255'],
-            'banner_subtitle' => ['nullable', 'string', 'max:255'],
+            'banner_subtitle' => ['nullable', 'string', 'max:500'],
             'banner_content' => ['nullable', 'string'],
-            'banner_image_url' => ['nullable', 'string', 'max:255'],
+            'banner_image_url' => ['nullable', 'string', 'max:1000'],
+            'banner_image_file' => ['nullable', 'image', 'max:20480'],
             'about_title' => ['nullable', 'string', 'max:255'],
             'about_content' => ['nullable', 'string'],
         ]);
 
-        $this->upsertContent('banner', [
-            'title' => $data['banner_title'] ?? null,
-            'content' => $data['banner_content'] ?? null,
-            'image_url' => $data['banner_image_url'] ?? null,
-            'extra' => ['subtitle' => $data['banner_subtitle'] ?? null],
-        ]);
+        $currentBanner = HomePageContent::where('key', 'banner')->first();
+        $bannerImageUrl = $this->storeBannerImage($request, $currentBanner?->image_url);
 
-        $this->upsertContent('about', [
-            'title' => $data['about_title'] ?? null,
-            'content' => $data['about_content'] ?? null,
-        ]);
+        DB::transaction(function () use ($data, $bannerImageUrl): void {
+            $this->upsertContent('banner', [
+                'title' => $data['banner_title'] ?? null,
+                'content' => $data['banner_content'] ?? null,
+                'image_url' => $bannerImageUrl,
+                'extra' => ['subtitle' => $data['banner_subtitle'] ?? null],
+            ]);
+
+            $this->upsertContent('about', [
+                'title' => $data['about_title'] ?? null,
+                'content' => $data['about_content'] ?? null,
+            ]);
+        });
 
         AuditLogger::log('home_page_content_updated', HomePageContent::class, null, 'Cập nhật nội dung trang chủ');
 
@@ -136,5 +146,25 @@ class AdminHomePageController extends Controller
     private function upsertContent(string $key, array $data): void
     {
         HomePageContent::updateOrCreate(['key' => $key], $data + ['key' => $key]);
+    }
+
+    private function storeBannerImage(Request $request, ?string $currentImageUrl): ?string
+    {
+        if (! $request->hasFile('banner_image_file')) {
+            return $currentImageUrl;
+        }
+
+        $file = $request->file('banner_image_file');
+        $extension = $file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg';
+        $filename = 'banner_' . now()->format('Ymd_His') . '_' . Str::lower(Str::random(10)) . '.' . $extension;
+        $path = $file->storeAs('uploads/banners', $filename, 'public');
+
+        if (! $path) {
+            throw ValidationException::withMessages([
+                'banner_image_file' => 'Không thể lưu ảnh banner. Vui lòng thử lại.',
+            ]);
+        }
+
+        return Storage::url($path);
     }
 }

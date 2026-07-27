@@ -74,20 +74,34 @@
                                 <a href="{{ route('rooms.edit', $room) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
                                     <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                 </a>
-                                @if($room->canDelete())
-                                    <form action="{{ route('rooms.destroy', $room) }}" method="POST" class="d-inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="content-action-btn icon-only delete" title="Xóa" aria-label="Xóa" data-bs-toggle="tooltip">
-                                            <i class="bi bi-trash"></i><span class="visually-hidden">Xóa</span>
-                                        </button>
-                                    </form>
-                                @else
-                                    <span class="text-muted small">Đã có TKB</span>
-                                @endif
-                            @else
-                                <span class="text-muted small">Chỉ xem</span>
                             @endunless
+                            <div class="dropdown">
+                                <button type="button" class="content-action-btn icon-only dropdown-toggle-clean more" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end content-action-menu">
+                                    <li>
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#roomDetailModal{{ $room->id }}">
+                                            <i class="bi bi-eye"></i>Xem chi tiết
+                                        </button>
+                                    </li>
+                                    @unless($readOnly)
+                                        @if($room->canDelete())
+                                            <li>
+                                                <form action="{{ route('rooms.destroy', $room) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn xóa phòng học này? Hành động này không thể hoàn tác.');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="dropdown-item danger">
+                                                        <i class="bi bi-trash"></i>Xóa bỏ
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @else
+                                            <li><span class="dropdown-item text-muted">Đã có TKB</span></li>
+                                        @endif
+                                    @endunless
+                                </ul>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -100,4 +114,48 @@
         </table>
     </div>
 </div>
+
+@foreach($rooms as $room)
+    <div class="modal fade content-modal room-detail-modal" id="roomDetailModal{{ $room->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="room-detail-header">
+                        <div class="room-detail-identity">
+                            <h5 class="modal-title">{{ \Illuminate\Support\Str::upper($room->name) }}</h5>
+                            <div>Cơ sở vật chất trường THPT</div>
+                        </div>
+                        <span class="badge {{ $room->statusBadgeClass() }}">{{ $room->statusLabel() }}</span>
+                    </div>
+                    <button type="button" class="btn-close ms-3" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <section class="room-detail-section">
+                        <h6>Thông số và phân loại phòng</h6>
+                        <div class="room-detail-grid">
+                            <article>
+                                <span>Loại phòng</span>
+                                <strong>{{ $room->typeLabel() }}</strong>
+                            </article>
+                            <article>
+                                <span>Sức chứa</span>
+                                <strong>{{ $room->capacity }} học sinh</strong>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section class="room-detail-section mt-3">
+                        <h6>Ghi chú thông tin bổ trợ</h6>
+                        <div class="room-detail-note">
+                            {{ trim((string) $room->note) !== '' ? $room->note : '-' }}
+                        </div>
+                    </section>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng hồ sơ phòng học</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endforeach
 @endsection

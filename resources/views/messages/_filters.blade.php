@@ -21,6 +21,5 @@
     <div class="admin-table-actions">
         <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-funnel me-1"></i>Lọc</button>
         <a class="btn btn-outline-secondary" href="{{ $action }}">Xóa lọc</a>
-        <a class="btn btn-primary" href="{{ route('messages.create') }}"><i class="bi bi-plus-lg me-1"></i>Soạn tin</a>
     </div>
 </form>

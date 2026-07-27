@@ -47,7 +47,34 @@ class MessageController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return view('messages.inbox', compact('messages', 'filters'));
+        $conversationIds = $messages->getCollection()
+            ->map(fn (MessageRecipient $recipient) => $recipient->message?->conversationKey())
+            ->filter()
+            ->unique()
+            ->values();
+
+        $messageThreads = $conversationIds->isNotEmpty()
+            ? Message::query()
+                ->with(['sender.teacher', 'sender.student', 'sender.parentProfile', 'recipients.receiver.teacher', 'recipients.receiver.student', 'recipients.receiver.parentProfile', 'attachments'])
+                ->where(fn (Builder $query) => $query
+                    ->whereIn('conversation_id', $conversationIds)
+                    ->orWhereIn('id', $conversationIds))
+                ->where(fn (Builder $query) => $query
+                    ->where('sender_user_id', Auth::id())
+                    ->orWhereHas('recipients', fn (Builder $recipientQuery) => $recipientQuery
+                        ->where('receiver_user_id', Auth::id())
+                        ->whereNull('permanently_deleted_at')))
+                ->orderBy('created_at')
+                ->get()
+                ->groupBy(fn (Message $message) => $message->conversationKey())
+            : collect();
+
+        $canReplyMap = $messages->getCollection()
+            ->mapWithKeys(fn (MessageRecipient $recipient) => [
+                (string) $recipient->message_id => $recipient->message ? $this->canReplyToMessage(Auth::user(), $recipient->message) : false,
+            ]);
+
+        return view('messages.inbox', compact('messages', 'filters', 'messageThreads', 'canReplyMap'));
     }
 
     public function sent(Request $request)
@@ -65,7 +92,34 @@ class MessageController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return view('messages.sent', compact('messages', 'filters'));
+        $conversationIds = $messages->getCollection()
+            ->map(fn (Message $message) => $message->conversationKey())
+            ->filter()
+            ->unique()
+            ->values();
+
+        $messageThreads = $conversationIds->isNotEmpty()
+            ? Message::query()
+                ->with(['sender.teacher', 'sender.student', 'sender.parentProfile', 'recipients.receiver.teacher', 'recipients.receiver.student', 'recipients.receiver.parentProfile', 'attachments'])
+                ->where(fn (Builder $query) => $query
+                    ->whereIn('conversation_id', $conversationIds)
+                    ->orWhereIn('id', $conversationIds))
+                ->where(fn (Builder $query) => $query
+                    ->where('sender_user_id', Auth::id())
+                    ->orWhereHas('recipients', fn (Builder $recipientQuery) => $recipientQuery
+                        ->where('receiver_user_id', Auth::id())
+                        ->whereNull('permanently_deleted_at')))
+                ->orderBy('created_at')
+                ->get()
+                ->groupBy(fn (Message $message) => $message->conversationKey())
+            : collect();
+
+        $canReplyMap = $messages->getCollection()
+            ->mapWithKeys(fn (Message $message) => [
+                (string) $message->id => $this->canReplyToMessage(Auth::user(), $message),
+            ]);
+
+        return view('messages.sent', compact('messages', 'filters', 'messageThreads', 'canReplyMap'));
     }
 
     public function trash(Request $request)
@@ -81,6 +135,7 @@ class MessageController extends Controller
             ->whereHas('message', fn (Builder $query) => $this->applyMessageSearch($query, $filters))
             ->when($filters['attachment'] === '1', fn (Builder $query) => $query->whereHas('message.attachments'))
             ->get()
+            ->toBase()
             ->map(fn (MessageRecipient $recipient) => [
                 'type' => 'received',
                 'message' => $recipient->message,
@@ -96,6 +151,7 @@ class MessageController extends Controller
             ->when($filters['attachment'] === '1', fn (Builder $query) => $query->whereHas('attachments'))
             ->tap(fn (Builder $query) => $this->applyMessageSearch($query, $filters))
             ->get()
+            ->toBase()
             ->map(fn (Message $message) => [
                 'type' => 'sent',
                 'message' => $message,
@@ -108,7 +164,28 @@ class MessageController extends Controller
             ->sortByDesc(fn (array $item) => $item['deleted_at']?->timestamp ?? 0)
             ->values();
 
-        return view('messages.trash', compact('messages', 'filters'));
+        $conversationIds = $messages
+            ->map(fn (array $item) => $item['message']?->conversationKey())
+            ->filter()
+            ->unique()
+            ->values();
+
+        $messageThreads = $conversationIds->isNotEmpty()
+            ? Message::query()
+                ->with(['sender.teacher', 'sender.student', 'sender.parentProfile', 'recipients.receiver.teacher', 'recipients.receiver.student', 'recipients.receiver.parentProfile', 'attachments'])
+                ->where(fn (Builder $query) => $query
+                    ->whereIn('conversation_id', $conversationIds)
+                    ->orWhereIn('id', $conversationIds))
+                ->where(fn (Builder $query) => $query
+                    ->where('sender_user_id', $userId)
+                    ->orWhereHas('recipients', fn (Builder $recipientQuery) => $recipientQuery
+                        ->where('receiver_user_id', $userId)))
+                ->orderBy('created_at')
+                ->get()
+                ->groupBy(fn (Message $message) => $message->conversationKey())
+            : collect();
+
+        return view('messages.trash', compact('messages', 'filters', 'messageThreads'));
     }
 
     public function create()
@@ -278,7 +355,11 @@ class MessageController extends Controller
             return $reply;
         });
 
-        return redirect()->route('messages.show', $reply)->with('success', 'Đã gửi phản hồi.');
+        return match ($request->input('redirect_box')) {
+            'inbox' => redirect()->route('messages.inbox')->with('success', 'Đã gửi phản hồi.'),
+            'sent' => redirect()->route('messages.sent')->with('success', 'Đã gửi phản hồi.'),
+            default => redirect()->route('messages.show', $reply)->with('success', 'Đã gửi phản hồi.'),
+        };
     }
 
     public function destroy(Request $request, Message $message)
@@ -453,10 +534,14 @@ class MessageController extends Controller
 
     private function canReplyToMessage(User $currentUser, Message $message): bool
     {
-        $message->loadMissing(['sender.teacher', 'recipients']);
+        $message->loadMissing(['sender.teacher', 'recipients.receiver']);
 
         if ($message->sender_user_id === $currentUser->id) {
-            return false;
+            return ($currentUser->isAdmin() || $currentUser->isStaff())
+                && $message->recipients
+                    ->pluck('receiver')
+                    ->filter()
+                    ->contains(fn (User $receiver) => $receiver->id !== $currentUser->id);
         }
 
         $isReceiver = $message->recipients->contains('receiver_user_id', $currentUser->id);

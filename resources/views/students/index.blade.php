@@ -20,9 +20,9 @@
 	            <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#studentImportModal">
 	                <i class="bi bi-upload me-1"></i>Nhập dữ liệu
 	            </button>
-            <a class="btn btn-primary" href="{{ route('students.create') }}">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#studentCreateModal">
                 <i class="bi bi-plus-lg me-1"></i>Tiếp nhận học sinh mới
-            </a>
+            </button>
         @endunless
         <div class="dropdown">
             <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Lọc học sinh" aria-label="Lọc học sinh">
@@ -122,9 +122,9 @@
 	                    <td class="text-end">
 	                        <div class="content-action-group justify-content-end">
 	                            @unless($readOnly)
-	                                <a href="{{ route('students.edit', $student) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
+	                                <button type="button" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="modal" data-bs-target="#studentEdit{{ $student->id }}">
 	                                    <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
-	                                </a>
+	                                </button>
 	                            @endunless
 	                            <div class="dropdown">
 	                                <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
@@ -167,10 +167,76 @@
     </div>
 </div>
 
+<?php if (! $readOnly): ?>
+    <div class="modal fade student-form-modal" id="studentCreateModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title">Tiếp nhận học sinh mới</h5>
+                        <div class="text-muted small">Nhập đầy đủ thông tin học tập, cá nhân và liên hệ phụ huynh.</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <?php echo $__env->make('students.partials.form', [
+                        'action' => route('students.store'),
+                        'student' => null,
+                        'primaryParent' => null,
+                        'classes' => $importClasses,
+                    ], \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 @foreach($students as $student)
-    <div class="modal fade content-modal student-profile-modal" id="studentDetail{{ $student->id }}" tabindex="-1" aria-hidden="true">
+    <?php if (! $readOnly): ?>
+        <?php
+            $studentEditClasses = $importClasses;
+            if ($student->classRoom && ! $studentEditClasses->contains('id', $student->class_id)) {
+                $studentEditClasses = $studentEditClasses->concat([$student->classRoom])
+                    ->sortBy([
+                        ['grade_level', 'asc'],
+                        ['name', 'asc'],
+                    ])
+                    ->values();
+            }
+        ?>
+        <div class="modal fade student-form-modal" id="studentEdit{{ $student->id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title">Chỉnh sửa thông tin học sinh</h5>
+                            <div class="text-muted small">{{ $student->student_code }} - {{ $student->name }}</div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <div class="modal-body">
+                        <?php echo $__env->make('students.partials.form', [
+                            'action' => route('students.update', $student),
+                            'student' => $student,
+                            'primaryParent' => $student->parents->first(),
+                            'classes' => $studentEditClasses,
+                        ], \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <div class="modal fade content-modal profile-detail-modal student-profile-modal" id="studentDetail{{ $student->id }}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <div class="student-v2-kicker">Hồ sơ học sinh</div>
+                        <h5 class="modal-title">Xem chi tiết</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
                 <div class="modal-body">
                     <div class="student-v2-shell">
                         <div class="student-v2-card-header">
@@ -185,8 +251,53 @@
                                 <div class="student-v2-kicker">Thẻ học sinh</div>
                                 <h5>{{ $student->name }}</h5>
                                 <div class="student-v2-code">{{ $student->student_code }}</div>
-                                <span class="badge {{ $student->statusBadgeClass() }}">{{ $student->statusLabel() }}</span>
                             </div>
+                            <span class="student-v2-status badge {{ $student->statusBadgeClass() }}">{{ $student->statusLabel() }}</span>
+                        </div>
+
+                        <div class="student-compact-detail-grid">
+                            <section class="student-compact-box">
+                                <div class="student-compact-title">
+                                    <i class="bi bi-mortarboard"></i>
+                                    <h6>Thông tin học tập</h6>
+                                </div>
+                                <div class="student-compact-list">
+                                    <div><span>Niên khóa</span><strong>{{ $student->cohortLabel() }}</strong></div>
+                                    <div><span>Lớp</span><strong>{{ $student->classRoom->name ?? '-' }}</strong></div>
+                                    <div><span>Loại nhập học</span><strong>{{ $student->admissionTypeLabel() }}</strong></div>
+                                    <div><span>Ngày nhập học</span><strong>{{ $student->enrollment_date?->format('d/m/Y') ?? '-' }}</strong></div>
+                                </div>
+                            </section>
+
+                            <section class="student-compact-box wide">
+                                <div class="student-compact-title">
+                                    <i class="bi bi-person-lines-fill"></i>
+                                    <h6>Thông tin cá nhân & liên hệ</h6>
+                                </div>
+                                <div class="student-compact-list two">
+                                    <div><span>SĐT phụ huynh</span><strong>{{ $student->parent_phone ?: '-' }}</strong></div>
+                                    <div><span>Ngày sinh</span><strong>{{ $student->dob?->format('d/m/Y') ?? '-' }}</strong></div>
+                                    <div><span>Giới tính</span><strong>{{ $student->genderLabel() }}</strong></div>
+                                    <div><span>Nơi sinh</span><strong>{{ $student->place_of_birth ?: '-' }}</strong></div>
+                                    <div><span>Dân tộc</span><strong>{{ $student->ethnicity ?: '-' }}</strong></div>
+                                    <div><span>Tôn giáo</span><strong>{{ $student->religion ?: '-' }}</strong></div>
+                                    <div class="full"><span>Địa chỉ</span><strong>{{ $student->address ?: '-' }}</strong></div>
+                                    <div class="full"><span>Ghi chú</span><strong>{{ $student->note ?: '-' }}</strong></div>
+                                </div>
+                            </section>
+
+                            @if($student->admission_type === \App\Models\Student::ADMISSION_TRANSFER)
+                                <section class="student-compact-box full">
+                                    <div class="student-compact-title">
+                                        <i class="bi bi-arrow-left-right"></i>
+                                        <h6>Chuyển trường</h6>
+                                    </div>
+                                    <div class="student-compact-list two">
+                                        <div><span>Trường cũ</span><strong>{{ $student->previous_school ?: '-' }}</strong></div>
+                                        <div><span>Khối hiện tại</span><strong>{{ $student->transfer_grade_level ? 'Khối '.$student->transfer_grade_level : '-' }}</strong></div>
+                                    </div>
+                                </section>
+                            @endif
                         </div>
 
                         <div class="student-v2-main-grid">
@@ -303,7 +414,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng hồ sơ</button>
                 </div>
             </div>
         </div>
@@ -349,4 +460,5 @@
         </div>
     </div>
 @endunless
+@include('students.partials.class-year-script')
 @endsection

@@ -182,7 +182,7 @@
                     <th>Phòng</th>
                     <th>Nhập điểm</th>
                     <th>Trạng thái</th>
-                    <th class="text-end">Thao tác</th>
+                    <th class="text-end action-column-header" aria-label="Thao tác"></th>
                 </tr>
             </thead>
             <tbody>
@@ -229,36 +229,66 @@
                     </td>
                 </tr>
 
-                <div class="modal fade content-modal" id="{{ $detailId }}" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal fade content-modal exam-detail-modal academic-detail-center-modal" id="{{ $detailId }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <div>
-                                    <div class="modal-kicker">Lịch kiểm tra</div>
-                                    <h5 class="modal-title">{{ $schedule->displayName() }}</h5>
+                                <div class="academic-detail-header">
+                                    <div class="academic-detail-identity">
+                                        <h5 class="modal-title">{{ \Illuminate\Support\Str::upper($schedule->displayName()) }} — MÔN {{ \Illuminate\Support\Str::upper($schedule->subject->name ?? 'ĐANG CẬP NHẬT') }}</h5>
+                                        <div>Lớp: {{ $schedule->classRoom->name ?? 'Đang cập nhật' }} | {{ $schedule->semester?->normalizedName() ?? $schedule->semester?->name ?? '-' }} (Niên khóa {{ $yearName($schedule) }})</div>
+                                    </div>
+                                    <span class="badge {{ $statusClass($schedule) }}">{{ $schedule->statusLabel() }}</span>
                                 </div>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                                <button type="button" class="btn-close ms-3" data-bs-dismiss="modal" aria-label="Đóng"></button>
                             </div>
                             <div class="modal-body">
-                                <dl class="content-detail-list">
-                                    <div><dt>Năm học</dt><dd>{{ $yearName($schedule) }}</dd></div>
-                                    <div><dt>Học kỳ</dt><dd>{{ $schedule->semester->name ?? 'Đang cập nhật' }}</dd></div>
-                                    <div><dt>Lớp</dt><dd>{{ $schedule->classRoom->name ?? 'Đang cập nhật' }}</dd></div>
-                                    <div><dt>Môn học</dt><dd>{{ $schedule->subject->name ?? 'Đang cập nhật' }}</dd></div>
-                                    <div><dt>Loại kiểm tra</dt><dd>{{ $schedule->displayName() }}</dd></div>
-                                    <div><dt>Ngày kiểm tra</dt><dd>{{ optional($schedule->exam_date)->format('d/m/Y') }}</dd></div>
-                                    <div><dt>Giờ bắt đầu</dt><dd>{{ $schedule->start_time ? substr($schedule->start_time, 0, 5) : 'Đang cập nhật' }}</dd></div>
-                                    <div><dt>Giờ kết thúc</dt><dd>{{ $schedule->end_time ? substr($schedule->end_time, 0, 5) : 'Đang cập nhật' }}</dd></div>
-                                    <div><dt>Phòng</dt><dd>{{ $schedule->room ?: 'Đang cập nhật' }}</dd></div>
-                                    <div><dt>Ngày mở nhập điểm</dt><dd>{{ optional($schedule->score_input_opens_at)->format('d/m/Y') ?: 'Chưa đặt' }}</dd></div>
-                                    <div><dt>Ngày khóa nhập điểm</dt><dd>{{ optional($schedule->score_input_closes_at)->format('d/m/Y') ?: 'Chưa đặt' }}</dd></div>
-                                    <div><dt>Trạng thái nhập điểm</dt><dd>{{ $schedule->scoreInputStatusLabel() }}</dd></div>
-                                    <div><dt>Ghi chú</dt><dd class="content-full-text">{!! nl2br(e($schedule->note ?: 'Không có ghi chú.')) !!}</dd></div>
-                                    <div><dt>Trạng thái</dt><dd>{{ $schedule->statusLabel() }}</dd></div>
-                                </dl>
+                                <section class="academic-detail-section">
+                                    <h6>Thời gian và địa điểm tổ chức</h6>
+                                    <div class="academic-detail-grid">
+                                        <article>
+                                            <span>Ngày kiểm tra</span>
+                                            <strong>{{ optional($schedule->exam_date)->format('d/m/Y') ?: '-' }}</strong>
+                                        </article>
+                                        <article>
+                                            <span>Thời gian làm bài</span>
+                                            <strong>{{ $schedule->timeRange() }}</strong>
+                                        </article>
+                                        <article>
+                                            <span>Phòng thi</span>
+                                            <strong>{{ $schedule->room ?: '-' }}</strong>
+                                        </article>
+                                        <article>
+                                            <span>Loại kiểm tra</span>
+                                            <strong>{{ $schedule->displayName() }}</strong>
+                                        </article>
+                                    </div>
+                                </section>
+
+                                <section class="academic-detail-section mt-3">
+                                    <h6>Thời hạn nhập điểm số & Trạng thái khóa sổ</h6>
+                                    <div class="exam-score-window-box">
+                                        <div class="academic-detail-grid">
+                                            <article>
+                                                <span>Ngày mở nhập điểm</span>
+                                                <strong>{{ optional($schedule->score_input_opens_at)->format('d/m/Y') ?: '-' }}</strong>
+                                            </article>
+                                            <article>
+                                                <span>Ngày khóa nhập điểm</span>
+                                                <strong>{{ optional($schedule->score_input_closes_at)->format('d/m/Y') ?: '-' }}</strong>
+                                            </article>
+                                        </div>
+                                        <span class="badge {{ $schedule->scoreInputBadgeClass() }} mt-3">{{ $schedule->scoreInputStatusLabel() }}</span>
+                                    </div>
+                                </section>
+
+                                <section class="academic-detail-section mt-3">
+                                    <h6>Ghi chú</h6>
+                                    <div class="exam-detail-note">{{ trim((string) $schedule->note) !== '' ? $schedule->note : '-' }}</div>
+                                </section>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Đóng</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng cửa sổ</button>
                             </div>
                         </div>
                     </div>
