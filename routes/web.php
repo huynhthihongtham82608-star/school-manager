@@ -116,7 +116,10 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
             Route::put('system/settings', [SystemSettingController::class, 'update'])->middleware('permission:system.settings')->name('system.settings.update');
             Route::get('system/backups', [BackupController::class, 'index'])->middleware('permission:backups.manage')->name('system.backups.index');
             Route::post('system/backups', [BackupController::class, 'store'])->middleware('permission:backups.manage')->name('system.backups.store');
+            Route::post('system/backups/restore/verify', [BackupController::class, 'verifyRestorePassword'])->middleware('permission:backups.manage')->name('system.backups.restore.verify');
+            Route::post('system/backups/{filename}/restore', [BackupController::class, 'restore'])->middleware('permission:backups.manage')->name('system.backups.restore');
             Route::get('system/backups/{filename}', [BackupController::class, 'download'])->middleware('permission:backups.manage')->name('system.backups.download');
+            Route::delete('system/backups/{filename}', [BackupController::class, 'destroy'])->middleware('permission:backups.manage')->name('system.backups.destroy');
             Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('permission:audit_logs.view')->name('audit-logs.index');
 
             Route::patch('admin-users/{admin_user}/toggle', [AdminUserController::class, 'toggle'])

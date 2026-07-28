@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Năm học')
 
 @section('content')
@@ -30,7 +30,9 @@
             </thead>
             <tbody>
                 @forelse($years as $year)
-                    @php($deleteCheck = $deleteChecks[(string) $year->getKey()] ?? ['allowed' => false, 'message' => null])
+                    @php
+                        $deleteCheck = $deleteChecks[(string) $year->getKey()] ?? ['allowed' => false, 'message' => null];
+                    @endphp
                     <tr>
                         <td class="fw-semibold">{{ $year->name }}</td>
                         <td>{{ optional($year->start_date)->format('d/m/Y') }}</td>

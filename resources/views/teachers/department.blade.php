@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Tổ chuyên môn')
 
 @section('content')
@@ -51,8 +51,12 @@
                 </thead>
                 <tbody>
                 @forelse($department->teachers as $teacher)
-                    @php($teacherAssignments = $assignments->where('teacher_id', $teacher->id))
-                    @php($progress = $scoreProgress[$teacher->id] ?? ['total' => $teacherAssignments->count(), 'completed' => 0, 'missing' => $teacherAssignments->count()])
+                    @php
+                        $teacherAssignments = $assignments->where('teacher_id', $teacher->id);
+                    @endphp
+                    @php
+                        $progress = $scoreProgress[$teacher->id] ?? ['total' => $teacherAssignments->count(), 'completed' => 0, 'missing' => $teacherAssignments->count()];
+                    @endphp
                     <tr>
                         <td class="fw-semibold">{{ $teacher->teacher_code }} - {{ $teacher->name }}</td>
                         <td>{{ $teacher->primarySubjectName() }}</td>

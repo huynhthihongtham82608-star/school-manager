@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Quản lý thời khóa biểu')
 
 @section('content')
@@ -105,8 +105,12 @@
                         <tr>
                             <td class="fw-semibold">{{ $periodLabel }}</td>
                             @foreach($days as $day => $dayLabel)
-                                @php($entry = $entries[$day.'-'.$period] ?? null)
-                                @php($selectedEntryValue = $entry ? ($entry->assignment_id ? 'assignment:'.$entry->assignment_id : ($entry->subject_id ? 'subject:'.$entry->subject_id : '')) : '')
+                                @php
+                                    $entry = $entries[$day.'-'.$period] ?? null;
+                                @endphp
+                                @php
+                                    $selectedEntryValue = $entry ? ($entry->assignment_id ? 'assignment:'.$entry->assignment_id : ($entry->subject_id ? 'subject:'.$entry->subject_id : '')) : '';
+                                @endphp
                                 <td style="min-width: 260px;">
                                     <div class="mb-2">
                                         <select class="form-select form-select-sm" name="entries[{{ $day }}][{{ $period }}][entry_value]" @disabled($readOnly)>
@@ -114,7 +118,9 @@
                                             @if($assignments->isNotEmpty())
                                                 <optgroup label="Môn chính khóa đã phân công">
                                                     @foreach($assignments as $assignment)
-                                                        @php($effectivePeriods = $assignment->effectiveWeeklyPeriods())
+                                                        @php
+                                                            $effectivePeriods = $assignment->effectiveWeeklyPeriods();
+                                                        @endphp
                                                         <option value="assignment:{{ $assignment->id }}" @selected($selectedEntryValue === 'assignment:'.$assignment->id)>
                                                             {{ $assignment->subject->name ?? '' }} - {{ $assignment->teacher->name ?? '' }} ({{ $assignment->roleLabel() }}){{ $effectivePeriods ? ' - ' . $effectivePeriods . ' tiết/tuần, ' . mb_strtolower($assignment->weeklyPeriodSourceLabel()) : ' - chưa có định mức' }}
                                                         </option>

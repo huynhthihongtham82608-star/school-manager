@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Tài liệu học tập')
 
 @section('content')
@@ -399,8 +399,12 @@
                     </div>
                     <div class="list-group list-group-flush">
                         @foreach($subjectDocuments as $document)
-                            @php($detailId = 'document-detail-' . $document->id)
-                            @php($documentFileUrl = $document->fileUrl())
+                            @php
+                                $detailId = 'document-detail-' . $document->id;
+                            @endphp
+                            @php
+                                $documentFileUrl = $document->fileUrl();
+                            @endphp
                             <div class="list-group-item">
                                 <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
                                     <div>
@@ -436,8 +440,12 @@
     @else
     <div class="content-grid">
         @forelse($documents as $document)
-            @php($detailId = 'document-detail-' . $document->id)
-            @php($documentFileUrl = $document->fileUrl())
+            @php
+                $detailId = 'document-detail-' . $document->id;
+            @endphp
+            @php
+                $documentFileUrl = $document->fileUrl();
+            @endphp
             <article class="info-card">
                 <span class="feature-card-icon mb-3"><i class="bi bi-file-earmark-text"></i></span>
                 <h6>{{ $document->title }}</h6>
@@ -465,8 +473,12 @@
     @endif
 
     @foreach($documents as $document)
-        @php($detailId = 'document-detail-' . $document->id)
-        @php($documentFileUrl = $document->fileUrl())
+        @php
+            $detailId = 'document-detail-' . $document->id;
+        @endphp
+        @php
+            $documentFileUrl = $document->fileUrl();
+        @endphp
         <div class="modal fade content-modal" id="{{ $detailId }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content">

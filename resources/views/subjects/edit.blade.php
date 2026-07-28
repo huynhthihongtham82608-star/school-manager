@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Sửa môn học')
 
 @section('content')
@@ -54,7 +54,9 @@
         <div class="text-muted small mb-3">Nhập số tiết mỗi tuần cho từng khối. Để trống nếu môn chưa áp dụng cho khối đó.</div>
         <div class="row g-3">
             @foreach($gradeLevels as $gradeLevel)
-                @php($norm = $subject->periodNormForGrade($gradeLevel))
+                @php
+                    $norm = $subject->periodNormForGrade($gradeLevel);
+                @endphp
                 <div class="col-md-3">
                     <label class="form-label">Khối {{ $gradeLevel }}</label>
                     <input type="number" name="period_norms[{{ $gradeLevel }}]" class="form-control" value="{{ old('period_norms.' . $gradeLevel, $norm?->periods_per_week) }}" min="1" max="10" placeholder="Số tiết/tuần">

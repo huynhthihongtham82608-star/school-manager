@@ -62,7 +62,7 @@ class AuditLog extends Model
         return match (true) {
             str_contains($this->action, 'created') || str_contains($this->action, 'store') => 'Thêm mới',
             str_contains($this->action, 'updated') || str_contains($this->action, 'changed') => 'Cập nhật',
-            str_contains($this->action, 'deleted') => 'Xóa bỏ',
+            str_contains($this->action, 'deleted') || str_contains($this->action, 'destroy') => 'Xóa bỏ',
             str_contains($this->action, 'reset') => 'Reset mật khẩu',
             str_contains($this->action, 'login') => 'Đăng nhập',
             str_contains($this->action, 'logout') => 'Đăng xuất',
@@ -97,6 +97,8 @@ class AuditLog extends Model
             'Thêm mới' => 'audit-action-create',
             'Cập nhật' => 'audit-action-update',
             'Đăng nhập' => 'audit-action-login',
+            'Đăng xuất' => 'audit-action-login',
+            'Sao lưu' => 'audit-action-login',
             default => 'audit-action-default',
         };
     }

@@ -66,7 +66,7 @@ class AuditLogController extends Controller
             $query->when($filters['date_from'] ?? null, fn ($query, $date) => $query->whereDate('created_at', '>=', $date));
             $query->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereDate('created_at', '<=', $date));
 
-            $logs = $query->paginate(20)->withQueryString();
+            $logs = $query->get();
         }
 
         return view('audit_logs.index', compact('logs', 'users', 'modules', 'actions', 'filters'));

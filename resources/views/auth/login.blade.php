@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="vi">
 <head>
     <meta charset="utf-8">
@@ -74,7 +74,9 @@
         }
     </style>
 </head>
-@php($systemSetting = \App\Models\SystemSetting::current())
+@php
+    $systemSetting = \App\Models\SystemSetting::current();
+@endphp
 <body class="d-flex align-items-center justify-content-center p-3">
     <div class="card login-card">
         <div class="card-body p-4">

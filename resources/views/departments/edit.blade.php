@@ -1,8 +1,10 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Sửa tổ chuyên môn')
 
 @section('content')
-@php($selectedSubjectIds = collect(old('subject_ids', $department->subjects->pluck('id')->all())))
+@php
+    $selectedSubjectIds = collect(old('subject_ids', $department->subjects->pluck('id')->all()));
+@endphp
 
 <form method="POST" action="{{ route('departments.update', $department) }}" class="card p-4 shadow-sm">
     @csrf

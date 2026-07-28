@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', (auth()->user()->isStudent() || auth()->user()->isParent()) ? 'Điểm số' : (auth()->user()->isAdmin() ? 'Quản lý bảng điểm tập trung' : 'Nhập điểm số'))
 
 @section('content')
@@ -118,7 +118,9 @@
         <div class="score-entry-filter-card">
             <form method="GET" action="{{ route('scores.entry') }}" class="score-entry-filter" data-score-assignment-form>
                 @if(! $isScoreAdmin && auth()->user()->isTeacher())
-                    @php($firstAssignment = $assignments->first())
+                    @php
+                        $firstAssignment = $assignments->first();
+                    @endphp
                     <input type="hidden" name="class_id" data-score-class-id value="{{ $firstAssignment?->class_id }}">
                     <input type="hidden" name="subject_id" data-score-subject-id value="{{ $firstAssignment?->subject_id }}">
                     <input type="hidden" name="semester_id" data-score-semester-id value="{{ $firstAssignment?->semester_id }}">

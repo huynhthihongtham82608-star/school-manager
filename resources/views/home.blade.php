@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="vi">
 <head>
     <meta charset="utf-8">
@@ -51,7 +51,9 @@
                     <div class="col-lg-5">
                         <div class="hero-panel">
                             @if(!empty($banner['image_url']))
-                                @php($bannerImageSrc = \Illuminate\Support\Str::startsWith($banner['image_url'], ['http://', 'https://']) ? $banner['image_url'] : asset(ltrim($banner['image_url'], '/')))
+                                @php
+                                    $bannerImageSrc = \Illuminate\Support\Str::startsWith($banner['image_url'], ['http://', 'https://']) ? $banner['image_url'] : asset(ltrim($banner['image_url'], '/'));
+                                @endphp
                                 <img src="{{ $bannerImageSrc }}" alt="Banner trường học">
                             @else
                                 <div class="hero-illustration">

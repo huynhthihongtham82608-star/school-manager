@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Cấu hình cột điểm')
 
 @section('content')
@@ -25,35 +25,40 @@
 <div class="card mb-3 score-column-filter-card">
     <div class="card-body">
         <form method="GET" class="score-column-filter-row">
-            <div class="score-filter-field">
-                <label class="form-label">Năm học</label>
-                <select name="school_year_id" class="form-select">
-                    @foreach($years as $year)
-                        <option value="{{ $year->id }}" @selected($selectedYearId === $year->id)>{{ $year->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="score-filter-field compact">
-                <label class="form-label">Khối</label>
-                <select name="grade_level" class="form-select">
-                    <option value="all" @selected($selectedGrade === 'all')>Tất cả</option>
-                    @foreach([10, 11, 12] as $grade)
-                        <option value="{{ $grade }}" @selected((string) $selectedGrade === (string) $grade)>Khối {{ $grade }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="score-filter-field wide">
-                <label class="form-label">Môn học</label>
-                <select name="subject_id" class="form-select">
-                    <option value="all" @selected($selectedSubjectId === 'all')>Tất cả môn học</option>
-                    @foreach($subjects as $subject)
-                        <option value="{{ $subject->id }}" @selected((string) $selectedSubjectId === (string) $subject->id)>{{ $subject->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="score-filter-field wide">
-                <label class="form-label">Tìm kiếm</label>
-                <input name="q" class="form-control" value="{{ $keyword ?? '' }}" placeholder="Tên cột điểm hoặc môn học">
+            <div class="score-column-filter-left">
+                <div class="score-filter-field wide score-filter-search-field">
+                    <label class="form-label">Tìm kiếm</label>
+                    <div class="toolbar-inline-search">
+                        <i class="bi bi-search"></i>
+                        <input type="search" name="q" class="form-control" value="{{ $keyword ?? '' }}" placeholder="Tên cột điểm hoặc môn học">
+                    </div>
+                </div>
+                <div class="score-filter-field">
+                    <label class="form-label">Năm học</label>
+                    <select name="school_year_id" class="form-select">
+                        @foreach($years as $year)
+                            <option value="{{ $year->id }}" @selected($selectedYearId === $year->id)>{{ $year->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="score-filter-field compact">
+                    <label class="form-label">Khối</label>
+                    <select name="grade_level" class="form-select">
+                        <option value="all" @selected($selectedGrade === 'all')>Tất cả</option>
+                        @foreach([10, 11, 12] as $grade)
+                            <option value="{{ $grade }}" @selected((string) $selectedGrade === (string) $grade)>Khối {{ $grade }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="score-filter-field wide">
+                    <label class="form-label">Môn học</label>
+                    <select name="subject_id" class="form-select">
+                        <option value="all" @selected($selectedSubjectId === 'all')>Tất cả môn học</option>
+                        @foreach($subjects as $subject)
+                            <option value="{{ $subject->id }}" @selected((string) $selectedSubjectId === (string) $subject->id)>{{ $subject->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
             <div class="score-filter-actions">
                 <button class="btn btn-primary">
@@ -173,7 +178,9 @@
     <div class="card-body">
         <div class="score-column-list">
             @forelse($scoreColumnGroups as $group)
-                @php($firstColumn = $group->first())
+                @php
+                    $firstColumn = $group->first();
+                @endphp
                 <section class="score-column-group">
                     <div class="score-column-group-header">
                         <div>

@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Giáo viên')
 
 @section('content')
@@ -64,7 +64,9 @@
                     <td>{{ $teacher->primarySubjectName() }}</td>
                     <td>{{ $teacher->department?->name ?? 'Chưa phân tổ' }}</td>
                     <td>
-                        @php($teacherHomeroomClasses = $selectedYearId ? $teacher->homeroomClasses->where('school_year_id', $selectedYearId) : $teacher->homeroomClasses)
+                        @php
+                            $teacherHomeroomClasses = $selectedYearId ? $teacher->homeroomClasses->where('school_year_id', $selectedYearId) : $teacher->homeroomClasses;
+                        @endphp
                         @forelse($teacherHomeroomClasses as $class)
                             <span class="badge bg-info">{{ $class->name }}</span>
                         @empty
@@ -138,9 +140,15 @@
 </div>
 
 @foreach($teachers as $teacher)
-    @php($teacherTeachingAssignments = $selectedYearId ? $teacher->assignments->where('school_year_id', $selectedYearId) : $teacher->assignments)
-    @php($teacherHomeroomDetailClasses = $selectedYearId ? $teacher->homeroomClasses->where('school_year_id', $selectedYearId) : $teacher->homeroomClasses)
-    @php($teacherInitial = \Illuminate\Support\Str::of($teacher->name ?: 'G')->substr(0, 1)->upper())
+    @php
+        $teacherTeachingAssignments = $selectedYearId ? $teacher->assignments->where('school_year_id', $selectedYearId) : $teacher->assignments;
+    @endphp
+    @php
+        $teacherHomeroomDetailClasses = $selectedYearId ? $teacher->homeroomClasses->where('school_year_id', $selectedYearId) : $teacher->homeroomClasses;
+    @endphp
+    @php
+        $teacherInitial = \Illuminate\Support\Str::of($teacher->name ?: 'G')->substr(0, 1)->upper();
+    @endphp
 
     <div class="modal fade student-form-modal teacher-form-modal" id="teacherEdit{{ $teacher->id }}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl">

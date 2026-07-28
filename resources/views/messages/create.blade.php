@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Soạn tin nhắn')
 
 @section('content')
@@ -113,7 +113,9 @@
         </div>
         <div class="message-directory-list" data-recipient-list>
             @forelse($users as $user)
-                @php($checked = in_array((string) $user['id'], $oldRecipientIds, true))
+                @php
+                    $checked = in_array((string) $user['id'], $oldRecipientIds, true);
+                @endphp
                 <label class="message-directory-option" data-recipient-option data-label="{{ $user['label'] }}" data-role="{{ $user['role'] }}" data-search="{{ \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii($user['label'] . ' ' . $user['role'])) }}">
                     <input type="checkbox" name="recipient_user_ids[]" value="{{ $user['id'] }}" class="form-check-input" @checked($checked)>
                     <span class="message-directory-name">{{ $user['label'] }}</span>

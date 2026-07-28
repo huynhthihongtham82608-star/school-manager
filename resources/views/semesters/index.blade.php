@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Học kỳ')
 
 @section('content')
@@ -25,7 +25,9 @@
             </thead>
             <tbody>
             @forelse($semesters as $semester)
-                @php($deleteCheck = $deleteChecks[(string) $semester->getKey()] ?? ['allowed' => false, 'message' => null])
+                @php
+                    $deleteCheck = $deleteChecks[(string) $semester->getKey()] ?? ['allowed' => false, 'message' => null];
+                @endphp
                 <tr>
                     <td class="fw-semibold">{{ $semester->normalizedName() }}</td>
                     <td>{{ $semester->schoolYear->name ?? '' }}</td>

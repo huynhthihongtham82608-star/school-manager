@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Thời khóa biểu')
 
 @section('content')
@@ -73,7 +73,9 @@
                     <tr>
                         <td class="fw-semibold">{{ $periodLabel }}</td>
                         @foreach($days as $day => $dayLabel)
-                            @php($entry = $entries[$day.'-'.$period] ?? null)
+                            @php
+                                $entry = $entries[$day.'-'.$period] ?? null;
+                            @endphp
                             <td>
                                 @if($entry)
                                     <div class="fw-semibold">{{ $entry->displaySubjectName() }}</div>

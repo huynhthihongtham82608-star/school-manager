@@ -496,13 +496,8 @@
     <div class="main-panel flex-grow-1">
         @if($showSidebar)
         <header class="topbar admin-header-stacked">
-            <div class="admin-info-row px-4 py-3 d-flex justify-content-between align-items-center">
+                <div class="admin-info-row px-4 py-3 d-flex justify-content-between align-items-center">
                 <div class="admin-topbar-left d-flex align-items-center gap-2">
-                    @if(! in_array($activeAdminGroup['key'] ?? '', ['overview', 'reports'], true))
-                        <button class="btn btn-outline-secondary d-lg-none" type="button" data-sidebar-toggle aria-label="Mở menu chức năng con">
-                            <i class="bi bi-list"></i>
-                        </button>
-                    @endif
                     <a href="{{ route('dashboard') }}" class="admin-school-heading" aria-label="{{ $schoolTitle }}">
                         @if($schoolLogoUrl)
                             <img src="{{ $schoolLogoUrl }}" alt="{{ $schoolTitle }}" class="admin-school-heading-logo object-fit-cover">
@@ -600,9 +595,6 @@
         <header class="topbar px-4 py-3 d-flex justify-content-between align-items-center">
             @if($showRoleMenu)
                 <div class="role-topbar-left">
-                    <button class="btn menu-trigger" type="button" data-role-menu-toggle aria-label="Mở menu">
-                        <i class="bi bi-list"></i>
-                    </button>
                     <div class="school-heading">{{ $schoolTitle }}</div>
                     <form class="topbar-search function-search" role="search" onsubmit="return false;" data-function-search>
                         <i class="bi bi-search"></i>
@@ -1372,6 +1364,15 @@
             .map((index) => row.cells[index]?.innerText || '')
             .join(' ');
 
+        const debounce = (callback, delay = 300) => {
+            let timeoutId;
+
+            return (...args) => {
+                window.clearTimeout(timeoutId);
+                timeoutId = window.setTimeout(() => callback(...args), delay);
+            };
+        };
+
         const findPreviousPageHeading = (element) => {
             let current = element;
 
@@ -1778,7 +1779,7 @@
                 movePageActionsToToolbar(toolbar, insertionTarget);
 
                 const searchInput = toolbar.querySelector('input[type="search"]');
-                searchInput.addEventListener('input', () => {
+                const applyTableSearch = () => {
                     const keyword = normalizeText(searchInput.value);
                     let visibleCount = 0;
 
@@ -1791,7 +1792,9 @@
                     });
 
                     noResultsRow.hidden = visibleCount > 0;
-                });
+                };
+
+                searchInput.addEventListener('input', debounce(applyTableSearch, 300));
             }
 
             headers.forEach((header, index) => {
@@ -2446,5 +2449,6 @@
     })();
     @endif
 </script>
+@stack('scripts')
 </body>
 </html>

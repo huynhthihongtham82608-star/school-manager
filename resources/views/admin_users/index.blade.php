@@ -140,9 +140,6 @@
             </tbody>
         </table>
     </div>
-    @if(method_exists($users, 'links'))
-        <div class="px-3 pb-3">{{ $users->links() }}</div>
-    @endif
 </div>
 
 <div class="modal fade content-modal" id="createAdminUserModal" tabindex="-1" aria-hidden="true">
