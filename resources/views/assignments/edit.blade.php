@@ -2,6 +2,10 @@
 @section('title', 'Sửa phân công')
 
 @section('content')
+@php
+    $selectedClassIds = collect(old('class_ids', [$assignment->class_id]))->map(fn ($id) => (string) $id);
+@endphp
+
 <form method="POST" action="{{ route('assignments.update', $assignment) }}" class="card p-4 shadow-sm">
     @csrf
     @method('PUT')
@@ -18,7 +22,16 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">Lớp</label>
-            <div class="form-control bg-light">{{ $assignment->classRoom->name ?? '-' }}</div>
+            <select name="class_ids[]" class="form-select" multiple size="6" required>
+                @foreach($classes as $class)
+                    <option value="{{ $class->id }}" @selected($selectedClassIds->contains((string) $class->id))>
+                        {{ $class->name }}
+                    </option>
+                @endforeach
+            </select>
+            <div class="form-text">Có thể chọn thêm lớp để tạo phân công cùng giáo viên và môn học.</div>
+            @error('class_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+            @error('class_ids.*')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-3">
             <label class="form-label">Môn học</label>

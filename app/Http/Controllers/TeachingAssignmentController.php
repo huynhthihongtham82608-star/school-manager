@@ -16,6 +16,7 @@ use App\Models\Timetable;
 use App\Models\TimetableEntry;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -35,7 +36,15 @@ class TeachingAssignmentController extends Controller
         ];
         $readOnly = $this->isHistoricalReadOnly();
 
-        $assignments = TeachingAssignment::with(['teacher.primarySubject.departments', 'teacher.department', 'classRoom', 'subject.periodNorms', 'subject.departments', 'schoolYear', 'semester'])
+        $assignments = TeachingAssignment::with([
+            'teacher.primarySubject.departments',
+            'teacher.department',
+            'classRoom',
+            'subject.periodNorms',
+            'subject.departments',
+            'schoolYear',
+            'semester',
+        ])
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
             ->when($filters['class_id'] !== 'all', fn ($query) => $query->where('class_id', $filters['class_id']))
@@ -51,11 +60,13 @@ class TeachingAssignmentController extends Controller
         $deleteChecks = $assignments->mapWithKeys(fn (TeachingAssignment $assignment) => [
             (string) $assignment->getKey() => $this->deleteCheck($assignment),
         ]);
+
         $scheduledCounts = TimetableEntry::whereIn('assignment_id', $assignments->pluck('id')->filter())
             ->where('status', '!=', TimetableEntry::STATUS_ARCHIVED)
             ->selectRaw('assignment_id, count(*) as total')
             ->groupBy('assignment_id')
             ->pluck('total', 'assignment_id');
+
         $periodProgress = $assignments->mapWithKeys(function (TeachingAssignment $assignment) use ($scheduledCounts) {
             $standard = (int) ($assignment->standardWeeklyPeriods() ?: 0);
             $expected = (int) ($assignment->effectiveWeeklyPeriods() ?: 0);
@@ -73,17 +84,26 @@ class TeachingAssignmentController extends Controller
                     'progress_class' => $scheduled > $expected
                         ? 'bg-danger'
                         : ($expected > 0 && $scheduled === $expected ? 'bg-success' : 'bg-warning'),
-                    'label' => $expected === 0
-                        ? 'Chưa cấu hình định mức'
-                        : ($scheduled > $expected ? 'Vượt số tiết' : ($scheduled === $expected ? 'Đủ' : 'Chưa đủ')),
+                    'label' => match (true) {
+                        $expected === 0 => 'Chưa cấu hình định mức',
+                        $scheduled > $expected => 'Vượt số tiết',
+                        $scheduled === $expected => 'Đủ',
+                        default => 'Chưa đủ',
+                    },
                 ],
             ];
         });
 
         return view('assignments.index', [
             'assignments' => $assignments,
-            'teachers' => Teacher::with(['primarySubject.departments', 'department'])->where('work_status', Teacher::STATUS_WORKING)->orderBy('name')->get(),
-            'departments' => TeacherDepartment::with('subjects')->where('status', TeacherDepartment::STATUS_ACTIVE)->orderBy('name')->get(),
+            'teachers' => Teacher::with(['primarySubject.departments', 'department'])
+                ->where('work_status', Teacher::STATUS_WORKING)
+                ->orderBy('name')
+                ->get(),
+            'departments' => TeacherDepartment::with('subjects')
+                ->where('status', TeacherDepartment::STATUS_ACTIVE)
+                ->orderBy('name')
+                ->get(),
             'classes' => SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
                 ->orderBy('name')
                 ->get(),
@@ -111,15 +131,25 @@ class TeachingAssignmentController extends Controller
     public function store(Request $request)
     {
         $this->denyHistoricalWrite();
-        $data = $this->validatedData($request);
+        $assignmentPayloads = $this->validatedStoreData($request);
 
-        $assignment = TeachingAssignment::create($data);
+        $assignments = DB::transaction(function () use ($assignmentPayloads) {
+            return collect($assignmentPayloads)->map(function (array $data) {
+                $assignment = TeachingAssignment::create($data);
+                AuditLogger::log(
+                    'teaching_assignment_created',
+                    TeachingAssignment::class,
+                    (string) $assignment->getKey(),
+                    'Tạo phân công giảng dạy ' . $assignment->roleLabel()
+                );
 
-        AuditLogger::log('teaching_assignment_created', TeachingAssignment::class, (string) $assignment->getKey(), 'Tạo phân công giảng dạy ' . $assignment->roleLabel());
+                return $assignment;
+            });
+        });
 
         return redirect()
-            ->route('assignments.index', ['school_year_id' => $assignment->school_year_id])
-            ->with('success', 'Đã phân công giảng dạy.');
+            ->route('assignments.index', ['school_year_id' => $assignments->first()?->school_year_id])
+            ->with('success', 'Đã phân công giảng dạy cho ' . $assignments->count() . ' lớp.');
     }
 
     public function edit(TeachingAssignment $assignment)
@@ -145,27 +175,35 @@ class TeachingAssignmentController extends Controller
         $oldTeacherId = $assignment->teacher_id;
         $oldRole = $assignment->roleLabel();
         $oldStatus = $assignment->status;
-        $data = $this->validatedData($request, $assignment);
+        $assignmentPayloads = $this->validatedStoreData($request, $assignment);
+        $primaryPayload = array_shift($assignmentPayloads);
+        $affectedCount = count($assignmentPayloads) + 1;
 
-        $assignment->update($data);
+        DB::transaction(function () use ($assignment, $primaryPayload, $assignmentPayloads, $oldTeacherId, $oldRole, $oldStatus) {
+            $assignment->update($primaryPayload);
+            AuditLogger::log('teaching_assignment_updated', TeachingAssignment::class, (string) $assignment->getKey(), 'Sửa phân công giảng dạy');
 
-        AuditLogger::log('teaching_assignment_updated', TeachingAssignment::class, (string) $assignment->getKey(), 'Sửa phân công giảng dạy');
+            if ((string) $oldTeacherId !== (string) $assignment->teacher_id) {
+                AuditLogger::log('teaching_assignment_teacher_changed', TeachingAssignment::class, (string) $assignment->getKey(), 'Đổi giáo viên phân công');
+            }
 
-        if ((string) $oldTeacherId !== (string) $assignment->teacher_id) {
-            AuditLogger::log('teaching_assignment_teacher_changed', TeachingAssignment::class, (string) $assignment->getKey(), 'Đổi giáo viên phân công');
-        }
+            if ($oldRole !== $assignment->roleLabel()) {
+                AuditLogger::log('teaching_assignment_role_changed', TeachingAssignment::class, (string) $assignment->getKey(), 'Đổi vai trò phân công sang ' . $assignment->roleLabel());
+            }
 
-        if ($oldRole !== $assignment->roleLabel()) {
-            AuditLogger::log('teaching_assignment_role_changed', TeachingAssignment::class, (string) $assignment->getKey(), 'Đổi vai trò phân công sang ' . $assignment->roleLabel());
-        }
+            if ($oldStatus !== $assignment->status) {
+                AuditLogger::log('teaching_assignment_status_changed', TeachingAssignment::class, (string) $assignment->getKey(), 'Đổi trạng thái phân công sang ' . $assignment->statusLabel());
+            }
 
-        if ($oldStatus !== $assignment->status) {
-            AuditLogger::log('teaching_assignment_status_changed', TeachingAssignment::class, (string) $assignment->getKey(), 'Đổi trạng thái phân công sang ' . $assignment->statusLabel());
-        }
+            foreach ($assignmentPayloads as $payload) {
+                $created = TeachingAssignment::create($payload);
+                AuditLogger::log('teaching_assignment_created', TeachingAssignment::class, (string) $created->getKey(), 'Tạo thêm phân công giảng dạy ' . $created->roleLabel());
+            }
+        });
 
         return redirect()
             ->route('assignments.index', ['school_year_id' => $assignment->school_year_id])
-            ->with('success', 'Đã cập nhật phân công.');
+            ->with('success', 'Đã cập nhật phân công giảng dạy cho ' . $affectedCount . ' lớp.');
     }
 
     public function destroy(TeachingAssignment $assignment)
@@ -182,7 +220,7 @@ class TeachingAssignmentController extends Controller
 
         AuditLogger::log('teaching_assignment_deleted', TeachingAssignment::class, $assignmentId, 'Xóa phân công giảng dạy');
 
-        return redirect()->route('assignments.index')->with('success', 'Đã xóa phân công.');
+        return redirect()->route('assignments.index')->with('success', 'Đã xóa phân công giảng dạy.');
     }
 
     private function formData(?TeachingAssignment $assignment = null): array
@@ -208,7 +246,10 @@ class TeachingAssignmentController extends Controller
                 ->orderBy('grade_level')
                 ->orderBy('name')
                 ->get(),
-            'departments' => TeacherDepartment::with('subjects')->where('status', TeacherDepartment::STATUS_ACTIVE)->orderBy('name')->get(),
+            'departments' => TeacherDepartment::with('subjects')
+                ->where('status', TeacherDepartment::STATUS_ACTIVE)
+                ->orderBy('name')
+                ->get(),
             'subjects' => Subject::with('departments')
                 ->where(function ($query) use ($currentSubjectId) {
                     $query->where(function ($activeQuery) {
@@ -231,9 +272,11 @@ class TeachingAssignmentController extends Controller
         ];
     }
 
-    private function validatedData(Request $request, ?TeachingAssignment $assignment = null): array
+    private function validatedStoreData(Request $request, ?TeachingAssignment $assignment = null): array
     {
         $rules = [
+            'class_ids' => ['required', 'array', 'min:1'],
+            'class_ids.*' => ['required', 'distinct', 'exists:classes,id'],
             'teacher_id' => ['required', 'exists:teachers,id'],
             'subject_id' => ['required', 'exists:subjects,id'],
             'role' => ['required', Rule::in(array_keys(TeachingAssignment::ROLES))],
@@ -244,36 +287,37 @@ class TeachingAssignmentController extends Controller
         ];
 
         if (! $assignment) {
-            $rules += [
-                'school_year_id' => ['required', 'exists:school_years,id'],
-                'semester_id' => ['required', 'exists:semesters,id'],
-                'class_id' => ['required', 'exists:classes,id'],
-            ];
+            $rules['school_year_id'] = ['required', 'exists:school_years,id'];
+            $rules['semester_id'] = ['required', 'exists:semesters,id'];
         }
 
-        $validated = $request->validate($rules, [
+        $data = $request->validate($rules, [
+            'class_ids.required' => 'Vui lòng chọn ít nhất một lớp.',
+            'class_ids.*.distinct' => 'Danh sách lớp bị chọn trùng.',
             'custom_role.required_if' => 'Vui lòng nhập vai trò khi chọn Khác.',
         ]);
 
-        $data = $assignment
-            ? array_merge($assignment->only(['school_year_id', 'semester_id', 'class_id']), $validated)
-            : $validated;
+        $classIds = array_values(array_unique($data['class_ids']));
+        unset($data['class_ids']);
+
+        if ($assignment) {
+            $data['school_year_id'] = $assignment->school_year_id;
+            $data['semester_id'] = $assignment->semester_id;
+        }
 
         $data['weekly_periods'] = $data['weekly_periods'] ?? null;
-
         $data['custom_role'] = $data['role'] === TeachingAssignment::ROLE_OTHER
             ? trim((string) ($data['custom_role'] ?? ''))
             : null;
 
-        $this->validateBusinessRules($data, $assignment);
+        return collect($classIds)->map(function ($classId) use ($data, $assignment) {
+            $payload = $data + ['class_id' => $classId];
+            $ignore = $assignment && (string) $assignment->class_id === (string) $classId ? $assignment : null;
+            $this->validateBusinessRules($payload, $ignore);
+            $payload['archived_at'] = $payload['status'] === TeachingAssignment::STATUS_ARCHIVED ? ($ignore?->archived_at ?? now()) : null;
 
-        if ($data['status'] === TeachingAssignment::STATUS_ARCHIVED) {
-            $data['archived_at'] = $assignment?->archived_at ?? now();
-        } else {
-            $data['archived_at'] = null;
-        }
-
-        return $data;
+            return $payload;
+        })->all();
     }
 
     private function validateBusinessRules(array $data, ?TeachingAssignment $assignment = null): void
@@ -285,88 +329,66 @@ class TeachingAssignmentController extends Controller
         $teacher = Teacher::findOrFail($data['teacher_id']);
 
         if (! $year->is_active || $year->isArchived()) {
-            throw ValidationException::withMessages(['school_year_id' => 'Chỉ được phân công trong năm học đang hoạt động.']);
+            throw ValidationException::withMessages([
+                'school_year_id' => 'Chỉ được phân công trong năm học đang hoạt động.',
+            ]);
         }
 
         if (! $semester->isActive() || (string) $semester->school_year_id !== (string) $year->getKey()) {
-            throw ValidationException::withMessages(['semester_id' => 'Chỉ được phân công trong học kỳ đang hoạt động của năm học hiện tại.']);
+            throw ValidationException::withMessages([
+                'semester_id' => 'Chỉ được phân công trong học kỳ đang hoạt động của năm học hiện tại.',
+            ]);
         }
 
         if (! $class->isActive() || $class->isArchived()) {
-            throw ValidationException::withMessages(['class_id' => 'Chỉ được chọn lớp đang hoạt động.']);
+            throw ValidationException::withMessages([
+                'class_id' => 'Chỉ được chọn lớp đang hoạt động.',
+            ]);
         }
 
         if ((string) $class->school_year_id !== (string) $year->getKey()) {
-            throw ValidationException::withMessages(['class_id' => 'Lớp không thuộc năm học đã chọn.']);
-        }
-
-        if ($subject->status !== Subject::STATUS_ACTIVE) {
-            throw ValidationException::withMessages(['subject_id' => 'Chỉ được chọn môn học đang hoạt động.']);
-        }
-
-        if (! $subject->requiresTeachingAssignment()) {
             throw ValidationException::withMessages([
-                'subject_id' => 'Môn ' . $subject->typeLabel() . ' không cần phân công giảng dạy. Hãy xếp trực tiếp trong thời khóa biểu.',
+                'class_id' => 'Lớp không thuộc năm học đã chọn.',
             ]);
         }
 
-        if (! $subject->departments()->exists()) {
+        if (! $subject->isActive()) {
             throw ValidationException::withMessages([
-                'subject_id' => 'Môn chính khóa phải được cấu hình Tổ chuyên môn trước khi phân công giảng dạy.',
+                'subject_id' => 'Chỉ được chọn môn học đang hoạt động.',
             ]);
         }
 
-        if (! $teacher->isWorking()) {
-            throw ValidationException::withMessages(['teacher_id' => 'Chỉ được chọn giáo viên đang công tác.']);
+        if (! $subject->isOfficialSubject()) {
+            throw ValidationException::withMessages([
+                'subject_id' => 'Chỉ môn chính khóa mới cần phân công giáo viên bộ môn.',
+            ]);
         }
 
-        $duplicateQuery = TeachingAssignment::where('school_year_id', $data['school_year_id'])
+        if ($teacher->work_status !== Teacher::STATUS_WORKING) {
+            throw ValidationException::withMessages([
+                'teacher_id' => 'Chỉ được chọn giáo viên đang công tác.',
+            ]);
+        }
+
+        $duplicate = TeachingAssignment::query()
+            ->where('school_year_id', $data['school_year_id'])
             ->where('semester_id', $data['semester_id'])
             ->where('class_id', $data['class_id'])
             ->where('subject_id', $data['subject_id'])
-            ->where('teacher_id', $data['teacher_id'])
-            ->where('role', $data['role'])
-            ->where(function ($query) use ($data) {
-                if ($data['role'] === TeachingAssignment::ROLE_OTHER) {
-                    $query->where('custom_role', $data['custom_role']);
-                } else {
-                    $query->whereNull('custom_role')->orWhere('custom_role', '');
-                }
-            });
+            ->when($assignment, fn ($query) => $query->whereKeyNot($assignment->getKey()))
+            ->exists();
 
-        if ($assignment) {
-            $duplicateQuery->whereKeyNot($assignment->getKey());
-        }
-
-        if ($duplicateQuery->exists()) {
+        if ($duplicate) {
             throw ValidationException::withMessages([
-                'teacher_id' => 'Phân công này đã tồn tại trong cùng năm học, học kỳ, lớp, môn, giáo viên và vai trò.',
+                'class_ids' => 'Lớp và môn học này đã có phân công trong học kỳ đã chọn.',
             ]);
-        }
-
-        if ($data['role'] === TeachingAssignment::ROLE_PRIMARY) {
-            $primaryQuery = TeachingAssignment::where('school_year_id', $data['school_year_id'])
-                ->where('semester_id', $data['semester_id'])
-                ->where('class_id', $data['class_id'])
-                ->where('subject_id', $data['subject_id'])
-                ->where('role', TeachingAssignment::ROLE_PRIMARY)
-                ->where('status', '!=', TeachingAssignment::STATUS_ARCHIVED);
-
-            if ($assignment) {
-                $primaryQuery->whereKeyNot($assignment->getKey());
-            }
-
-            if ($primaryQuery->exists()) {
-                throw ValidationException::withMessages([
-                    'role' => 'Trong cùng năm học, học kỳ, lớp và môn chỉ được có một giáo viên giảng dạy chính.',
-                ]);
-            }
         }
 
         if ($assignment) {
             $scheduledCount = TimetableEntry::where('assignment_id', $assignment->getKey())
                 ->where('status', '!=', TimetableEntry::STATUS_ARCHIVED)
                 ->count();
+
             $assignment->fill(['weekly_periods' => $data['weekly_periods']]);
             $assignment->setRelation('subject', $subject->loadMissing('periodNorms'));
             $assignment->setRelation('classRoom', $class);
@@ -374,7 +396,7 @@ class TeachingAssignmentController extends Controller
 
             if ($effectiveLimit > 0 && $scheduledCount > $effectiveLimit) {
                 throw ValidationException::withMessages([
-                    'weekly_periods' => 'Phân công này đã được xếp ' . $scheduledCount . ' tiết trong thời khóa biểu, không thể đặt định mức hiệu lực nhỏ hơn.',
+                    'weekly_periods' => 'Phân công này đã xếp ' . $scheduledCount . ' tiết trong thời khóa biểu, không thể đặt định mức hiệu lực nhỏ hơn.',
                 ]);
             }
         }

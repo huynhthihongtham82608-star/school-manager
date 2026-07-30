@@ -27,13 +27,16 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">Lớp</label>
-            <select name="class_id" class="form-select" required>
-                <option value="">Chọn lớp</option>
+            <select name="class_ids[]" class="form-select" multiple size="6" required>
                 @foreach($classes as $class)
-                    <option value="{{ $class->id }}" @selected(old('class_id') === $class->id)>{{ $class->name }}</option>
+                    <option value="{{ $class->id }}" @selected(collect(old('class_ids', []))->contains($class->id))>
+                        {{ $class->name }}
+                    </option>
                 @endforeach
             </select>
-            @error('class_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+            <div class="form-text">Có thể chọn nhiều lớp cho cùng một giáo viên và môn học.</div>
+            @error('class_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+            @error('class_ids.*')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-3">
             <label class="form-label">Môn học</label>

@@ -5,6 +5,7 @@
 @php
     $roleFilters = ['all' => 'Tất cả vai trò'] + \App\Models\TeachingAssignment::ROLES;
     $statusFilters = ['all' => 'Tất cả trạng thái'] + \App\Models\TeachingAssignment::STATUSES;
+    $teacherGroups = $assignments->groupBy(fn ($assignment) => (string) ($assignment->teacher_id ?? 'unknown'));
 @endphp
 
 <x-page-header
@@ -13,7 +14,9 @@
 >
     <div class="d-flex align-items-center gap-2">
         @unless($readOnly)
-            <a class="btn btn-primary" href="{{ route('assignments.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm phân công</a>
+            <a class="btn btn-primary" href="{{ route('assignments.create') }}">
+                <i class="bi bi-plus-lg me-1"></i>Thêm phân công
+            </a>
         @endunless
         <div class="dropdown">
             <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Lọc phân công" aria-label="Lọc phân công">
@@ -74,72 +77,78 @@
     </div>
 </x-page-header>
 
-<div class="card">
+<div class="card assignment-list-card">
     <div class="table-responsive">
-        <table class="table">
+        <table class="table align-middle assignment-table assignment-group-table">
             <thead>
                 <tr>
-                    <th>Giáo viên</th>
-                    <th>Lớp</th>
-                    <th>Tiến độ tiết</th>
-                    <th>Vai trò</th>
-                    <th>Trạng thái</th>
-                    <th></th>
+                    <th style="width: 28%;">Giáo viên</th>
+                    <th>Danh sách lớp & Định mức</th>
+                    <th class="text-end action-column-header" style="width: 110px;" aria-label="Thao tác"></th>
                 </tr>
             </thead>
             <tbody>
-            @forelse($assignments as $assignment)
+            @forelse($teacherGroups as $teacherKey => $teacherAssignments)
                 @php
-                    $deleteCheck = $deleteChecks[(string) $assignment->getKey()] ?? ['allowed' => false, 'message' => null];
-                    $subjectDepartments = $assignment->subject?->departments ?? collect();
-                    $teacherDepartmentId = $assignment->teacher?->department_id;
-                    $teacherOutsideDepartment = $subjectDepartments->isNotEmpty()
-                        && $teacherDepartmentId
-                        && ! $subjectDepartments->pluck('id')->contains($teacherDepartmentId);
-                    $detailId = 'assignmentDetailModal' . $assignment->id;
+                    $firstAssignment = $teacherAssignments->first();
+                    $teacher = $firstAssignment?->teacher;
+                    $modalId = 'assignmentTeacherModal' . md5((string) $teacherKey);
                 @endphp
                 <tr>
                     <td>
-                        <div class="fw-semibold">{{ $assignment->teacher->name ?? '-' }}</div>
-                        <div class="text-muted small">{{ $assignment->teacher->teacher_code ?? '-' }} · {{ $assignment->subject->name ?? '-' }}</div>
-                        <div class="text-muted small">Tổ: {{ $assignment->teacher?->department?->name ?? 'Chưa phân tổ' }}</div>
-                        @if($teacherOutsideDepartment)
-                            <div class="small text-warning">Giáo viên này không thuộc tổ phụ trách môn học.</div>
-                        @endif
+                        <div class="assignment-teacher-name">{{ $teacher?->name ?? 'Chưa xác định giáo viên' }}</div>
+                        <div class="assignment-muted">{{ $teacher?->teacher_code ?? '-' }}</div>
+                        <div class="assignment-muted">Tổ: {{ $teacher?->department?->name ?? 'Chưa phân tổ' }}</div>
                     </td>
-                    <td class="fw-semibold">{{ $assignment->classRoom->name ?? '-' }}</td>
                     <td>
-                        @php
-                            $period = $periodProgress[(string) $assignment->getKey()] ?? ['standard' => 0, 'expected' => 0, 'scheduled' => 0, 'percent' => 0, 'badge_class' => 'bg-light text-muted border', 'progress_class' => 'bg-warning', 'label' => 'Chưa cấu hình định mức'];
-                        @endphp
-                        @if($period['expected'] > 0)
-                            <div class="d-flex flex-wrap align-items-center gap-2">
-                                <span class="badge {{ $period['badge_class'] }}">{{ $period['label'] }}</span>
-                                @if($assignment->hasWeeklyPeriodOverride())
-                                    <span class="badge bg-info">Đã điều chỉnh</span>
-                                @endif
-                            </div>
-                            <div class="small mt-2">
-                                <div>Định mức: <strong>{{ $period['expected'] }}</strong> tiết{{ $assignment->hasWeeklyPeriodOverride() && $period['standard'] ? ' (chuẩn: ' . $period['standard'] . ')' : '' }}</div>
-                                <div>Đã xếp: <strong>{{ $period['scheduled'] }}/{{ $period['expected'] }}</strong> tiết</div>
-                            </div>
-                            <div class="progress mt-2" style="height: 6px;">
-                                <div class="progress-bar {{ $period['progress_class'] }}" style="width: {{ $period['percent'] }}%"></div>
-                            </div>
-                        @else
-                            <span class="badge {{ $period['badge_class'] }}">{{ $period['label'] }}</span>
-                        @endif
+                        <div class="assignment-class-stack">
+                            @foreach($teacherAssignments as $assignment)
+                                @php
+                                    $period = $periodProgress[(string) $assignment->getKey()] ?? [
+                                        'standard' => 0,
+                                        'expected' => 0,
+                                        'scheduled' => 0,
+                                        'percent' => 0,
+                                        'badge_class' => 'bg-light text-muted border',
+                                        'progress_class' => 'bg-warning',
+                                        'label' => 'Chưa cấu hình định mức',
+                                    ];
+                                    $subjectDepartments = $assignment->subject?->departments ?? collect();
+                                    $teacherDepartmentId = $assignment->teacher?->department_id;
+                                    $teacherOutsideDepartment = $subjectDepartments->isNotEmpty()
+                                        && $teacherDepartmentId
+                                        && ! $subjectDepartments->pluck('id')->contains($teacherDepartmentId);
+                                @endphp
+                                <div class="assignment-class-row">
+                                    <div class="assignment-class-main">
+                                        <span class="assignment-class-tag">{{ $assignment->classRoom?->name ?? '-' }}</span>
+                                        <span class="assignment-subject-chip">{{ $assignment->subject?->name ?? '-' }}</span>
+                                    </div>
+                                    <div class="assignment-class-meta">
+                                        <span>Định mức: <strong>{{ $period['expected'] ?: '-' }}</strong> tiết/tuần</span>
+                                        <span>Đã xếp: <strong>{{ $period['scheduled'] }}/{{ $period['expected'] ?: '-' }}</strong> tiết</span>
+                                        <span>Vai trò: <strong>{{ $assignment->roleLabel() }}</strong></span>
+                                        <span>Trạng thái: <strong>{{ $assignment->statusLabel() }}</strong></span>
+                                    </div>
+                                    <div class="assignment-class-progress">
+                                        <span class="badge {{ $period['badge_class'] }}">{{ $period['label'] }}</span>
+                                        @if($assignment->hasWeeklyPeriodOverride())
+                                            <span class="badge bg-info">Đã điều chỉnh</span>
+                                        @endif
+                                        @if($teacherOutsideDepartment)
+                                            <span class="badge bg-warning text-dark">Khác tổ phụ trách</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
                     </td>
-                    <td>{{ $assignment->roleLabel() }}</td>
-                    <td><span class="badge {{ $assignment->statusBadgeClass() }}">{{ $assignment->statusLabel() }}</span></td>
                     <td class="text-end">
                         <div class="content-action-group justify-content-end" data-action-synced="true">
                             @unless($readOnly)
-                                <a href="{{ route('assignments.edit', $assignment) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
-                                    <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
+                                <a href="{{ route('assignments.edit', $firstAssignment) }}" class="content-action-btn icon-only edit" title="Sửa phân công" aria-label="Sửa phân công">
+                                    <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa phân công</span>
                                 </a>
-                            @else
-                                <span class="text-muted small">Chỉ xem</span>
                             @endunless
                             <div class="dropdown">
                                 <button type="button" class="content-action-btn icon-only dropdown-toggle-clean more" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
@@ -147,25 +156,10 @@
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end content-action-menu">
                                     <li>
-                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}">
+                                        <button type="button" class="dropdown-item font-normal" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}">
                                             <i class="bi bi-eye"></i>Xem chi tiết
                                         </button>
                                     </li>
-                                    @unless($readOnly)
-                                        @if($deleteCheck['allowed'])
-                                            <li>
-                                                <form action="{{ route('assignments.destroy', $assignment) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa phân công này? Hành động này không thể hoàn tác.');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="dropdown-item danger">
-                                                        <i class="bi bi-trash"></i>Xóa bỏ
-                                                    </button>
-                                                </form>
-                                            </li>
-                                        @else
-                                            <li><span class="dropdown-item text-muted">{{ $deleteCheck['message'] ?? 'Đã phát sinh dữ liệu' }}</span></li>
-                                        @endif
-                                    @endunless
                                 </ul>
                             </div>
                         </div>
@@ -173,7 +167,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6"><div class="empty-state"><i class="bi bi-diagram-3"></i>Chưa có phân công.</div></td>
+                    <td colspan="3"><div class="empty-state"><i class="bi bi-diagram-3"></i>Chưa có phân công.</div></td>
                 </tr>
             @endforelse
             </tbody>
@@ -181,68 +175,64 @@
     </div>
 </div>
 
-@foreach($assignments as $assignment)
+@foreach($teacherGroups as $teacherKey => $teacherAssignments)
     @php
-        $assignmentPeriod = $periodProgress[(string) $assignment->getKey()] ?? ['standard' => 0, 'expected' => 0, 'scheduled' => 0];
-        $assignmentDepartments = $assignment->subject?->departments?->pluck('name')->filter()->join(', ');
-        $assignmentStatusLabel = $assignment->status === \App\Models\TeachingAssignment::STATUS_ACTIVE ? 'Đã kích hoạt' : $assignment->statusLabel();
+        $firstAssignment = $teacherAssignments->first();
+        $teacher = $firstAssignment?->teacher;
+        $modalId = 'assignmentTeacherModal' . md5((string) $teacherKey);
     @endphp
-    <div class="modal fade content-modal assignment-detail-modal academic-detail-center-modal" id="assignmentDetailModal{{ $assignment->id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade content-modal assignment-detail-modal academic-detail-center-modal" id="{{ $modalId }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <div class="academic-detail-header">
                         <div class="academic-detail-identity">
-                            <h5 class="modal-title">CHI TIẾT PHÂN CÔNG GIẢNG DẠY</h5>
-                            <div>Niên khóa: {{ $assignment->schoolYear->name ?? '-' }} | {{ $assignment->semester?->normalizedName() ?? $assignment->semester?->name ?? '-' }}</div>
+                            <h5 class="modal-title">{{ $teacher?->name ?? 'Chưa xác định giáo viên' }}</h5>
+                            <div>{{ $teacher?->teacher_code ?? '-' }} | Tổ: {{ $teacher?->department?->name ?? 'Chưa phân tổ' }}</div>
                         </div>
-                        <span class="badge {{ $assignment->statusBadgeClass() }}">{{ $assignmentStatusLabel }}</span>
+                        <span class="badge bg-success">{{ $teacherAssignments->count() }} phân công</span>
                     </div>
                     <button type="button" class="btn-close ms-3" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <section class="academic-detail-section">
-                        <h6>Thông tin đối tượng liên kết</h6>
-                        <div class="academic-detail-grid">
-                            <article>
-                                <span>Lớp học</span>
-                                <strong>{{ $assignment->classRoom->name ?? '-' }}</strong>
-                            </article>
-                            <article>
-                                <span>Môn học</span>
-                                <strong>{{ $assignment->subject->name ?? '-' }}</strong>
-                            </article>
-                            <article>
-                                <span>Giáo viên giảng dạy</span>
-                                <strong>{{ $assignment->teacher->name ?? '-' }}</strong>
-                            </article>
-                            <article>
-                                <span>Tổ chuyên môn liên kết</span>
-                                <strong>{{ $assignmentDepartments ?: '-' }}</strong>
-                            </article>
-                        </div>
-                    </section>
-
-                    <section class="academic-detail-section mt-3">
-                        <h6>Định mức tiết dạy & Ghi chú</h6>
-                        <div class="assignment-detail-note-box">
-                            <div class="assignment-period-row">
-                                <span>Số tiết/tuần</span>
-                                <strong>
-                                    @if($assignment->hasWeeklyPeriodOverride())
-                                        {{ $assignment->weekly_periods }} tiết/tuần
-                                    @else
-                                        Sử dụng định mức mặc định của môn học
-                                    @endif
-                                </strong>
-                            </div>
-                            <div class="assignment-period-sub">
-                                Định mức hiệu lực: {{ $assignmentPeriod['expected'] ?: '-' }} tiết/tuần · Đã xếp: {{ $assignmentPeriod['scheduled'] ?? 0 }}/{{ $assignmentPeriod['expected'] ?: '-' }} tiết
-                            </div>
-                            <div class="assignment-detail-flat-note">
-                                <span>Ghi chú</span>
-                                <p>{{ trim((string) $assignment->note) !== '' ? $assignment->note : '-' }}</p>
-                            </div>
+                        <h6>Danh sách lớp giảng dạy</h6>
+                        <div class="assignment-detail-list">
+                            @foreach($teacherAssignments as $assignment)
+                                @php
+                                    $assignmentPeriod = $periodProgress[(string) $assignment->getKey()] ?? ['standard' => 0, 'expected' => 0, 'scheduled' => 0, 'label' => 'Chưa cấu hình định mức'];
+                                    $assignmentDepartments = $assignment->subject?->departments?->pluck('name')->filter()->join(', ');
+                                @endphp
+                                <article class="assignment-detail-item">
+                                    <div class="assignment-detail-item-title">
+                                        <span class="assignment-class-tag">{{ $assignment->classRoom?->name ?? '-' }}</span>
+                                        <strong>{{ $assignment->subject?->name ?? '-' }}</strong>
+                                        <span class="badge {{ $assignment->statusBadgeClass() }}">{{ $assignment->statusLabel() }}</span>
+                                    </div>
+                                    <div class="academic-detail-grid mt-2">
+                                        <article>
+                                            <span>Vai trò</span>
+                                            <strong>{{ $assignment->roleLabel() }}</strong>
+                                        </article>
+                                        <article>
+                                            <span>Tổ phụ trách môn</span>
+                                            <strong>{{ $assignmentDepartments ?: '-' }}</strong>
+                                        </article>
+                                        <article>
+                                            <span>Định mức tiết/tuần</span>
+                                            <strong>{{ $assignmentPeriod['expected'] ?: '-' }}</strong>
+                                        </article>
+                                        <article>
+                                            <span>Đã xếp thời khóa biểu</span>
+                                            <strong>{{ $assignmentPeriod['scheduled'] ?? 0 }}/{{ $assignmentPeriod['expected'] ?: '-' }} tiết</strong>
+                                        </article>
+                                    </div>
+                                    <div class="assignment-detail-flat-note mt-2">
+                                        <span>Ghi chú</span>
+                                        <p>{{ trim((string) $assignment->note) !== '' ? $assignment->note : '-' }}</p>
+                                    </div>
+                                </article>
+                            @endforeach
                         </div>
                     </section>
                 </div>
