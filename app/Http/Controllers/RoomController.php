@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Room;
+use App\Models\SchoolClass;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,7 @@ class RoomController extends Controller
         $readOnly = $this->isHistoricalReadOnly();
 
         $rooms = Room::query()
+            ->with('fixedClass.schoolYear')
             ->when($selectedType !== 'all', fn ($query) => $query->where('type', $selectedType))
             ->when($selectedStatus !== 'all', fn ($query) => $query->where('status', $selectedStatus))
             ->withCount('timetableEntries')
@@ -35,7 +37,9 @@ class RoomController extends Controller
             ]);
         }
 
-        return view('rooms.create');
+        return view('rooms.create', [
+            'classes' => $this->classOptions(),
+        ]);
     }
 
     public function store(Request $request)
@@ -62,6 +66,7 @@ class RoomController extends Controller
         return view('rooms.edit', [
             'room' => $room,
             'isUsed' => $room->isUsed(),
+            'classes' => $this->classOptions($room->fixed_class_id ? (string) $room->fixed_class_id : null),
         ]);
     }
 
@@ -122,6 +127,12 @@ class RoomController extends Controller
             'type' => ['required', Rule::in(array_keys(Room::TYPES))],
             'custom_type' => ['nullable', 'string', 'max:255', Rule::requiredIf($request->input('type') === Room::TYPE_OTHER)],
             'capacity' => ['required', 'integer', 'min:1', 'max:100'],
+            'fixed_class_id' => [
+                'nullable',
+                'string',
+                'exists:classes,id',
+                Rule::unique('rooms', 'fixed_class_id')->ignore($room?->getKey()),
+            ],
             'status' => ['required', Rule::in(array_keys(Room::STATUSES))],
             'note' => ['nullable', 'string', 'max:2000'],
         ], [
@@ -136,6 +147,19 @@ class RoomController extends Controller
         }
 
         return $data;
+    }
+
+    private function classOptions(?string $currentClassId = null)
+    {
+        return SchoolClass::with('schoolYear')
+            ->where(function ($query) use ($currentClassId) {
+                $query->whereDoesntHave('fixedRoom')
+                    ->when($currentClassId, fn ($classQuery) => $classQuery->orWhereKey($currentClassId));
+            })
+            ->where('status', '!=', SchoolClass::STATUS_ARCHIVED)
+            ->orderBy('grade_level')
+            ->orderBy('name')
+            ->get();
     }
 
     private function denyHistoricalWrite(): void

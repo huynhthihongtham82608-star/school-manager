@@ -87,6 +87,17 @@
                                                 <i class="bi bi-arrow-left-right"></i>Chuyển lớp học sinh
                                             </button>
                                         </li>
+                                        @if($class->isDraft())
+                                            <li>
+                                                <form action="{{ route('classes.activate', $class) }}" method="POST">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit" class="dropdown-item">
+                                                        <i class="bi bi-unlock"></i>Kích hoạt hoạt động
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @endif
                                         @if($class->canLock() && ! $class->isLocked())
                                             <li>
                                                 <form action="{{ route('classes.lock', $class) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn khóa lớp học này?');">
@@ -150,7 +161,7 @@
             ->filter()
             ->unique()
             ->values();
-        $cohortSummary = $cohortLabels->count() > 1 ? 'Nhiều niên khóa' : ($cohortLabels->first() ?? '-');
+        $cohortSummary = $class->cohort ?: ($cohortLabels->count() > 1 ? 'Nhiều niên khóa' : ($cohortLabels->first() ?? '-'));
         $availableTransferClasses = $transferClasses->reject(fn ($targetClass) => (string) $targetClass->getKey() === (string) $class->getKey())->values();
     @endphp
 
@@ -177,7 +188,7 @@
                             </article>
                             <article>
                                 <span>Phòng học cố định</span>
-                                <strong>-</strong>
+                                <strong>{{ $class->fixedRoom?->name ?? '-' }}</strong>
                             </article>
                             <article>
                                 <span>Sĩ số hiện tại</span>

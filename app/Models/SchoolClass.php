@@ -20,6 +20,7 @@ class SchoolClass extends Model
     protected $fillable = [
         'name',
         'grade_level',
+        'cohort',
         'school_year_id',
         'semester_id',
         'homeroom_teacher_id',
@@ -62,6 +63,11 @@ class SchoolClass extends Model
     public function assignments()
     {
         return $this->hasMany(TeachingAssignment::class, 'class_id');
+    }
+
+    public function fixedRoom()
+    {
+        return $this->hasOne(Room::class, 'fixed_class_id');
     }
 
     public static function statusLabels(): array

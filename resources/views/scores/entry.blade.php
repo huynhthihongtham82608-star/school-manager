@@ -4,6 +4,7 @@
 @section('content')
 @php
     $isScoreAdmin = auth()->user()->isAdmin() || auth()->user()->isStaff();
+    $usesPassFailAssessment = $subject->usesPassFailAssessment();
 @endphp
 
 <x-page-header
@@ -81,10 +82,37 @@
                                 $fieldName = "scores[{$column->id}][{$student->id}]";
                                 $fieldKey = "scores.{$column->id}.{$student->id}";
                                 $displayValue = old($fieldKey, $detail?->value !== null ? rtrim(rtrim(number_format((float) $detail->value, 1, '.', ''), '0'), '.') : '');
+                                if ($usesPassFailAssessment) {
+                                    $displayValue = old($fieldKey, $detail?->value !== null ? ((float) $detail->value >= 0.5 ? 'pass' : 'fail') : '');
+                                }
+                                $passFailLabel = match ($displayValue) {
+                                    'pass', '1' => 'Đạt',
+                                    'fail', '0' => 'Chưa đạt',
+                                    default => '',
+                                };
                             @endphp
                             <td>
                                 @if($isScoreAdmin)
-                                    <span class="score-readonly-value {{ $displayValue === '' ? 'empty' : '' }}">{{ $displayValue !== '' ? $displayValue : '-' }}</span>
+                                    <span class="score-readonly-value {{ $displayValue === '' ? 'empty' : '' }}">
+                                        @if($usesPassFailAssessment)
+                                            {{ $passFailLabel !== '' ? $passFailLabel : '-' }}
+                                        @else
+                                            {{ $displayValue !== '' ? $displayValue : '-' }}
+                                        @endif
+                                    </span>
+                                @elseif($usesPassFailAssessment)
+                                    <select
+                                        name="{{ $fieldName }}"
+                                        class="form-select form-select-sm {{ $errors->has($fieldKey) ? 'is-invalid' : '' }}"
+                                        @disabled(! $permission['editable'])
+                                    >
+                                        <option value="">Chọn</option>
+                                        <option value="pass" @selected($displayValue === 'pass' || $displayValue === '1')>Đạt (Đ)</option>
+                                        <option value="fail" @selected($displayValue === 'fail' || $displayValue === '0')>Chưa đạt (CĐ)</option>
+                                    </select>
+                                    @if($errors->has($fieldKey))
+                                        <div class="invalid-feedback">{{ $errors->first($fieldKey) }}</div>
+                                    @endif
                                 @else
                                     <input
                                         type="text"

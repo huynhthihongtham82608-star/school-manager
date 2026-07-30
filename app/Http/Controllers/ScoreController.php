@@ -34,6 +34,7 @@ class ScoreController extends Controller
         $teachers = collect();
         $student = null;
         $studentScores = collect();
+        $studentReportRows = collect();
 
         if ($user->isStudent() || $user->isParent()) {
             if ($user->isStudent()) {
@@ -54,11 +55,38 @@ class ScoreController extends Controller
                     ->get()
                     ->sortBy(fn (ScoreHeader $score) => ($score->subject->name ?? '') . ($score->semester->name ?? ''))
                     ->values();
+
+                $scoreMap = $studentScores->keyBy('subject_id');
+                $assignedSubjectIds = collect();
+
+                if ($student->class_id) {
+                    $assignedSubjectIds = TeachingAssignment::query()
+                        ->where('class_id', $student->class_id)
+                        ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                        ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
+                        ->where('status', TeachingAssignment::STATUS_ACTIVE)
+                        ->pluck('subject_id')
+                        ->unique()
+                        ->values();
+                }
+
+                $studentSubjects = Subject::whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
+                    ->where('status', Subject::STATUS_ACTIVE)
+                    ->when($assignedSubjectIds->isNotEmpty(), fn ($query) => $query->whereIn('id', $assignedSubjectIds))
+                    ->orderBy('name')
+                    ->get();
+
+                $studentReportRows = $studentSubjects
+                    ->map(fn (Subject $subject) => [
+                        'subject' => $subject,
+                        'score' => $scoreMap->get($subject->id),
+                    ])
+                    ->values();
             }
 
             $detailLabels = $this->detailLabels();
 
-            return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'selectedYearId', 'selectedSemesterId', 'student', 'studentScores', 'detailLabels'));
+            return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'selectedYearId', 'selectedSemesterId', 'student', 'studentScores', 'studentReportRows', 'detailLabels'));
         }
 
         $assignments = collect();
@@ -136,6 +164,7 @@ class ScoreController extends Controller
         $scoreColumns = $this->scoreColumnsFor($class, $subject, $semester);
         $columnPermissions = $this->scoreColumnPermissions($class, $subject, $semester, $scoreColumns);
         $editableColumns = $scoreColumns->filter(fn (ScoreColumn $column) => $columnPermissions[$column->id]['editable'] ?? false);
+        $usesPassFailAssessment = $subject->usesPassFailAssessment();
 
         if ($editableColumns->isEmpty()) {
             abort(403, 'Hiện không có cột điểm nào đang mở để nhập hoặc chỉnh sửa.');
@@ -155,6 +184,23 @@ class ScoreController extends Controller
 
                 if ($value === '') {
                     $normalizedScores[$column->id][$student->id] = null;
+                    continue;
+                }
+
+                if ($usesPassFailAssessment) {
+                    $normalized = strtolower(str_replace([' ', '_', '-'], '', $value));
+
+                    if (in_array($normalized, ['pass', 'dat', 'd', '1'], true)) {
+                        $normalizedScores[$column->id][$student->id] = 1.0;
+                        continue;
+                    }
+
+                    if (in_array($normalized, ['fail', 'chuadat', 'cd', '0'], true)) {
+                        $normalizedScores[$column->id][$student->id] = 0.0;
+                        continue;
+                    }
+
+                    $errors[$field] = 'Vui lòng chọn Đạt hoặc Chưa đạt.';
                     continue;
                 }
 
@@ -210,6 +256,15 @@ class ScoreController extends Controller
 
     private function recalculateAverage(ScoreHeader $header): void
     {
+        $header->loadMissing('subject');
+
+        if ($header->subject?->usesPassFailAssessment()) {
+            $header->average = null;
+            $header->save();
+
+            return;
+        }
+
         $details = $header->details()->get();
         $weightedSum = $details->sum(fn (ScoreDetail $detail) => (float) $detail->value * (int) $detail->weight_group);
         $totalWeight = $details->sum(fn (ScoreDetail $detail) => (int) $detail->weight_group);

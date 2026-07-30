@@ -25,7 +25,7 @@
         : 'Theo dõi lịch kiểm tra phù hợp với lớp, môn học và vai trò đang đăng nhập.'"
 >
     <div class="d-flex align-items-center gap-2">
-        <div class="dropdown">
+        <div class="dropdown d-none">
             <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Bộ lọc" aria-label="Bộ lọc">
                 <i class="bi bi-funnel"></i>
             </button>
@@ -170,6 +170,34 @@
             <p>Trạng thái thời gian được hệ thống tự động xác định theo ngày giờ kiểm tra.</p>
         </div>
     </div>
+    <div class="unified-table-toolbar mb-3" data-exam-filter-toolbar>
+        <div class="admin-table-tools-left">
+            <select class="form-select form-select-sm" data-exam-filter="class">
+                <option value="">Tất cả lớp</option>
+                @foreach($classes as $class)
+                    <option value="{{ $class->id }}">{{ $class->name }}</option>
+                @endforeach
+            </select>
+            <select class="form-select form-select-sm" data-exam-filter="subject">
+                <option value="">Tất cả môn học</option>
+                @foreach($subjects as $subject)
+                    <option value="{{ $subject->id }}">{{ $subject->name }}</option>
+                @endforeach
+            </select>
+            <select class="form-select form-select-sm" data-exam-filter="type">
+                <option value="">Tất cả loại kiểm tra</option>
+                @foreach($examTypes as $type => $label)
+                    <option value="{{ $type }}">{{ $label }}</option>
+                @endforeach
+            </select>
+            <select class="form-select form-select-sm" data-exam-filter="status">
+                <option value="">Tất cả trạng thái</option>
+                <option value="draft">Bản nháp</option>
+                <option value="published">Công bố</option>
+                <option value="canceled">Đã hủy</option>
+            </select>
+        </div>
+    </div>
     <div class="table-responsive content-table-wrap">
         <table class="table content-table align-middle">
             <thead>
@@ -192,7 +220,7 @@
                     $editId = 'exam-schedule-edit-' . $schedule->id;
                     $selectedYearId = $schedule->schoolYearId();
                 @endphp
-                <tr>
+                <tr data-exam-row data-class-id="{{ $schedule->class_id }}" data-subject-id="{{ $schedule->subject_id }}" data-type="{{ $schedule->type }}" data-status="{{ $schedule->statusValue() }}">
                     <td class="fw-semibold">{{ $schedule->classRoom->name ?? 'Đang cập nhật' }}</td>
                     <td>{{ $schedule->subject->name ?? 'Đang cập nhật' }}</td>
                     <td>{{ $schedule->displayName() }}</td>
@@ -416,6 +444,35 @@
 </div>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        const examToolbar = document.querySelector('[data-exam-filter-toolbar]');
+        const examRows = Array.from(document.querySelectorAll('[data-exam-row]'));
+        let examFilterTimer = null;
+
+        const applyExamFilters = () => {
+            const values = {
+                class: examToolbar?.querySelector('[data-exam-filter="class"]')?.value || '',
+                subject: examToolbar?.querySelector('[data-exam-filter="subject"]')?.value || '',
+                type: examToolbar?.querySelector('[data-exam-filter="type"]')?.value || '',
+                status: examToolbar?.querySelector('[data-exam-filter="status"]')?.value || '',
+            };
+
+            examRows.forEach((row) => {
+                const visible = (!values.class || row.dataset.classId === values.class)
+                    && (!values.subject || row.dataset.subjectId === values.subject)
+                    && (!values.type || row.dataset.type === values.type)
+                    && (!values.status || row.dataset.status === values.status);
+
+                row.classList.toggle('d-none', !visible);
+            });
+        };
+
+        examToolbar?.querySelectorAll('[data-exam-filter]').forEach((field) => {
+            field.addEventListener('change', () => {
+                clearTimeout(examFilterTimer);
+                examFilterTimer = setTimeout(applyExamFilters, 300);
+            });
+        });
+
         document.querySelectorAll('form').forEach((form) => {
             const select = form.querySelector('[data-exam-type-select]');
             const customWrap = form.querySelector('[data-custom-exam-type-wrap]');

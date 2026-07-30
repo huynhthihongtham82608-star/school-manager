@@ -27,7 +27,7 @@ class SchoolClassController extends Controller
         $selectedGrade = $request->query('grade_level', 'all');
         $readOnly = $this->isHistoricalReadOnly();
 
-        $classes = SchoolClass::with(['schoolYear', 'semester', 'homeroomTeacher', 'students'])
+        $classes = SchoolClass::with(['schoolYear', 'semester', 'homeroomTeacher', 'students', 'fixedRoom'])
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->when(in_array($selectedGrade, ['10', '11', '12'], true), fn ($query) => $query->where('grade_level', $selectedGrade))
             ->orderBy('grade_level')
@@ -426,6 +426,7 @@ class SchoolClassController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'grade_level' => ['required', 'integer', Rule::in([10, 11, 12])],
+            'cohort' => ['nullable', 'string', 'max:20'],
             'school_year_id' => ['required', 'exists:school_years,id'],
             'homeroom_teacher_id' => ['nullable', 'exists:teachers,id'],
             'capacity' => ['required', 'integer', 'min:1', 'max:45'],
@@ -433,6 +434,12 @@ class SchoolClassController extends Controller
 
         $year = SchoolYear::findOrFail($validated['school_year_id']);
         $validated['semester_id'] = $class?->semester_id ?: $this->defaultSemesterIdForYear((string) $year->getKey());
+        $validated['cohort'] = trim((string) ($validated['cohort'] ?? ''));
+        if ($validated['cohort'] === '') {
+            $start = $year->start_date?->format('Y') ?: null;
+            $end = $start ? ((int) $start + 3) : null;
+            $validated['cohort'] = $start && $end ? $start . ' - ' . $end : null;
+        }
 
         if ($year->isArchived()) {
             throw ValidationException::withMessages(['school_year_id' => 'Không thể tạo lớp trong năm học đã lưu trữ.']);

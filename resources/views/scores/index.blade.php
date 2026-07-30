@@ -5,15 +5,29 @@
 @if(auth()->user()->isStudent() || auth()->user()->isParent())
     @php
         $detailLabels = $detailLabels ?? [];
-        $formatScoreList = function ($score, array $types) use ($detailLabels) {
-            $items = $score->details->filter(function ($detail) use ($types) {
+        $formatScoreList = function ($score, array $types, array $keywords = []) use ($detailLabels) {
+            if (! $score) {
+                return '<span class="text-muted">&nbsp;</span>';
+            }
+
+            $items = $score->details->filter(function ($detail) use ($types, $keywords, $detailLabels) {
                 $normalizedType = match ($detail->type) {
                     'oral', 'quiz', 'test', 'regular' => 'regular',
                     'final', 'final_test' => 'final',
                     default => $detail->type,
                 };
 
-                return in_array($normalizedType, $types, true);
+                if (! in_array($normalizedType, $types, true)) {
+                    return false;
+                }
+
+                if ($keywords === []) {
+                    return true;
+                }
+
+                $label = mb_strtolower((string) ($detail->scoreColumn?->name ?: ($detail->name ?: ($detailLabels[$detail->type] ?? $detail->type))));
+
+                return collect($keywords)->contains(fn ($keyword) => str_contains($label, mb_strtolower($keyword)));
             });
 
             if ($items->isEmpty()) {
@@ -22,9 +36,11 @@
 
             return $items
                 ->sortBy(fn ($detail) => $detail->scoreColumn?->sort_order ?? 999)
-                ->map(function ($detail) use ($detailLabels) {
+                ->map(function ($detail) use ($detailLabels, $score) {
                     $label = $detail->scoreColumn?->name ?: ($detail->name ?: ($detailLabels[$detail->type] ?? $detail->type));
-                    $value = rtrim(rtrim(number_format((float) $detail->value, 2, '.', ''), '0'), '.');
+                    $value = $score->subject?->usesPassFailAssessment()
+                        ? ((float) $detail->value >= 0.5 ? 'Đ' : 'CĐ')
+                        : rtrim(rtrim(number_format((float) $detail->value, 2, '.', ''), '0'), '.');
 
                     return '<span class="score-chip"><span>' . e($label) . '</span><strong>' . e($value) . '</strong></span>';
                 })
@@ -62,30 +78,38 @@
                 <thead>
                     <tr>
                         <th>Môn học</th>
-                        <th>Đánh giá thường xuyên</th>
+                        <th>Miệng</th>
+                        <th>15p</th>
                         <th>Đánh giá giữa kỳ</th>
                         <th>Đánh giá cuối kỳ</th>
                         <th>Điểm trung bình môn</th>
                     </tr>
                 </thead>
                 <tbody>
-                @forelse($studentScores as $score)
+                @forelse($studentReportRows as $row)
+                    @php
+                        $subject = $row['subject'];
+                        $score = $row['score'];
+                    @endphp
                     <tr>
-                        <td class="fw-semibold">{{ $score->subject->name ?? '-' }}</td>
-                        <td><div class="score-chip-list">{!! $formatScoreList($score, ['regular']) !!}</div></td>
+                        <td class="fw-semibold">{{ $subject->name ?? '-' }}</td>
+                        <td><div class="score-chip-list">{!! $formatScoreList($score, ['regular'], ['miệng', 'mieng']) !!}</div></td>
+                        <td><div class="score-chip-list">{!! $formatScoreList($score, ['regular'], ['15', '15p', 'phút', 'phut']) !!}</div></td>
                         <td><div class="score-chip-list">{!! $formatScoreList($score, ['midterm']) !!}</div></td>
                         <td><div class="score-chip-list">{!! $formatScoreList($score, ['final']) !!}</div></td>
                         <td>
-                            @if($score->average !== null)
+                            @if($subject->usesPassFailAssessment())
+                                <span class="text-muted">Không tính TB</span>
+                            @elseif($score?->average !== null)
                                 <span class="badge bg-info">{{ rtrim(rtrim(number_format($score->average, 2), '0'), '.') }}</span>
                             @else
-                                <span class="text-muted">Chưa có</span>
+                                <span class="text-muted">&nbsp;</span>
                             @endif
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5">
+                        <td colspan="6">
                             <div class="empty-state"><i class="bi bi-clipboard-data"></i>Chưa có dữ liệu điểm trong học kỳ này.</div>
                         </td>
                     </tr>

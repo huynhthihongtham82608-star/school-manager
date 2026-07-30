@@ -39,6 +39,7 @@ class Room extends Model
         'type',
         'custom_type',
         'capacity',
+        'fixed_class_id',
         'status',
         'note',
     ];
@@ -50,6 +51,11 @@ class Room extends Model
     public function timetableEntries()
     {
         return $this->hasMany(TimetableEntry::class, 'room_id');
+    }
+
+    public function fixedClass()
+    {
+        return $this->belongsTo(SchoolClass::class, 'fixed_class_id');
     }
 
     public function typeLabel(): string

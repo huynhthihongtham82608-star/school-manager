@@ -595,6 +595,9 @@
         <header class="topbar px-4 py-3 d-flex justify-content-between align-items-center">
             @if($showRoleMenu)
                 <div class="role-topbar-left">
+                    <button type="button" class="btn btn-light role-menu-toggle" data-role-menu-toggle aria-label="Mở menu chức năng">
+                        <i class="bi bi-list"></i>
+                    </button>
                     <div class="school-heading">{{ $schoolTitle }}</div>
                     <form class="topbar-search function-search" role="search" onsubmit="return false;" data-function-search>
                         <i class="bi bi-search"></i>

@@ -528,6 +528,7 @@
     @endif
 @endif
 
+@if($canManageAttendance)
 <div class="card">
     <div class="card-header">Danh sách điểm danh</div>
     <div class="table-responsive">
@@ -752,6 +753,8 @@
         </div>
     </div>
 @endforeach
+
+@endif
 
 <script>
     document.querySelectorAll('[data-attendance-type-select]').forEach((select) => {

@@ -34,6 +34,18 @@
             <input type="number" name="capacity" class="form-control" value="{{ old('capacity', $room->capacity) }}" min="1" max="100" required>
             @error('capacity')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
+        <div class="col-md-4">
+            <label class="form-label">Lớp học cố định</label>
+            <select name="fixed_class_id" class="form-select">
+                <option value="">Chưa gán lớp cố định</option>
+                @foreach(($classes ?? collect()) as $class)
+                    <option value="{{ $class->id }}" @selected(old('fixed_class_id', $room->fixed_class_id) == $class->id)>
+                        {{ $class->name }}{{ $class->schoolYear ? ' - ' . $class->schoolYear->name : '' }}
+                    </option>
+                @endforeach
+            </select>
+            @error('fixed_class_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+        </div>
         <div class="col-md-3">
             <label class="form-label">Trạng thái</label>
             <select name="status" class="form-select" required>

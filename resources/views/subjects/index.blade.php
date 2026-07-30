@@ -144,6 +144,10 @@
                                 <span>Hệ số môn</span>
                                 <strong>{{ $subject->credit }}</strong>
                             </div>
+                            <div>
+                                <span>Hình thức đánh giá</span>
+                                <strong>{{ $subject->assessmentTypeLabel() }}</strong>
+                            </div>
                             <div class="wide">
                                 <span>Tổ phụ trách</span>
                                 <strong>

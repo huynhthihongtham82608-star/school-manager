@@ -42,11 +42,20 @@ class Subject extends Model
         self::STATUS_ARCHIVED => 'Lưu trữ',
     ];
 
+    public const ASSESSMENT_NUMERIC = 'numeric';
+    public const ASSESSMENT_PASS_FAIL = 'pass_fail';
+
+    public const ASSESSMENT_TYPES = [
+        self::ASSESSMENT_NUMERIC => 'Thang điểm 10',
+        self::ASSESSMENT_PASS_FAIL => 'Nhận xét Đạt/Chưa đạt',
+    ];
+
     protected $fillable = [
         'code',
         'name',
         'credit',
         'type',
+        'assessment_type',
         'status',
     ];
 
@@ -142,6 +151,21 @@ class Subject extends Model
     public function statusLabel(): string
     {
         return self::STATUSES[$this->status] ?? self::STATUSES[self::STATUS_ACTIVE];
+    }
+
+    public function assessmentTypeLabel(): string
+    {
+        return self::ASSESSMENT_TYPES[$this->assessment_type ?: self::ASSESSMENT_NUMERIC] ?? self::ASSESSMENT_TYPES[self::ASSESSMENT_NUMERIC];
+    }
+
+    public function usesPassFailAssessment(): bool
+    {
+        return ($this->assessment_type ?: self::ASSESSMENT_NUMERIC) === self::ASSESSMENT_PASS_FAIL;
+    }
+
+    public function usesNumericAssessment(): bool
+    {
+        return ! $this->usesPassFailAssessment();
     }
 
     public function statusBadgeClass(): string

@@ -57,6 +57,7 @@
                     <th>Sức chứa</th>
                     <th>Trạng thái</th>
                     <th>Ghi chú</th>
+                    <th>Lớp cố định</th>
                     <th></th>
                 </tr>
             </thead>
@@ -68,6 +69,7 @@
                     <td>{{ $room->capacity }}</td>
                     <td><span class="badge {{ $room->statusBadgeClass() }}">{{ $room->statusLabel() }}</span></td>
                     <td class="text-muted">{{ \Illuminate\Support\Str::limit($room->note, 80) ?: '-' }}</td>
+                    <td>{{ $room->fixedClass?->name ?? '-' }}</td>
                     <td class="text-end">
                         <div class="content-action-group justify-content-end">
                             @unless($readOnly)

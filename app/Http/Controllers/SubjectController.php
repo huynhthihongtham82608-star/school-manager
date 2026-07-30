@@ -148,6 +148,7 @@ class SubjectController extends Controller
         $request->merge([
             'code' => $subject?->code ?: Subject::nextCode(),
             'name' => trim((string) $request->input('name')),
+            'assessment_type' => $request->input('assessment_type', $subject?->assessment_type ?: Subject::ASSESSMENT_NUMERIC),
         ]);
 
         $validated = $request->validate([
@@ -166,6 +167,7 @@ class SubjectController extends Controller
             ],
             'credit' => ['required', 'integer', 'min:1', 'max:10'],
             'type' => ['required', Rule::in(array_keys(Subject::TYPES))],
+            'assessment_type' => ['required', Rule::in(array_keys(Subject::ASSESSMENT_TYPES))],
             'status' => ['required', Rule::in(array_keys(Subject::STATUSES))],
             'period_norms' => ['nullable', 'array'],
             'period_norms.10' => ['nullable', 'integer', 'min:1', 'max:10'],

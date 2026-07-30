@@ -28,6 +28,12 @@
             </select>
             @error('school_year_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
+        <div class="col-md-3">
+            <label class="form-label">Niên khóa</label>
+            <input type="text" name="cohort" class="form-control" value="{{ old('cohort') }}" placeholder="2026 - 2029">
+            <div class="form-text">Áp dụng cho mọi khối lớp khi khởi tạo lớp.</div>
+            @error('cohort')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+        </div>
         <div class="col-md-4">
             <label class="form-label">Giáo viên chủ nhiệm</label>
             <select name="homeroom_teacher_id" class="form-select">
