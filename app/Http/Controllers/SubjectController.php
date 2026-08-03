@@ -148,7 +148,7 @@ class SubjectController extends Controller
         $request->merge([
             'code' => $subject?->code ?: Subject::nextCode(),
             'name' => trim((string) $request->input('name')),
-            'assessment_type' => $request->input('assessment_type', $subject?->assessment_type ?: Subject::ASSESSMENT_NUMERIC),
+            'assessment_type' => Subject::normalizeAssessmentType($request->input('assessment_type', $subject?->assessment_type ?: Subject::ASSESSMENT_GRADE_10)),
         ]);
 
         $validated = $request->validate([

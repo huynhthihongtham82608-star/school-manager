@@ -42,12 +42,20 @@ class Subject extends Model
         self::STATUS_ARCHIVED => 'Lưu trữ',
     ];
 
-    public const ASSESSMENT_NUMERIC = 'numeric';
-    public const ASSESSMENT_PASS_FAIL = 'pass_fail';
+    public const ASSESSMENT_GRADE_10 = 'GRADE_10';
+    public const ASSESSMENT_ASSESSMENT = 'ASSESSMENT';
+    public const ASSESSMENT_NONE = 'NONE';
+
+    public const ASSESSMENT_NUMERIC = self::ASSESSMENT_GRADE_10;
+    public const ASSESSMENT_PASS_FAIL = self::ASSESSMENT_ASSESSMENT;
+
+    public const LEGACY_ASSESSMENT_NUMERIC = 'numeric';
+    public const LEGACY_ASSESSMENT_PASS_FAIL = 'pass_fail';
 
     public const ASSESSMENT_TYPES = [
-        self::ASSESSMENT_NUMERIC => 'Thang điểm 10',
-        self::ASSESSMENT_PASS_FAIL => 'Nhận xét Đạt/Chưa đạt',
+        self::ASSESSMENT_GRADE_10 => 'Thang điểm 10',
+        self::ASSESSMENT_ASSESSMENT => 'Chọn đánh giá Đạt / Không đạt',
+        self::ASSESSMENT_NONE => 'Không đánh giá',
     ];
 
     protected $fillable = [
@@ -123,6 +131,11 @@ class Subject extends Model
             || in_array($this->type, self::LEGACY_SCORABLE_TYPES, true);
     }
 
+    public function isEvaluated(): bool
+    {
+        return $this->isScorable() && ! $this->isNotEvaluated();
+    }
+
     public function isOfficialSubject(): bool
     {
         return $this->isScorable();
@@ -155,17 +168,55 @@ class Subject extends Model
 
     public function assessmentTypeLabel(): string
     {
-        return self::ASSESSMENT_TYPES[$this->assessment_type ?: self::ASSESSMENT_NUMERIC] ?? self::ASSESSMENT_TYPES[self::ASSESSMENT_NUMERIC];
+        return self::ASSESSMENT_TYPES[$this->normalizedAssessmentType()] ?? self::ASSESSMENT_TYPES[self::ASSESSMENT_GRADE_10];
     }
 
     public function usesPassFailAssessment(): bool
     {
-        return ($this->assessment_type ?: self::ASSESSMENT_NUMERIC) === self::ASSESSMENT_PASS_FAIL;
+        return $this->normalizedAssessmentType() === self::ASSESSMENT_ASSESSMENT;
     }
 
     public function usesNumericAssessment(): bool
     {
-        return ! $this->usesPassFailAssessment();
+        return $this->normalizedAssessmentType() === self::ASSESSMENT_GRADE_10;
+    }
+
+    public function isNotEvaluated(): bool
+    {
+        return $this->normalizedAssessmentType() === self::ASSESSMENT_NONE;
+    }
+
+    public function normalizedAssessmentType(): string
+    {
+        return self::normalizeAssessmentType($this->assessment_type);
+    }
+
+    public static function normalizeAssessmentType(?string $value): string
+    {
+        return match ($value) {
+            self::ASSESSMENT_GRADE_10, self::LEGACY_ASSESSMENT_NUMERIC, null, '' => self::ASSESSMENT_GRADE_10,
+            self::ASSESSMENT_ASSESSMENT, self::LEGACY_ASSESSMENT_PASS_FAIL => self::ASSESSMENT_ASSESSMENT,
+            self::ASSESSMENT_NONE => self::ASSESSMENT_NONE,
+            default => self::ASSESSMENT_GRADE_10,
+        };
+    }
+
+    public static function evaluatedAssessmentValues(): array
+    {
+        return [
+            self::ASSESSMENT_GRADE_10,
+            self::ASSESSMENT_ASSESSMENT,
+            self::LEGACY_ASSESSMENT_NUMERIC,
+            self::LEGACY_ASSESSMENT_PASS_FAIL,
+        ];
+    }
+
+    public function scopeWithEvaluatedAssessment($query)
+    {
+        return $query->where(function ($inner) {
+            $inner->whereIn('assessment_type', self::evaluatedAssessmentValues())
+                ->orWhereNull('assessment_type');
+        });
     }
 
     public function statusBadgeClass(): string

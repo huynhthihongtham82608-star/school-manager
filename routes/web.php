@@ -103,6 +103,8 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::post('parents/{parent}/reset-password', [ParentController::class, 'resetPassword'])->name('parents.reset-password');
         Route::resource('parents', ParentController::class)->except(['show']);
         Route::resource('assignments', TeachingAssignmentController::class)->except(['show']);
+        Route::patch('score-columns/settings', [ScoreColumnController::class, 'updateSettings'])->name('score-columns.settings.update');
+        Route::patch('score-columns/matrix-counts', [ScoreColumnController::class, 'updateMatrixCounts'])->name('score-columns.matrix-counts.update');
         Route::patch('score-columns/bulk-lock', [ScoreColumnController::class, 'bulkLock'])->name('score-columns.bulk-lock');
         Route::patch('score-columns/{scoreColumn}/toggle-lock', [ScoreColumnController::class, 'toggleLock'])->name('score-columns.toggle-lock');
         Route::resource('score-columns', ScoreColumnController::class)->except(['show', 'create', 'edit']);
@@ -145,11 +147,14 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
 
     Route::middleware('role:admin,staff,teacher,student,parent')->group(function () {
         Route::get('scores', [ScoreController::class, 'index'])->name('scores.index');
+        Route::get('scores/report-card', [ScoreController::class, 'reportCard'])->name('scores.report-card');
+        Route::get('scores/report-card/export', [ScoreController::class, 'exportReportCard'])->name('scores.report-card.export');
     });
 
     Route::middleware('role:admin,staff,teacher')->group(function () {
         Route::get('scores/entry', [ScoreController::class, 'entry'])->middleware('score.assignment')->name('scores.entry');
         Route::post('scores/entry', [ScoreController::class, 'store'])->middleware('score.assignment')->name('scores.store');
+        Route::post('exam-schedules/{examSchedule}/scores', [ExamScheduleController::class, 'storeScores'])->name('exam-schedules.scores.store');
     });
 
     Route::middleware('role:admin,staff,teacher')->group(function () {

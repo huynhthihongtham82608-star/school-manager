@@ -4,6 +4,7 @@
 @section('content')
 @php
     $canManageSchedules = auth()->user()->isAdmin() || auth()->user()->isStaff();
+    $canEnterExamScores = auth()->user()->isAdmin() || auth()->user()->isStaff() || auth()->user()->isTeacher();
     $yearName = function ($schedule) use ($years) {
         $yearId = $schedule->schoolYearId();
         return optional($years->firstWhere('id', $yearId))->name
@@ -17,6 +18,51 @@
         default => 'bg-secondary',
     };
 @endphp
+
+<style>
+    .exam-score-sync-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        color: #c2410c;
+        background: #fff7ed;
+        transition: all .18s ease;
+    }
+
+    .exam-score-sync-btn:hover {
+        color: #9a3412;
+        background: #ffedd5;
+    }
+
+    .exam-score-sync-table th,
+    .exam-score-sync-table td {
+        font-size: 1rem;
+        font-weight: 400;
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    .exam-score-sync-table th {
+        color: #111827;
+        font-weight: 500;
+    }
+
+    .exam-score-sync-table .form-control {
+        max-width: 110px;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 400;
+    }
+
+    .exam-score-sync-table .form-control:focus {
+        border-color: #f97316;
+        box-shadow: 0 0 0 .2rem rgba(255, 237, 213, .9);
+    }
+</style>
 
 <x-page-header
     title="Lịch kiểm tra"
@@ -218,7 +264,23 @@
                 @php
                     $detailId = 'exam-schedule-detail-' . $schedule->id;
                     $editId = 'exam-schedule-edit-' . $schedule->id;
+                    $scoreInputId = 'exam-schedule-score-input-' . $schedule->id;
                     $selectedYearId = $schedule->schoolYearId();
+                    $scoreColumnType = match ($schedule->type) {
+                        \App\Models\ExamSchedule::TYPE_MIDTERM => \App\Models\ScoreColumn::TYPE_MIDTERM,
+                        \App\Models\ExamSchedule::TYPE_FINAL_TEST => \App\Models\ScoreColumn::TYPE_FINAL,
+                        default => null,
+                    };
+                    $canSyncThisExam = $canEnterExamScores && $scoreColumnType && (
+                        auth()->user()->isAdmin()
+                        || auth()->user()->isStaff()
+                        || \App\Models\TeachingAssignment::where('teacher_id', auth()->user()->teacher?->id)
+                            ->where('class_id', $schedule->class_id)
+                            ->where('subject_id', $schedule->subject_id)
+                            ->where('semester_id', $schedule->semester_id)
+                            ->where('status', \App\Models\TeachingAssignment::STATUS_ACTIVE)
+                            ->exists()
+                    );
                 @endphp
                 <tr data-exam-row data-class-id="{{ $schedule->class_id }}" data-subject-id="{{ $schedule->subject_id }}" data-type="{{ $schedule->type }}" data-status="{{ $schedule->statusValue() }}">
                     <td class="fw-semibold">{{ $schedule->classRoom->name ?? 'Đang cập nhật' }}</td>
@@ -238,6 +300,11 @@
                     <td><span class="badge {{ $statusClass($schedule) }}">{{ $schedule->statusLabel() }}</span></td>
                     <td>
                         <div class="content-action-group justify-content-end">
+                            @if($canSyncThisExam)
+                                <button type="button" class="exam-score-sync-btn" data-bs-toggle="modal" data-bs-target="#{{ $scoreInputId }}" title="Nhập điểm và đồng bộ sổ điểm" aria-label="Nhập điểm và đồng bộ sổ điểm">
+                                    <i class="bi bi-journal-check"></i>
+                                </button>
+                            @endif
                             <button type="button" class="content-action-btn icon-only detail" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}" title="Xem chi tiết" aria-label="Xem chi tiết">
                                 <i class="bi bi-eye"></i><span class="visually-hidden">Xem chi tiết</span>
                             </button>
@@ -321,6 +388,113 @@
                         </div>
                     </div>
                 </div>
+
+                @if($canSyncThisExam)
+                    @php
+                        $examStudents = $schedule->classRoom?->students
+                            ? $schedule->classRoom->students->where('status', \App\Models\Student::STATUS_STUDYING)->sortBy('student_code')->values()
+                            : collect();
+                        $examScoreColumn = \App\Models\ScoreColumn::where('school_year_id', $schedule->semester?->school_year_id ?? $schedule->schoolYearId())
+                            ->where('subject_id', $schedule->subject_id)
+                            ->where('grade_level', (int) ($schedule->classRoom?->grade_level ?? 0))
+                            ->where('type', $scoreColumnType)
+                            ->orderBy('sort_order')
+                            ->first();
+                        $examHeaders = \App\Models\ScoreHeader::with(['details.scoreColumn'])
+                            ->whereIn('student_id', $examStudents->pluck('id'))
+                            ->where('subject_id', $schedule->subject_id)
+                            ->where('semester_id', $schedule->semester_id)
+                            ->get()
+                            ->keyBy('student_id');
+                        $scoreModalLocked = ! (auth()->user()->isAdmin() || auth()->user()->isStaff()) && ! $schedule->isScoreInputOpen();
+                    @endphp
+                    <div class="modal fade content-modal" id="{{ $scoreInputId }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                            <div class="modal-content">
+                                <form method="POST" action="{{ route('exam-schedules.scores.store', $schedule) }}" data-exam-score-sync-form>
+                                    @csrf
+                                    <div class="modal-header">
+                                        <div>
+                                            <div class="modal-kicker">Đồng bộ điểm tự động</div>
+                                            <h5 class="modal-title">{{ $schedule->displayName() }} - {{ $schedule->subject?->name ?? '-' }}</h5>
+                                            <p class="text-muted small mb-0 fw-normal">{{ $schedule->classRoom?->name ?? '-' }} · {{ $schedule->semester?->normalizedName() ?? '-' }} · {{ $scoreColumnType === \App\Models\ScoreColumn::TYPE_MIDTERM ? 'Cột Kiểm tra Giữa kỳ' : 'Cột Kiểm tra Cuối kỳ' }}</p>
+                                        </div>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        @if($scoreModalLocked)
+                                            <div class="alert alert-warning fw-normal">
+                                                Lịch kiểm tra chưa mở hoặc đã khóa nhập điểm. Dữ liệu bên dưới đang ở chế độ chỉ xem.
+                                            </div>
+                                        @endif
+                                        <label class="d-inline-flex align-items-center gap-2 mb-3 fw-normal text-gray-800">
+                                            <input type="checkbox" class="form-check-input mt-0" name="is_retest" value="1" @disabled($scoreModalLocked)>
+                                            Đánh dấu đây là điểm kiểm tra bù/thi lại nếu ghi đè điểm cũ
+                                        </label>
+                                        <div class="table-responsive">
+                                            <table class="table align-middle exam-score-sync-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Mã HS</th>
+                                                        <th>Họ tên</th>
+                                                        <th>Điểm bài kiểm tra</th>
+                                                        <th>Trạng thái đồng bộ</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                @forelse($examStudents as $student)
+                                                    @php
+                                                        $header = $examHeaders->get($student->id);
+                                                        $detail = $examScoreColumn
+                                                            ? $header?->details?->firstWhere('score_column_id', $examScoreColumn->id)
+                                                            : $header?->details?->firstWhere('exam_schedule_id', $schedule->id);
+                                                        $value = $detail?->value !== null ? rtrim(rtrim(number_format((float) $detail->value, 1, '.', ''), '0'), '.') : '';
+                                                    @endphp
+                                                    <tr>
+                                                        <td class="fw-semibold">{{ $student->student_code }}</td>
+                                                        <td>{{ $student->name }}</td>
+                                                        <td>
+                                                            <input
+                                                                type="text"
+                                                                name="scores[{{ $student->id }}]"
+                                                                class="form-control"
+                                                                value="{{ $value }}"
+                                                                inputmode="decimal"
+                                                                pattern="^(10(\.0)?|[0-9](\.[0-9])?)$"
+                                                                placeholder="0-10"
+                                                                @disabled($scoreModalLocked)
+                                                            >
+                                                        </td>
+                                                        <td>
+                                                            @if($detail)
+                                                                <span class="badge bg-success">Đã có trong sổ điểm</span>
+                                                            @else
+                                                                <span class="text-muted">Chưa nhập</span>
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="4">
+                                                            <div class="empty-state"><i class="bi bi-person-dash"></i>Lớp chưa có học sinh.</div>
+                                                        </td>
+                                                    </tr>
+                                                @endforelse
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                        <button class="btn btn-primary" @disabled($scoreModalLocked || $examStudents->isEmpty())>
+                                            <i class="bi bi-save me-1"></i>Lưu và đồng bộ sổ điểm
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 @if($canManageSchedules)
                     <div class="modal fade content-modal" id="{{ $editId }}" tabindex="-1" aria-hidden="true">

@@ -5,23 +5,33 @@ namespace App\Http\Controllers;
 use App\Models\ExamSchedule;
 use App\Models\SchoolClass;
 use App\Models\SchoolYear;
+use App\Models\ScoreColumn;
+use App\Models\ScoreDetail;
+use App\Models\ScoreHeader;
+use App\Models\ScoreSetting;
 use App\Models\Semester;
+use App\Models\Student;
 use App\Models\Subject;
+use App\Models\TeachingAssignment;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ExamScheduleController extends Controller
 {
+    private const SCORE_PATTERN = '/^(10(\.0)?|[0-9](\.[0-9])?)$/';
+
     public function index(Request $request)
     {
         $user = $request->user();
         $selectedYearId = $this->selectedSchoolYearId($request);
         $selectedSemesterId = $this->selectedSemesterId($request);
         $query = Schema::hasTable('exam_schedules')
-            ? ExamSchedule::with(['classRoom', 'subject', 'semester.schoolYear'])
+            ? ExamSchedule::with(['classRoom.students', 'subject', 'semester.schoolYear'])
             : null;
 
         if ($query && ! ($user->isAdmin() || $user->isStaff())) {
@@ -104,6 +114,7 @@ class ExamScheduleController extends Controller
         $subjects = Schema::hasTable('subjects')
             ? Subject::whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
                 ->where('status', Subject::STATUS_ACTIVE)
+                ->withEvaluatedAssessment()
                 ->orderBy('name')
                 ->get()
             : collect();
@@ -198,6 +209,106 @@ class ExamScheduleController extends Controller
         return back()->with('success', 'Đã xóa lịch kiểm tra.');
     }
 
+    public function storeScores(Request $request, ExamSchedule $examSchedule)
+    {
+        $this->authorizeExamScoreEntry($request, $examSchedule);
+
+        if (! $examSchedule->isPublished()) {
+            abort(403, 'Chỉ nhập điểm cho lịch kiểm tra đã công bố.');
+        }
+
+        if (! ($request->user()->isAdmin() || $request->user()->isStaff()) && ! $examSchedule->isScoreInputOpen()) {
+            abort(403, 'Lịch kiểm tra chưa mở hoặc đã khóa nhập điểm.');
+        }
+
+        $scoreColumnType = $this->scoreColumnTypeForExam($examSchedule);
+        if (! $scoreColumnType) {
+            abort(422, 'Chỉ tự động đồng bộ điểm cho bài kiểm tra Giữa kỳ hoặc Cuối kỳ.');
+        }
+
+        $data = $request->validate([
+            'scores' => ['array'],
+            'scores.*' => ['nullable', 'regex:' . self::SCORE_PATTERN],
+            'is_retest' => ['nullable', 'boolean'],
+        ], [], [
+            'scores.*' => 'điểm bài kiểm tra',
+        ]);
+
+        $students = Student::where('class_id', $examSchedule->class_id)
+            ->where('status', Student::STATUS_STUDYING)
+            ->orderBy('student_code')
+            ->get()
+            ->keyBy('id');
+        $scoreSetting = ScoreSetting::current();
+        $scoreColumn = $this->scoreColumnForExam($examSchedule, $scoreColumnType, $scoreSetting);
+        $markAsRetest = (bool) ($data['is_retest'] ?? false) || $this->looksLikeRetestSchedule($examSchedule);
+        $updatedCount = 0;
+
+        DB::transaction(function () use ($students, $examSchedule, $scoreColumn, $scoreColumnType, $scoreSetting, $request, $markAsRetest, &$updatedCount) {
+            foreach ($students as $student) {
+                $rawValue = trim((string) $request->input("scores.{$student->id}", ''));
+
+                $header = ScoreHeader::firstOrCreate([
+                    'student_id' => $student->id,
+                    'subject_id' => $examSchedule->subject_id,
+                    'semester_id' => $examSchedule->semester_id,
+                    'school_year_id' => $examSchedule->semester?->school_year_id ?? $examSchedule->schoolYearId(),
+                ]);
+
+                $detail = $header->details()
+                    ->where('score_column_id', $scoreColumn->id)
+                    ->first();
+
+                if ($rawValue === '') {
+                    if ($detail && (string) $detail->exam_schedule_id === (string) $examSchedule->id) {
+                        $detail->delete();
+                        $updatedCount++;
+                    }
+
+                    $this->recalculateAverage($header);
+                    continue;
+                }
+
+                $value = round((float) $rawValue, 1);
+                $payload = [
+                    'exam_schedule_id' => $examSchedule->id,
+                    'score_column_id' => $scoreColumn->id,
+                    'type' => $scoreColumnType,
+                    'name' => $scoreColumn->name,
+                    'value' => $value,
+                    'weight_group' => $scoreSetting->weightForScoreType($scoreColumnType),
+                ];
+
+                if ($detail) {
+                    $oldValue = $detail->value !== null ? round((float) $detail->value, 1) : null;
+                    $isChangedRetest = $markAsRetest && $oldValue !== null && abs($oldValue - $value) > 0.0001;
+
+                    $detail->update([
+                        ...$payload,
+                        'is_retest' => $isChangedRetest || (bool) $detail->is_retest,
+                        'original_value' => $isChangedRetest ? $oldValue : $detail->original_value,
+                        'retest_updated_at' => $isChangedRetest ? now() : $detail->retest_updated_at,
+                    ]);
+                } else {
+                    ScoreDetail::create([
+                        'score_header_id' => $header->id,
+                        ...$payload,
+                        'is_retest' => false,
+                        'original_value' => null,
+                        'retest_updated_at' => null,
+                    ]);
+                }
+
+                $updatedCount++;
+                $this->recalculateAverage($header);
+            }
+        });
+
+        AuditLogger::log('exam_scores_synced', ExamSchedule::class, $examSchedule->id, 'Đồng bộ điểm bài kiểm tra vào sổ điểm');
+
+        return back()->with('success', "Đã đồng bộ {$updatedCount} điểm bài kiểm tra vào sổ điểm học kỳ.");
+    }
+
     private function rules(): array
     {
         return [
@@ -241,7 +352,7 @@ class ExamScheduleController extends Controller
     private function ensureValidScheduleWindow(array $data): void
     {
         $subject = Subject::findOrFail($data['subject_id']);
-        if (! $subject->isScorable()) {
+        if (! $subject->isEvaluated()) {
             throw ValidationException::withMessages([
                 'subject_id' => 'Môn học này chỉ dùng trong thời khóa biểu, không tạo lịch kiểm tra.',
             ]);
@@ -312,6 +423,114 @@ class ExamScheduleController extends Controller
         if ($semester->isArchived()) {
             abort(403, 'Học kỳ đã lưu trữ chỉ được xem, không thể chỉnh sửa lịch kiểm tra.');
         }
+    }
+
+    private function authorizeExamScoreEntry(Request $request, ExamSchedule $examSchedule): void
+    {
+        $user = $request->user();
+
+        if ($user->isAdmin() || $user->isStaff()) {
+            return;
+        }
+
+        $teacherId = $user->teacher?->id;
+        if (! $teacherId) {
+            abort(403);
+        }
+
+        $isAssigned = TeachingAssignment::where('teacher_id', $teacherId)
+            ->where('class_id', $examSchedule->class_id)
+            ->where('subject_id', $examSchedule->subject_id)
+            ->where('semester_id', $examSchedule->semester_id)
+            ->where('status', TeachingAssignment::STATUS_ACTIVE)
+            ->exists();
+
+        if (! $isAssigned) {
+            abort(403, 'Chỉ giáo viên bộ môn được phân công mới được nhập điểm bài kiểm tra.');
+        }
+    }
+
+    private function scoreColumnTypeForExam(ExamSchedule $examSchedule): ?string
+    {
+        return match ($examSchedule->type) {
+            ExamSchedule::TYPE_MIDTERM => ScoreColumn::TYPE_MIDTERM,
+            ExamSchedule::TYPE_FINAL_TEST => ScoreColumn::TYPE_FINAL,
+            default => null,
+        };
+    }
+
+    private function scoreColumnForExam(ExamSchedule $examSchedule, string $type, ScoreSetting $setting): ScoreColumn
+    {
+        $gradeLevel = (int) ($examSchedule->classRoom?->grade_level ?? SchoolClass::find($examSchedule->class_id)?->grade_level ?? 0);
+        $schoolYearId = $examSchedule->semester?->school_year_id ?? $examSchedule->schoolYearId();
+        $name = $type === ScoreColumn::TYPE_MIDTERM ? 'Kiểm tra Giữa kỳ' : 'Kiểm tra Cuối kỳ';
+        $sortOrder = $type === ScoreColumn::TYPE_MIDTERM ? 40 : 50;
+
+        return ScoreColumn::firstOrCreate([
+            'school_year_id' => $schoolYearId,
+            'subject_id' => $examSchedule->subject_id,
+            'grade_level' => $gradeLevel,
+            'type' => $type,
+        ], [
+            'name' => $name,
+            'weight_group' => $setting->weightForScoreType($type),
+            'sort_order' => $sortOrder,
+            'is_active' => true,
+        ]);
+    }
+
+    private function looksLikeRetestSchedule(ExamSchedule $examSchedule): bool
+    {
+        $text = Str::lower(Str::ascii($examSchedule->displayName() . ' ' . $examSchedule->note));
+
+        return str_contains($text, 'bu')
+            || str_contains($text, 'thi lai')
+            || str_contains($text, 'kiem tra lai');
+    }
+
+    private function recalculateAverage(ScoreHeader $header): void
+    {
+        $header->loadMissing('subject');
+
+        if ($header->subject?->usesPassFailAssessment() || $header->subject?->isNotEvaluated()) {
+            $header->forceFill(['average' => null])->save();
+            return;
+        }
+
+        $scoreSetting = ScoreSetting::current();
+        $details = $header->details()
+            ->with('scoreColumn')
+            ->get()
+            ->reject(fn (ScoreDetail $detail) => $detail->scoreColumn && $this->scoreColumnReportFamily($detail->scoreColumn) === 'one_period');
+        $weightedSum = $details->sum(fn (ScoreDetail $detail) => (float) $detail->value * $scoreSetting->weightForScoreType($detail->type));
+        $totalWeight = $details->sum(fn (ScoreDetail $detail) => $scoreSetting->weightForScoreType($detail->type));
+
+        $header->forceFill([
+            'average' => $totalWeight > 0 ? round($weightedSum / $totalWeight, 1) : null,
+        ])->save();
+    }
+
+    private function scoreColumnReportFamily(ScoreColumn $column): string
+    {
+        if ($column->type === ScoreColumn::TYPE_MIDTERM) {
+            return 'midterm';
+        }
+
+        if ($column->type === ScoreColumn::TYPE_FINAL) {
+            return 'final';
+        }
+
+        $name = Str::lower(Str::ascii((string) $column->name));
+
+        if (str_contains($name, 'mieng') || str_contains($name, 'oral')) {
+            return 'oral';
+        }
+
+        if (str_contains($name, '15')) {
+            return 'fifteen';
+        }
+
+        return 'one_period';
     }
 
     private function minutes(string $time): int

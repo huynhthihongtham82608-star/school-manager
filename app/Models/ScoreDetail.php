@@ -18,6 +18,9 @@ class ScoreDetail extends Model
         'name',
         'value',
         'weight_group',
+        'is_retest',
+        'original_value',
+        'retest_updated_at',
     ];
 
     public function examSchedule()
@@ -32,6 +35,9 @@ class ScoreDetail extends Model
 
     protected $casts = [
         'value' => 'float',
+        'is_retest' => 'boolean',
+        'original_value' => 'float',
+        'retest_updated_at' => 'datetime',
     ];
 
     public function scoreHeader()

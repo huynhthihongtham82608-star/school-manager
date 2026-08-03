@@ -157,6 +157,8 @@ class TimetableController extends Controller
         $timetable = null;
         $entries = collect();
         $assignments = collect();
+        $unassignedOfficialSubjects = collect();
+        $validationEntries = collect();
         $specialSubjects = $this->specialSubjectsForTimetable();
         $cloneTargetSemesters = collect();
         $rooms = $readOnly ? Room::orderBy('name')->get() : Room::where('status', Room::STATUS_ACTIVE)->orderBy('name')->get();
@@ -166,7 +168,7 @@ class TimetableController extends Controller
                 'class_id' => 'required|exists:classes,id',
             ]);
 
-            $selectedClass = SchoolClass::find($request->input('class_id'));
+            $selectedClass = SchoolClass::with(['fixedRoom', 'homeroomTeacher'])->find($request->input('class_id'));
             $selectedSemester = Semester::find($selectedSemesterId);
             $this->validateSelection($selectedClass, $selectedSemester, $readOnly);
 
@@ -183,6 +185,16 @@ class TimetableController extends Controller
                 ]);
 
             $assignments = $this->activeAssignmentsFor($selectedClass, $selectedSemester);
+            $assignedSubjectIds = $assignments->pluck('subject_id')->filter()->unique()->values();
+            $unassignedOfficialSubjects = Subject::with('periodNorms')
+                ->where('status', Subject::STATUS_ACTIVE)
+                ->where(function ($query) {
+                    $query->where('type', Subject::TYPE_OFFICIAL)
+                        ->orWhereIn('type', Subject::LEGACY_SCORABLE_TYPES);
+                })
+                ->when($assignedSubjectIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $assignedSubjectIds))
+                ->orderBy('name')
+                ->get();
 
             if ($timetable) {
                 $entries = TimetableEntry::where('timetable_id', $timetable->id)
@@ -190,6 +202,14 @@ class TimetableController extends Controller
                     ->get()
                     ->keyBy(fn ($entry) => $entry->day_of_week . '-' . $entry->period);
             }
+
+            $validationEntries = TimetableEntry::with(['timetable.classRoom', 'assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo'])
+                ->where('status', TimetableEntry::STATUS_ACTIVE)
+                ->whereHas('timetable', function ($query) use ($selectedSemester) {
+                    $query->where('school_year_id', $selectedSemester->school_year_id)
+                        ->where('semester_id', $selectedSemester->id);
+                })
+                ->get();
 
             $cloneTargetSemesters = $semesters->filter(function (Semester $semester) use ($selectedSemester) {
                 return $selectedSemester
@@ -210,6 +230,8 @@ class TimetableController extends Controller
             'timetable' => $timetable,
             'entries' => $entries,
             'assignments' => $assignments,
+            'unassignedOfficialSubjects' => $unassignedOfficialSubjects,
+            'validationEntries' => $validationEntries,
             'specialSubjects' => $specialSubjects,
             'selectedYearId' => $selectedYearId,
             'selectedSemesterId' => $selectedSemesterId,
@@ -277,6 +299,12 @@ class TimetableController extends Controller
                 AuditLogger::log($action, TimetableEntry::class, (string) $entry->getKey(), $description);
             }
         });
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Đã lưu thời khóa biểu.',
+            ]);
+        }
 
         return back()->with('success', 'Đã lưu thời khóa biểu.');
     }

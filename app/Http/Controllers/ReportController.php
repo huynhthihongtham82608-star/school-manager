@@ -156,6 +156,7 @@ class ReportController extends Controller
             ->get();
         $scorableTypes = array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES);
         $subjects = Subject::whereIn('type', $scorableTypes)
+            ->withEvaluatedAssessment()
             ->when($teacherSubjectIds !== null, fn ($query) => $query->whereIn('id', $teacherSubjectIds))
             ->orderBy('name')
             ->get();
@@ -173,7 +174,7 @@ class ReportController extends Controller
                 ->when($selectedYear?->id, fn ($query) => $query->where('school_year_id', $selectedYear->id))
                 ->when($filters['semester_id'], fn ($query) => $query->where('semester_id', $filters['semester_id']))
                 ->when($filters['subject_id'], fn ($query) => $query->where('subject_id', $filters['subject_id']))
-                ->whereHas('subject', fn ($query) => $query->whereIn('type', $scorableTypes))
+                ->whereHas('subject', fn ($query) => $query->whereIn('type', $scorableTypes)->withEvaluatedAssessment())
                 ->get()
             : collect();
 
@@ -765,6 +766,10 @@ class ReportController extends Controller
 
         $completedAssignments = 0;
         foreach ($assignments as $assignment) {
+            if (! $assignment->subject?->isEvaluated()) {
+                continue;
+            }
+
             $hasScore = Schema::hasTable('score_headers')
                 && ScoreHeader::where('subject_id', $assignment->subject_id)
                     ->when($schoolYearId, fn ($query) => $query->where('school_year_id', $schoolYearId))
@@ -795,7 +800,7 @@ class ReportController extends Controller
         }
 
         $subject = Subject::find($subjectId);
-        if (! $subject) {
+        if (! $subject || ! $subject->isEvaluated()) {
             return null;
         }
 

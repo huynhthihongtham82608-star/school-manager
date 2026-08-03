@@ -69,7 +69,8 @@ class TeacherPortalController extends Controller
             ->where('status', TeachingAssignment::STATUS_ACTIVE)
             ->get();
 
-        $scoreProgress = $assignments->groupBy('teacher_id')->map(function ($teacherAssignments) use ($selectedYearId, $selectedSemesterId) {
+        $scoreAssignments = $assignments->filter(fn (TeachingAssignment $assignment) => $assignment->subject?->isEvaluated());
+        $scoreProgress = $scoreAssignments->groupBy('teacher_id')->map(function ($teacherAssignments) use ($selectedYearId, $selectedSemesterId) {
             $completed = 0;
 
             foreach ($teacherAssignments as $assignment) {

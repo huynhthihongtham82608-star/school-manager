@@ -164,7 +164,11 @@
         ];
 
         if ($currentUser->hasAnyPermission(['scores.view', 'scores.manage'])) {
-            $academicResultItems[] = $adminItem('bi-table', 'Điểm số', route('scores.index'), ['scores.*', 'scores*', 'score-columns.*', 'score-columns*', 'grade-windows.*', 'grade-windows*'], 'scores.view');
+            $academicResultItems[] = $adminItem('bi-table', 'Điểm số', route('scores.index'), ['scores.*', 'scores*', 'grade-windows.*', 'grade-windows*'], 'scores.view');
+        }
+
+        if ($currentUser->hasPermission('scores.manage')) {
+            $academicResultItems[] = $adminItem('bi-sliders', 'Cấu hình đầu điểm', route('score-columns.index'), ['score-columns.*', 'score-columns*'], 'scores.manage');
         }
 
         if ($currentUser->hasAnyPermission(['conduct.view', 'conduct.manage'])) {

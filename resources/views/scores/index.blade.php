@@ -2,6 +2,261 @@
 @section('title', (auth()->user()->isStudent() || auth()->user()->isParent()) ? 'Điểm số' : (auth()->user()->isAdmin() ? 'Quản lý bảng điểm tập trung' : 'Nhập điểm số'))
 
 @section('content')
+<style>
+    .score-formula-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .36rem .62rem;
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        color: #c2410c;
+        background: #fff7ed;
+        font-size: .78rem;
+        font-weight: 400;
+        line-height: 1;
+    }
+
+    .score-formula-badge:hover {
+        color: #9a3412;
+        background: #ffedd5;
+    }
+
+    .score-formula-modal .modal-dialog {
+        max-width: 448px;
+    }
+
+    .score-formula-modal .modal-content {
+        border: 0;
+        border-radius: 8px;
+        box-shadow: 0 24px 56px rgba(15, 23, 42, .22);
+    }
+
+    .score-formula-modal .modal-body {
+        padding: 1.5rem;
+    }
+
+    .score-formula-title {
+        display: flex;
+        align-items: center;
+        gap: .55rem;
+        margin: 0 0 1rem;
+        color: #111827;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .score-formula-title::before {
+        width: 4px;
+        height: 16px;
+        display: inline-block;
+        border-radius: 999px;
+        background: #f97316;
+        content: "";
+    }
+
+    .score-formula-text {
+        color: #374151;
+        font-size: .92rem;
+        font-weight: 400;
+        line-height: 1.65;
+    }
+
+    .score-formula-box {
+        margin-top: .9rem;
+        padding: .75rem;
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        color: #9a3412;
+        background: #fff7ed;
+        font-size: .86rem;
+        font-weight: 400;
+        line-height: 1.55;
+    }
+
+    .score-config-shortcut-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .5rem .75rem;
+        border: 1px solid #fed7aa;
+        border-radius: 6px;
+        color: #c2410c;
+        background: #fff7ed;
+        font-size: .88rem;
+        font-weight: 400;
+        line-height: 1.2;
+        transition: all .18s ease;
+    }
+
+    .score-config-shortcut-btn:hover {
+        color: #9a3412;
+        background: #ffedd5;
+    }
+
+    .student-report-toolbar {
+        margin-bottom: .9rem;
+        padding: .9rem;
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    .student-report-toolbar form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: .75rem;
+    }
+
+    .student-report-toolbar label {
+        color: #374151;
+        font-size: .86rem;
+        font-weight: 400;
+    }
+
+    .student-report-toolbar .form-select {
+        min-width: 180px;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 400;
+    }
+
+    .student-report-toolbar .form-select:focus {
+        border-color: #f97316;
+        box-shadow: 0 0 0 .2rem rgba(255, 237, 213, .9);
+    }
+
+    .student-report-table th,
+    .student-report-table td {
+        color: #1f2937;
+        font-size: 1rem;
+        font-weight: 400;
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    .student-report-table th {
+        color: #111827;
+        font-weight: 500;
+    }
+
+    .student-report-gpa-row td {
+        color: #c2410c;
+        background: #fff7ed;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .student-report-term-col {
+        background: rgba(255, 247, 237, .38) !important;
+    }
+
+    .student-report-term-value {
+        color: #ea580c;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .student-report-term-muted {
+        color: #9ca3af;
+        font-size: .92rem;
+        font-weight: 400;
+    }
+
+    .student-report-summary {
+        width: 100%;
+        margin-top: .9rem;
+        padding: 1rem;
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        background: rgba(255, 247, 237, .55);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: space-between;
+        gap: .8rem;
+    }
+
+    .student-report-summary-item {
+        color: #374151;
+        font-size: 1rem;
+        font-weight: 400;
+    }
+
+    .student-report-summary-item strong {
+        color: #ea580c;
+        font-weight: 700;
+    }
+
+    .student-report-summary-item.master {
+        color: #111827;
+        font-size: 1.12rem;
+        font-weight: 500;
+    }
+
+    @media (min-width: 576px) {
+        .student-report-summary {
+            flex-direction: row;
+            align-items: center;
+        }
+    }
+
+    .score-retest-badge {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        margin-left: .25rem;
+        padding: .05rem .28rem;
+        border-radius: 4px;
+        color: #c2410c;
+        background: #fff7ed;
+        font-size: 10px;
+        font-weight: 400;
+        line-height: 1.25;
+        cursor: help;
+    }
+
+    .score-retest-badge:hover::after {
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 8px);
+        z-index: 20;
+        min-width: 210px;
+        padding: .45rem .55rem;
+        border: 1px solid #fed7aa;
+        border-radius: 6px;
+        color: #7c2d12;
+        background: #fff;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
+        font-size: .75rem;
+        font-weight: 400;
+        line-height: 1.4;
+        white-space: normal;
+        transform: translateX(-50%);
+        content: attr(data-tooltip);
+    }
+
+    .student-report-export-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .5rem .75rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        color: #374151;
+        background: #f9fafb;
+        font-size: .88rem;
+        font-weight: 400;
+        text-decoration: none;
+        transition: all .18s ease;
+    }
+
+    .student-report-export-btn:hover {
+        color: #ea580c;
+        background: #fff7ed;
+    }
+</style>
 @if(auth()->user()->isStudent() || auth()->user()->isParent())
     @php
         $detailLabels = $detailLabels ?? [];
@@ -53,7 +308,30 @@
         :subtitle="auth()->user()->isParent()
             ? 'Theo dõi điểm thành phần và điểm trung bình của học sinh đang chọn.'
             : 'Theo dõi điểm thành phần và điểm trung bình theo từng môn học.'"
-    />
+    >
+        <button type="button" class="score-formula-badge" data-bs-toggle="modal" data-bs-target="#scoreFormulaModal">
+            👁️ Xem cách tính điểm
+        </button>
+    </x-page-header>
+
+    <div class="modal fade score-formula-modal" id="scoreFormulaModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-white">
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                        <h5 class="score-formula-title">Quy tắc tính điểm số học kỳ</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <div class="score-formula-text">
+                        Nhà trường đang áp dụng hệ số W1 = {{ $scoreSetting->weight_gdtx }} cho các cột đánh giá thường xuyên, W2 = {{ $scoreSetting->weight_dggk }} cho đánh giá giữa kỳ và W3 = {{ $scoreSetting->weight_dgck }} cho đánh giá cuối kỳ. Điểm trung bình môn học kỳ được tính theo tổng điểm thành phần đã nhân hệ số chia cho tổng hệ số của các cột có điểm.
+                    </div>
+                    <div class="score-formula-box">
+                        ĐTBmhk = {{ $scoreSetting->formulaLabel() }}. Kết quả được làm tròn 1 chữ số thập phân.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="card mb-3">
         <div class="card-body d-flex flex-column flex-md-row gap-3 justify-content-between">
@@ -72,52 +350,328 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="student-report-toolbar" data-student-report-toolbar>
+        <form data-student-report-filter data-url="{{ route('scores.report-card') }}">
+            <div>
+                <label class="form-label">Chọn Năm học</label>
+                <select class="form-select" name="school_year_id" data-report-year>
+                    @foreach($years as $year)
+                        <option value="{{ $year->id }}" @selected((string) $selectedYearId === (string) $year->id)>{{ $year->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Chọn Học kỳ</label>
+                <select class="form-select" name="semester_id" data-report-semester>
+                    @foreach($semesters as $semester)
+                        <option value="{{ $semester->id }}" @selected((string) $selectedSemesterId === (string) $semester->id)>{{ $semester->normalizedName() }}</option>
+                    @endforeach
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <div class="card" data-student-report-card>
+        <div class="card-header d-flex align-items-center justify-content-between gap-3 bg-white">
+            <span class="fw-medium text-gray-900">Phiếu điểm tổng hợp học kỳ</span>
+            <a
+                href="{{ route('scores.report-card.export', ['school_year_id' => $selectedYearId, 'semester_id' => $selectedSemesterId]) }}"
+                class="student-report-export-btn"
+                data-report-export
+            >
+                📥 Xuất phiếu điểm học kỳ
+            </a>
+        </div>
         <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
+            @php
+                $studentReportColumnHeaders = collect($studentReportColumnHeaders ?? []);
+                $studentReportColumnsBySubject = collect($studentReportColumnsBySubject ?? []);
+                $studentReportAnnualSummary = $studentReportAnnualSummary ?? ['hk1_gpa' => null, 'hk2_gpa' => null, 'year_gpa' => null];
+                $formatTermValue = fn ($value) => $value !== null ? number_format((float) $value, 1, '.', '') : null;
+                $formatReportScoreValue = function ($score, $subject, $column) {
+                    if (! $score || ! $column) {
+                        return '<span class="text-muted">-</span>';
+                    }
+
+                    $detail = $score->details?->firstWhere('score_column_id', $column->id);
+                    if (! $detail || $detail->value === null) {
+                        return '<span class="text-muted">-</span>';
+                    }
+
+                    $value = $subject->usesPassFailAssessment()
+                        ? ((float) $detail->value >= 0.5 ? 'Đ' : 'CĐ')
+                        : rtrim(rtrim(number_format((float) $detail->value, 1, '.', ''), '0'), '.');
+                    $badge = '';
+
+                    if ($detail->is_retest && $detail->original_value !== null) {
+                        $originalValue = rtrim(rtrim(number_format((float) $detail->original_value, 1, '.', ''), '0'), '.');
+                        $tooltip = 'Điểm gốc: ' . $originalValue . '. Cập nhật ngày: ' . ($detail->retest_updated_at?->format('d/m/Y') ?? '-');
+                        $badge = '<span class="score-retest-badge" data-tooltip="' . e($tooltip) . '">Bù</span>';
+                    }
+
+                    return '<span class="score-chip"><strong>' . e($value) . '</strong>' . $badge . '</span>';
+                };
+            @endphp
+            <table class="table align-middle student-report-table">
+                <thead data-report-head>
                     <tr>
                         <th>Môn học</th>
-                        <th>Miệng</th>
-                        <th>15p</th>
-                        <th>Đánh giá giữa kỳ</th>
-                        <th>Đánh giá cuối kỳ</th>
+                        @foreach($studentReportColumnHeaders as $header)
+                            <th class="text-nowrap">{{ $header['label'] }}</th>
+                        @endforeach
                         <th>Điểm trung bình môn</th>
+                        <th class="student-report-term-col">Tổng kết HK1</th>
+                        <th class="student-report-term-col">Tổng kết HK2</th>
+                        <th class="student-report-term-col">Điểm Cả Năm</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody data-report-body>
                 @forelse($studentReportRows as $row)
                     @php
                         $subject = $row['subject'];
                         $score = $row['score'];
+                        $columnsByFamily = collect($studentReportColumnsBySubject->get($subject->id, []));
                     @endphp
                     <tr>
                         <td class="fw-semibold">{{ $subject->name ?? '-' }}</td>
-                        <td><div class="score-chip-list">{!! $formatScoreList($score, ['regular'], ['miệng', 'mieng']) !!}</div></td>
-                        <td><div class="score-chip-list">{!! $formatScoreList($score, ['regular'], ['15', '15p', 'phút', 'phut']) !!}</div></td>
-                        <td><div class="score-chip-list">{!! $formatScoreList($score, ['midterm']) !!}</div></td>
-                        <td><div class="score-chip-list">{!! $formatScoreList($score, ['final']) !!}</div></td>
+                        @foreach($studentReportColumnHeaders as $header)
+                            @php
+                                $familyColumns = collect($columnsByFamily->get($header['family'], []))->values();
+                                $column = $familyColumns->get(((int) $header['index']) - 1);
+                            @endphp
+                            <td>{!! $formatReportScoreValue($score, $subject, $column) !!}</td>
+                        @endforeach
                         <td>
                             @if($subject->usesPassFailAssessment())
                                 <span class="text-muted">Không tính TB</span>
                             @elseif($score?->average !== null)
-                                <span class="badge bg-info">{{ rtrim(rtrim(number_format($score->average, 2), '0'), '.') }}</span>
+                                <span class="badge bg-info">{{ rtrim(rtrim(number_format($score->average, 1), '0'), '.') }}</span>
                             @else
                                 <span class="text-muted">&nbsp;</span>
+                            @endif
+                        </td>
+                        @php
+                            $termAverages = $row['annual'] ?? ['hk1' => null, 'hk2' => null, 'year' => null];
+                        @endphp
+                        <td class="student-report-term-col">
+                            @if($termAverages['hk1'] !== null)
+                                <span class="student-report-term-value">{{ $formatTermValue($termAverages['hk1']) }}</span>
+                            @else
+                                <span class="student-report-term-muted">-</span>
+                            @endif
+                        </td>
+                        <td class="student-report-term-col">
+                            @if($termAverages['hk2'] !== null)
+                                <span class="student-report-term-value">{{ $formatTermValue($termAverages['hk2']) }}</span>
+                            @else
+                                <span class="student-report-term-muted">-</span>
+                            @endif
+                        </td>
+                        <td class="student-report-term-col">
+                            @if($termAverages['year'] !== null)
+                                <span class="student-report-term-value">{{ $formatTermValue($termAverages['year']) }}</span>
+                            @else
+                                <span class="student-report-term-muted">-</span>
                             @endif
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6">
+                        <td colspan="{{ $studentReportColumnHeaders->count() + 5 }}">
                             <div class="empty-state"><i class="bi bi-clipboard-data"></i>Chưa có dữ liệu điểm trong học kỳ này.</div>
                         </td>
                     </tr>
                 @endforelse
+                    <tr class="student-report-gpa-row" data-report-gpa-row>
+                        <td colspan="{{ $studentReportColumnHeaders->count() + 4 }}">Điểm trung bình học kỳ (Tất cả các môn)</td>
+                        <td data-report-gpa>{{ $studentReportGlobalGpa !== null ? number_format($studentReportGlobalGpa, 1, '.', '') : '-' }}</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
+        <div
+            class="student-report-summary"
+            data-report-annual-summary
+            data-hk1="{{ $studentReportAnnualSummary['hk1_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk1_gpa'], 1, '.', '') : '-' }}"
+            data-hk2="{{ $studentReportAnnualSummary['hk2_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk2_gpa'], 1, '.', '') : '-' }}"
+            data-year="{{ $studentReportAnnualSummary['year_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['year_gpa'], 1, '.', '') : '-' }}"
+        >
+            <div class="student-report-summary-item">🟢 Điểm TB học kỳ 1: <strong data-report-summary-hk1>{{ $studentReportAnnualSummary['hk1_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk1_gpa'], 1, '.', '') : '-' }}</strong></div>
+            <div class="student-report-summary-item">🔵 Điểm TB học kỳ 2: <strong data-report-summary-hk2>{{ $studentReportAnnualSummary['hk2_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk2_gpa'], 1, '.', '') : '-' }}</strong></div>
+            <div class="student-report-summary-item master">🔥 ĐIỂM TRUNG BÌNH CẢ NĂM: <strong data-report-summary-year>{{ $studentReportAnnualSummary['year_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['year_gpa'], 1, '.', '') : '-' }}</strong></div>
+        </div>
     </div>
+
+    <script>
+        (() => {
+            const form = document.querySelector('[data-student-report-filter]');
+            const tableHead = document.querySelector('[data-report-head]');
+            const tableBody = document.querySelector('[data-report-body]');
+            const yearSelect = form?.querySelector('[data-report-year]');
+            const semesterSelect = form?.querySelector('[data-report-semester]');
+            const exportButton = document.querySelector('[data-report-export]');
+            const summaryHk1 = document.querySelector('[data-report-summary-hk1]');
+            const summaryHk2 = document.querySelector('[data-report-summary-hk2]');
+            const summaryYear = document.querySelector('[data-report-summary-year]');
+
+            if (! form || ! tableHead || ! tableBody || ! yearSelect || ! semesterSelect) {
+                return;
+            }
+
+            const createCell = (tag, text, className = '') => {
+                const cell = document.createElement(tag);
+                cell.textContent = text;
+                if (className) {
+                    cell.className = className;
+                }
+                return cell;
+            };
+
+            const renderSemesters = (semesters, selectedSemesterId) => {
+                semesterSelect.innerHTML = '';
+                semesters.forEach((semester) => {
+                    const option = document.createElement('option');
+                    option.value = semester.id;
+                    option.textContent = semester.name;
+                    option.selected = String(semester.id) === String(selectedSemesterId);
+                    semesterSelect.appendChild(option);
+                });
+            };
+
+            const createTermCell = (value) => {
+                const td = document.createElement('td');
+                td.className = 'student-report-term-col';
+                const span = document.createElement('span');
+                span.className = value ? 'student-report-term-value' : 'student-report-term-muted';
+                span.textContent = value || '-';
+                td.appendChild(span);
+
+                return td;
+            };
+
+            const renderAnnualSummary = (summary = {}) => {
+                if (summaryHk1) {
+                    summaryHk1.textContent = summary.hk1_gpa || '-';
+                }
+
+                if (summaryHk2) {
+                    summaryHk2.textContent = summary.hk2_gpa || '-';
+                }
+
+                if (summaryYear) {
+                    summaryYear.textContent = summary.year_gpa || '-';
+                }
+            };
+
+            const renderReport = (payload) => {
+                renderSemesters(payload.semesters || [], payload.selected_semester_id);
+                if (exportButton) {
+                    const exportUrl = new URL(exportButton.href, window.location.origin);
+                    exportUrl.searchParams.set('school_year_id', payload.selected_year_id || yearSelect.value);
+                    exportUrl.searchParams.set('semester_id', payload.selected_semester_id || semesterSelect.value);
+                    exportButton.href = exportUrl.toString();
+                }
+
+                const headerRow = document.createElement('tr');
+                headerRow.appendChild(createCell('th', 'Môn học'));
+                (payload.headers || []).forEach((header) => {
+                    headerRow.appendChild(createCell('th', header.label, 'text-nowrap'));
+                });
+                headerRow.appendChild(createCell('th', 'Điểm trung bình môn'));
+                headerRow.appendChild(createCell('th', 'Tổng kết HK1', 'student-report-term-col'));
+                headerRow.appendChild(createCell('th', 'Tổng kết HK2', 'student-report-term-col'));
+                headerRow.appendChild(createCell('th', 'Điểm Cả Năm', 'student-report-term-col'));
+                tableHead.innerHTML = '';
+                tableHead.appendChild(headerRow);
+
+                tableBody.innerHTML = '';
+                const colspan = (payload.headers || []).length + 5;
+                renderAnnualSummary(payload.annual_summary || {});
+
+                if (! payload.rows || payload.rows.length === 0) {
+                    const emptyRow = document.createElement('tr');
+                    const emptyCell = createCell('td', 'Chưa có dữ liệu điểm trong học kỳ này.', 'text-muted');
+                    emptyCell.colSpan = colspan;
+                    emptyRow.appendChild(emptyCell);
+                    tableBody.appendChild(emptyRow);
+                } else {
+                    payload.rows.forEach((row) => {
+                        const tr = document.createElement('tr');
+                        tr.appendChild(createCell('td', row.subject_name || '-', 'fw-semibold'));
+
+                        (row.values || []).forEach((value) => {
+                            const td = document.createElement('td');
+                            const span = document.createElement('span');
+                            span.className = value.muted ? 'text-muted' : 'score-chip';
+                            span.textContent = value.text || '-';
+
+                            if (value.is_retest && value.retest_tooltip) {
+                                const badge = document.createElement('span');
+                                badge.className = 'score-retest-badge';
+                                badge.dataset.tooltip = value.retest_tooltip;
+                                badge.textContent = 'Bù';
+                                span.appendChild(badge);
+                            }
+
+                            td.appendChild(span);
+                            tr.appendChild(td);
+                        });
+
+                        const average = document.createElement('td');
+                        if (row.uses_pass_fail) {
+                            average.appendChild(createCell('span', 'Không tính TB', 'text-muted'));
+                        } else if (row.average !== null && row.average !== undefined) {
+                            average.appendChild(createCell('span', row.average, 'badge bg-info'));
+                        } else {
+                            average.appendChild(createCell('span', '-', 'text-muted'));
+                        }
+                        tr.appendChild(average);
+                        tr.appendChild(createTermCell(row.term_averages?.hk1));
+                        tr.appendChild(createTermCell(row.term_averages?.hk2));
+                        tr.appendChild(createTermCell(row.term_averages?.year));
+                        tableBody.appendChild(tr);
+                    });
+                }
+
+                const gpaRow = document.createElement('tr');
+                gpaRow.className = 'student-report-gpa-row';
+                const gpaLabel = createCell('td', 'Điểm trung bình học kỳ (Tất cả các môn)');
+                gpaLabel.colSpan = Math.max(1, colspan - 1);
+                gpaRow.appendChild(gpaLabel);
+                gpaRow.appendChild(createCell('td', payload.global_gpa || '-'));
+                tableBody.appendChild(gpaRow);
+            };
+
+            const fetchReport = async () => {
+                const params = new URLSearchParams({
+                    school_year_id: yearSelect.value,
+                    semester_id: semesterSelect.value,
+                });
+
+                const response = await fetch(`${form.dataset.url}?${params.toString()}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                const payload = await response.json().catch(() => ({}));
+
+                if (! response.ok) {
+                    throw new Error(payload.message || 'Không thể tải phiếu điểm.');
+                }
+
+                renderReport(payload);
+            };
+
+            [yearSelect, semesterSelect].forEach((select) => {
+                select.addEventListener('change', () => {
+                    fetchReport().catch((error) => {
+                        console.error(error);
+                    });
+                });
+            });
+        })();
+    </script>
 @else
     @php
         $isScoreAdmin = auth()->user()->isAdmin() || auth()->user()->isStaff();
@@ -131,12 +685,15 @@
             : 'Giáo viên bộ môn nhập điểm theo các cột điểm do Admin cấu hình.'"
     >
         @if(auth()->user()->hasPermission('scores.manage'))
-            <a href="{{ route('score-columns.index') }}" class="btn btn-outline-primary score-config-link">
-                <i class="bi bi-sliders"></i>
-                Cấu hình cột điểm
-            </a>
+            <button type="button" class="score-config-shortcut-btn" data-bs-toggle="modal" data-bs-target="#scoreColumnConfigModal">
+                ⚙️ Quản lý cấu hình cột điểm
+            </button>
         @endif
     </x-page-header>
+
+    @if(auth()->user()->hasPermission('scores.manage') && $scoreColumnConfig)
+        <x-score-column-config-modal id="scoreColumnConfigModal" :config="$scoreColumnConfig" />
+    @endif
 
     <div class="score-entry-shell">
         <div class="score-entry-filter-card">

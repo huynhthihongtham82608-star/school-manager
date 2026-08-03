@@ -34,10 +34,10 @@
             <label class="form-label">Hình thức đánh giá</label>
             <select name="assessment_type" class="form-select" required>
                 @foreach(\App\Models\Subject::ASSESSMENT_TYPES as $value => $label)
-                    <option value="{{ $value }}" @selected(old('assessment_type', \App\Models\Subject::ASSESSMENT_NUMERIC) === $value)>{{ $label }}</option>
+                    <option value="{{ $value }}" @selected(old('assessment_type', \App\Models\Subject::ASSESSMENT_GRADE_10) === $value)>{{ $label }}</option>
                 @endforeach
             </select>
-            <div class="form-text">Chọn nhận xét Đạt/Chưa đạt cho môn không nhập điểm số.</div>
+            <div class="form-text">Chọn Không đánh giá cho môn chỉ xếp lịch như Chào cờ, Sinh hoạt lớp hoặc hoạt động phát sinh.</div>
             @error('assessment_type')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-6">

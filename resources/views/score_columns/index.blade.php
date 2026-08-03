@@ -6,6 +6,317 @@
     $typeOptions = \App\Models\ScoreColumn::TYPES;
 @endphp
 
+<style>
+    .score-weight-card {
+        margin-bottom: 1rem;
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, .06);
+    }
+
+    .score-weight-card .card-body {
+        padding: 1.15rem;
+    }
+
+    .score-weight-title {
+        display: flex;
+        align-items: center;
+        gap: .55rem;
+        margin: 0 0 1rem;
+        color: #111827;
+        font-size: 1.05rem;
+        font-weight: 700;
+    }
+
+    .score-weight-title::before {
+        width: 4px;
+        height: 16px;
+        display: inline-block;
+        border-radius: 999px;
+        background: #f97316;
+        content: "";
+    }
+
+    .score-weight-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .score-weight-grid label {
+        color: #374151;
+        font-size: .9rem;
+        font-weight: 400;
+    }
+
+    .score-weight-grid .form-control {
+        border-color: #e5e7eb;
+        border-radius: 8px;
+        font-weight: 400;
+    }
+
+    .score-weight-grid .form-control:focus {
+        border-color: #f97316;
+        box-shadow: 0 0 0 .2rem rgba(255, 237, 213, .95);
+    }
+
+    .score-weight-formula {
+        margin-top: 1rem;
+        padding: .7rem .85rem;
+        border: 1px solid rgba(253, 186, 116, .65);
+        border-radius: 8px;
+        color: #9a3412;
+        background: rgba(255, 247, 237, .72);
+        font-size: .9rem;
+        font-weight: 400;
+    }
+
+    .score-matrix-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .score-matrix-card .card-body {
+        padding: 0;
+    }
+
+    .score-matrix-table {
+        width: 100%;
+        margin: 0;
+        table-layout: fixed;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .score-matrix-table th {
+        padding: .85rem .75rem;
+        color: #374151;
+        background: #f9fafb;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 1rem;
+        font-weight: 500;
+        text-align: left;
+    }
+
+    .score-matrix-table td {
+        padding: .8rem .75rem;
+        border-bottom: 1px solid #f1f5f9;
+        color: #374151;
+        font-size: 1rem;
+        font-weight: 400;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .score-grade-header {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .score-grade-header td {
+        padding: .75rem 1rem;
+        border-top: 1px solid #fed7aa;
+        border-bottom: 1px solid #fed7aa;
+        color: #111827;
+        background: rgba(255, 237, 213, .4);
+        font-size: .9rem;
+        font-weight: 700;
+    }
+
+    .score-matrix-subject-row {
+        cursor: pointer;
+        transition: all .18s ease;
+    }
+
+    .score-matrix-subject-row.is-odd td {
+        background: #fff;
+    }
+
+    .score-matrix-subject-row.is-even td {
+        background: rgba(249, 250, 251, .55);
+    }
+
+    .score-matrix-subject-row:hover td {
+        background: rgba(255, 247, 237, .72) !important;
+    }
+
+    .score-grade-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+    }
+
+    .score-grade-arrow {
+        width: 1rem;
+        display: inline-block;
+        color: #c2410c;
+        font-weight: 700;
+    }
+
+    .score-subject-cell strong {
+        display: block;
+        color: #111827;
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1.35;
+    }
+
+    .score-subject-cell span {
+        display: block;
+        margin-top: .2rem;
+        color: #6b7280;
+        font-size: .82rem;
+        font-weight: 400;
+    }
+
+    .score-matrix-point-list {
+        display: grid;
+        gap: .5rem;
+    }
+
+    .score-matrix-count {
+        width: fit-content;
+        display: inline-flex;
+        align-items: center;
+        padding: .1rem .42rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 999px;
+        color: #6b7280;
+        background: #f9fafb;
+        font-size: .76rem;
+        font-weight: 400;
+        line-height: 1.2;
+    }
+
+    .score-matrix-point {
+        min-width: 0;
+        display: grid;
+        gap: .35rem;
+        padding: .55rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    .score-matrix-point.midterm {
+        border-color: #bfdbfe;
+        background: #eff6ff;
+    }
+
+    .score-matrix-point.final {
+        border-color: #ddd6fe;
+        background: #f5f3ff;
+    }
+
+    .score-matrix-point-name {
+        color: #111827;
+        font-size: .86rem;
+        font-weight: 500;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+
+    .score-matrix-point-empty {
+        color: #9ca3af;
+        font-size: .86rem;
+        font-weight: 400;
+    }
+
+    .score-matrix-time {
+        display: grid;
+        gap: .16rem;
+        color: #6b7280;
+        font-size: .78rem;
+        font-weight: 400;
+        line-height: 1.35;
+    }
+
+    .score-matrix-time span {
+        display: inline-flex;
+        align-items: center;
+        gap: .25rem;
+    }
+
+    .score-matrix-time em {
+        font-style: normal;
+    }
+
+    .score-matrix-time .score-column-manual-lock {
+        color: #b91c1c;
+        font-weight: 500;
+    }
+
+    .score-matrix-actions {
+        text-align: center;
+    }
+
+    .score-matrix-edit-btn {
+        width: 34px;
+        height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        color: #c2410c;
+        background: #fff7ed;
+    }
+
+    .score-matrix-edit-btn:hover {
+        color: #fff;
+        background: #ea580c;
+        border-color: #ea580c;
+    }
+
+    .score-matrix-config-list {
+        display: grid;
+        gap: .75rem;
+    }
+
+    .score-matrix-config-row {
+        padding: .85rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    .score-matrix-config-grid {
+        display: grid;
+        grid-template-columns: minmax(160px, 1.4fr) minmax(130px, .85fr) repeat(2, minmax(130px, .8fr)) minmax(90px, .5fr) auto;
+        gap: .65rem;
+        align-items: end;
+    }
+
+    .score-matrix-config-grid label {
+        color: #4b5563;
+        font-size: .78rem;
+        font-weight: 400;
+    }
+
+    .score-matrix-config-grid .form-control,
+    .score-matrix-config-grid .form-select {
+        font-size: .88rem;
+        font-weight: 400;
+    }
+
+    @media (max-width: 767.98px) {
+        .score-weight-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .score-matrix-table {
+            min-width: 1180px;
+        }
+
+        .score-matrix-config-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
 <x-page-header
     title="Cấu hình cột điểm"
     subtitle="Admin quản lý tên, loại và số lượng cột điểm theo năm học, khối và môn học."
@@ -15,12 +326,44 @@
             <i class="bi bi-arrow-left"></i>
             Quay lại điểm số
         </a>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createScoreColumnModal">
-            <i class="bi bi-plus-circle"></i>
-            Thêm cột điểm
-        </button>
     </div>
 </x-page-header>
+
+<div class="card score-weight-card">
+    <div class="card-body">
+        <form method="POST" action="{{ route('score-columns.settings.update') }}" data-score-weight-form>
+            @csrf
+            @method('PATCH')
+            <div class="d-flex flex-column flex-lg-row gap-3 justify-content-between">
+                <div class="flex-grow-1">
+                    <h2 class="score-weight-title">Cấu hình trọng số và công thức tính điểm toàn trường</h2>
+                    <div class="score-weight-grid">
+                        <div>
+                            <label class="form-label">Trọng số ĐGTX</label>
+                            <input type="number" name="weight_gdtx" class="form-control" value="{{ old('weight_gdtx', $scoreSetting->weight_gdtx) }}" min="1" max="20" required data-score-weight-input>
+                        </div>
+                        <div>
+                            <label class="form-label">Trọng số Giữa kỳ</label>
+                            <input type="number" name="weight_dggk" class="form-control" value="{{ old('weight_dggk', $scoreSetting->weight_dggk) }}" min="1" max="20" required data-score-weight-input>
+                        </div>
+                        <div>
+                            <label class="form-label">Trọng số Cuối kỳ</label>
+                            <input type="number" name="weight_dgck" class="form-control" value="{{ old('weight_dgck', $scoreSetting->weight_dgck) }}" min="1" max="20" required data-score-weight-input>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-end">
+                    <button class="btn btn-primary" data-score-weight-save>
+                        <i class="bi bi-save me-1"></i>Lưu hệ số
+                    </button>
+                </div>
+            </div>
+            <div class="score-weight-formula" data-score-weight-formula>
+                ĐTBmhk = {{ $scoreSetting->formulaLabel() }}. Kết quả làm tròn 1 chữ số thập phân.
+            </div>
+        </form>
+    </div>
+</div>
 
 <div class="card mb-3 score-column-filter-card">
     <div class="card-body">
@@ -163,108 +506,257 @@
         $column->subject_id,
     ]));
 
-    $typeBadgeClass = fn ($type) => match ($type) {
-        \App\Models\ScoreColumn::TYPE_MIDTERM => 'midterm',
-        \App\Models\ScoreColumn::TYPE_FINAL => 'final',
-        default => 'regular',
+    $classifyScoreColumn = function ($column) {
+        if ($column->type === \App\Models\ScoreColumn::TYPE_MIDTERM) {
+            return 'midterm';
+        }
+
+        if ($column->type === \App\Models\ScoreColumn::TYPE_FINAL) {
+            return 'final';
+        }
+
+        $name = \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii((string) $column->name));
+
+        if (str_contains($name, 'mieng') || str_contains($name, 'oral')) {
+            return 'oral';
+        }
+
+        if (str_contains($name, '15')) {
+            return 'fifteen';
+        }
+
+        return 'one_period';
+    };
+
+    $scoreMatrixRows = $scoreColumnGroups
+        ->map(function ($group, $key) use ($classifyScoreColumn) {
+            $firstColumn = $group->first();
+
+            return [
+                'key' => md5($key),
+                'first' => $firstColumn,
+                'columns' => $group->sortBy(fn ($column) => [$column->sort_order, $column->name])->values(),
+                'categories' => [
+                    'oral' => $group->filter(fn ($column) => $classifyScoreColumn($column) === 'oral')->sortBy(fn ($column) => [$column->sort_order, $column->name])->values(),
+                    'fifteen' => $group->filter(fn ($column) => $classifyScoreColumn($column) === 'fifteen')->sortBy(fn ($column) => [$column->sort_order, $column->name])->values(),
+                    'one_period' => $group->filter(fn ($column) => $classifyScoreColumn($column) === 'one_period')->sortBy(fn ($column) => [$column->sort_order, $column->name])->values(),
+                    'midterm' => $group->filter(fn ($column) => $classifyScoreColumn($column) === 'midterm')->sortBy(fn ($column) => [$column->sort_order, $column->name])->values(),
+                    'final' => $group->filter(fn ($column) => $classifyScoreColumn($column) === 'final')->sortBy(fn ($column) => [$column->sort_order, $column->name])->values(),
+                ],
+            ];
+        })
+        ->sortBy(fn ($row) => [(int) ($row['first']->grade_level ?? 0), $row['first']->subject?->name ?? ''])
+        ->values();
+
+    $scoreRowsByGrade = $scoreMatrixRows->groupBy(fn ($row) => (int) ($row['first']->grade_level ?? 0))->sortKeys();
+    $renderMatrixPoint = function ($column, string $visualType = 'regular') {
+        $deadlineLabel = $column->input_closes_at
+            ? '⌛ Hạn: ' . $column->input_closes_at->format('d/m/Y')
+            : 'Vô thời hạn';
+
+        return '
+            <div class="score-matrix-point ' . e($visualType) . '">
+                <div class="score-matrix-point-name">' . e($column->name) . '</div>
+                <button
+                    type="button"
+                    class="score-column-toggle ' . ($column->is_active ? 'open' : 'locked') . '"
+                    data-score-column-toggle
+                    data-url="' . e(route('score-columns.toggle-lock', $column)) . '"
+                    data-active="' . ($column->is_active ? '1' : '0') . '"
+                    data-column-id="' . e($column->id) . '"
+                >' . ($column->is_active ? '🟢 Đang mở' : '🔒 Đã khóa') . '</button>
+                <div
+                    class="score-matrix-time"
+                    data-score-column-time="' . e($column->id) . '"
+                    data-open-label="' . e($column->input_opens_at?->format('d/m/Y') ?? 'Vô thời hạn') . '"
+                    data-close-label="' . e($column->input_closes_at?->format('d/m/Y') ?? '') . '"
+                    data-deadline-label="' . e($deadlineLabel) . '"
+                    data-updated-label="' . e($column->updated_at?->timezone(config('app.timezone'))->format('H:i d/m/Y') ?? now()->format('H:i d/m/Y')) . '"
+                >
+                    <span data-time-close-row>
+                        <i class="bi bi-hourglass-split" data-time-close-icon></i>
+                        <em data-time-close class="' . (! $column->input_closes_at ? 'text-muted' : '') . '">' . e($deadlineLabel) . '</em>
+                    </span>
+                </div>
+            </div>
+        ';
     };
 @endphp
 
-<div class="card score-column-list-card">
+<div class="card score-matrix-card">
     <div class="card-header d-flex align-items-center justify-content-between">
         <span>Danh sách cột điểm</span>
         <span class="text-muted small">{{ $columns->count() }} đầu điểm</span>
     </div>
     <div class="card-body">
-        <div class="score-column-list">
-            @forelse($scoreColumnGroups as $group)
-                @php
-                    $firstColumn = $group->first();
-                @endphp
-                <section class="score-column-group">
-                    <div class="score-column-group-header">
-                        <div>
-                            <strong>📖 MÔN: {{ mb_strtoupper($firstColumn->subject?->name ?? '-') }}</strong>
-                            <span>Khối {{ $firstColumn->grade_level }} · {{ $firstColumn->schoolYear?->name ?? '-' }}</span>
-                        </div>
-                        <span>{{ $group->count() }} đầu điểm</span>
-                    </div>
-
-                    <div class="score-column-group-rows">
-                        @foreach($group as $column)
-                            <article class="score-column-list-item">
-                                <div class="score-column-name-cell">
-                                    <strong>{{ $column->name }}</strong>
-                                </div>
-
-                                <div class="score-column-type-cell">
-                                    <span class="score-column-type-badge {{ $typeBadgeClass($column->type) }}">{{ $column->typeLabel() }}</span>
-                                </div>
-
-                                <div
-                                    class="score-column-time-compact"
-                                    data-score-column-time="{{ $column->id }}"
-                                    data-open-label="{{ $column->input_opens_at?->format('d/m/Y') ?? 'Vô thời hạn' }}"
-                                    data-close-label="{{ $column->input_closes_at?->format('d/m/Y') ?? 'Chưa khóa' }}"
-                                    data-updated-label="{{ $column->updated_at?->timezone(config('app.timezone'))->format('H:i d/m/Y') ?? now()->format('H:i d/m/Y') }}"
-                                >
-                                    <span><i class="bi bi-calendar3"></i><span data-time-open>{{ $column->input_opens_at?->format('d/m/Y') ?? 'Vô thời hạn' }}</span></span>
-                                    <span data-time-close-row @class(['is-manual-lock' => ! $column->is_active])>
-                                        <i @class(['bi', 'bi-lock-fill' => ! $column->is_active, 'bi-hourglass-split' => $column->is_active]) data-time-close-icon></i>
-                                        <em data-time-close @class(['text-muted' => $column->is_active && ! $column->input_closes_at, 'score-column-manual-lock' => ! $column->is_active])>
-                                            {{ $column->is_active ? ($column->input_closes_at?->format('d/m/Y') ?? 'Chưa khóa') : 'Đã khóa thủ công lúc '.($column->updated_at?->timezone(config('app.timezone'))->format('H:i d/m/Y') ?? now()->format('H:i d/m/Y')) }}
-                                        </em>
-                                    </span>
-                                </div>
-
-                                <div class="score-column-row-actions">
-                                    <button
-                                        type="button"
-                                        class="score-column-toggle {{ $column->is_active ? 'open' : 'locked' }}"
-                                        data-score-column-toggle
-                                        data-url="{{ route('score-columns.toggle-lock', $column) }}"
-                                        data-active="{{ $column->is_active ? '1' : '0' }}"
-                                        data-column-id="{{ $column->id }}"
-                                    >
-                                        {{ $column->is_active ? '🟢 Đang mở' : '🔒 Đã khóa' }}
-                                    </button>
-                                    <div class="content-action-group justify-content-end" data-action-synced="true">
-                                        <button type="button" class="content-action-btn icon-only edit" data-bs-toggle="modal" data-bs-target="#editScoreColumn{{ $column->id }}" title="Chỉnh sửa" aria-label="Chỉnh sửa">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <div class="dropdown">
-                                            <button type="button" class="content-action-btn icon-only dropdown-toggle-clean more" data-bs-toggle="dropdown" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
-                                                <i class="bi bi-three-dots-vertical"></i>
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-end content-action-menu">
-                                                <li>
-                                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#showScoreColumn{{ $column->id }}">
-                                                        <i class="bi bi-eye"></i>Xem chi tiết
-                                                    </button>
-                                                </li>
-                                                <li>
-                                                    <form method="POST" action="{{ route('score-columns.destroy', $column) }}" onsubmit="return confirm('Xóa đầu điểm này? Hành động này không thể hoàn tác.');">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button class="dropdown-item danger" type="submit">
-                                                            <i class="bi bi-trash"></i>Xóa đầu điểm
-                                                        </button>
-                                                    </form>
-                                                </li>
-                                            </ul>
-                                        </div>
+        <div class="table-responsive">
+            <table class="score-matrix-table">
+                <colgroup>
+                    <col style="width: 22%;">
+                    <col style="width: 17%;">
+                    <col style="width: 17%;">
+                    <col style="width: 17%;">
+                    <col style="width: 17%;">
+                    <col style="width: 10%;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Môn học</th>
+                        <th>Kiểm tra Miệng</th>
+                        <th>Kiểm tra 15 phút</th>
+                        <th>Kiểm tra Giữa kỳ</th>
+                        <th>Kiểm tra Cuối kỳ</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @forelse($scoreRowsByGrade as $grade => $rows)
+                    <tr class="score-grade-header" data-score-grade-toggle="{{ $grade }}">
+                        <td colspan="6">
+                            <span class="score-grade-toggle">
+                                <span class="score-grade-arrow" data-score-grade-arrow>▼</span>
+                                Khối {{ $grade }} · {{ $rows->count() }} môn học · {{ $rows->sum(fn ($row) => $row['columns']->count()) }} đầu điểm
+                            </span>
+                        </td>
+                    </tr>
+                    @foreach($rows as $row)
+                        @php
+                            $firstColumn = $row['first'];
+                            $modalId = 'scoreColumnMatrixModal' . $row['key'];
+                        @endphp
+                        <tr class="score-matrix-subject-row {{ $loop->even ? 'is-even' : 'is-odd' }}" data-score-grade-row="{{ $grade }}">
+                            <td class="score-subject-cell">
+                                <strong>📖 {{ $firstColumn->subject?->name ?? '-' }}</strong>
+                                <span>{{ $row['columns']->count() }} đầu điểm · {{ $firstColumn->schoolYear?->name ?? '-' }}</span>
+                            </td>
+                            @foreach(['oral' => 'regular', 'fifteen' => 'regular', 'midterm' => 'midterm', 'final' => 'final'] as $category => $visualType)
+                                <td>
+                                    <div class="score-matrix-point-list">
+                                        @if($row['categories'][$category]->isNotEmpty())
+                                            <span class="score-matrix-count">x{{ $row['categories'][$category]->count() }}</span>
+                                        @endif
+                                        @forelse($row['categories'][$category] as $column)
+                                            {!! $renderMatrixPoint($column, $visualType) !!}
+                                        @empty
+                                            <span class="score-matrix-point-empty">Chưa cấu hình</span>
+                                        @endforelse
                                     </div>
-                                </div>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @empty
-                <div class="empty-state"><i class="bi bi-table"></i>Chưa có cột điểm nào.</div>
-            @endforelse
+                                </td>
+                            @endforeach
+                            <td class="score-matrix-actions">
+                                <button type="button" class="score-matrix-edit-btn" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}" title="Cấu hình chi tiết" aria-label="Cấu hình chi tiết">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    @endforeach
+                @empty
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state"><i class="bi bi-table"></i>Chưa có cột điểm nào.</div>
+                        </td>
+                    </tr>
+                @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
+
+@foreach($scoreMatrixRows as $row)
+    @php
+        $firstColumn = $row['first'];
+        $modalId = 'scoreColumnMatrixModal' . $row['key'];
+    @endphp
+    <div class="modal fade content-modal score-column-config-modal" id="{{ $modalId }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 448px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="score-column-modal-title">
+                        <h5 class="modal-title">Cấu hình đầu điểm - {{ $firstColumn->subject?->name ?? '-' }}</h5>
+                        <p>Khối {{ $firstColumn->grade_level }} · {{ $firstColumn->schoolYear?->name ?? '-' }} · {{ $row['columns']->count() }} đầu điểm</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="POST" action="{{ route('score-columns.matrix-counts.update') }}" class="score-matrix-config-row mb-0" data-score-column-count-form>
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="school_year_id" value="{{ $firstColumn->school_year_id }}">
+                        <input type="hidden" name="grade_level" value="{{ $firstColumn->grade_level }}">
+                        <input type="hidden" name="subject_id" value="{{ $firstColumn->subject_id }}">
+                        <div class="d-grid gap-3">
+                            <div>
+                                <label class="form-label fw-normal">Số lượng cột kiểm tra Miệng</label>
+                                <input type="number" name="oral_count" class="form-control" value="{{ $row['categories']['oral']->count() }}" min="0" max="10" step="1" required>
+                            </div>
+                            <div>
+                                <label class="form-label fw-normal">Số lượng cột 15 phút</label>
+                                <input type="number" name="fifteen_count" class="form-control" value="{{ $row['categories']['fifteen']->count() }}" min="0" max="10" step="1" required>
+                            </div>
+                            <div>
+                                <label class="form-label fw-normal">Số lượng cột Kiểm tra Giữa kỳ</label>
+                                <input type="number" class="form-control" value="1" disabled>
+                            </div>
+                            <div>
+                                <label class="form-label fw-normal">Số lượng cột Kiểm tra Cuối kỳ</label>
+                                <input type="number" class="form-control" value="1" disabled>
+                            </div>
+                            <button class="btn btn-primary w-100">💾 Lưu cấu hình môn</button>
+                        </div>
+                    </form>
+                    <div class="score-matrix-config-list d-none">
+                        @foreach($row['columns'] as $column)
+                            <form method="POST" action="{{ route('score-columns.update', $column) }}" class="score-matrix-config-row" data-score-column-form>
+                                @csrf
+                                @method('PUT')
+                                <input type="hidden" name="school_year_id" value="{{ $column->school_year_id }}">
+                                <input type="hidden" name="grade_level" value="{{ $column->grade_level }}">
+                                <input type="hidden" name="subject_id" value="{{ $column->subject_id }}">
+                                <div class="score-matrix-config-grid">
+                                    <div>
+                                        <label class="form-label">Tên cột điểm</label>
+                                        <input name="name" class="form-control" value="{{ $column->name }}" required maxlength="255">
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Loại điểm</label>
+                                        <select name="type" class="form-select" required>
+                                            @foreach($typeOptions as $value => $label)
+                                                <option value="{{ $value }}" @selected($column->type === $value)>{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Ngày mở</label>
+                                        <input type="date" name="input_opens_at" class="form-control" value="{{ $column->input_opens_at?->format('Y-m-d') }}">
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Ngày khóa</label>
+                                        <input type="date" name="input_closes_at" class="form-control" value="{{ $column->input_closes_at?->format('Y-m-d') }}">
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Thứ tự</label>
+                                        <input type="number" name="sort_order" class="form-control" value="{{ $column->sort_order }}" min="0" max="1000">
+                                    </div>
+                                    <div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" name="is_active" value="1" id="matrixActive{{ $column->id }}" @checked($column->is_active)>
+                                            <label class="form-check-label" for="matrixActive{{ $column->id }}">Đang mở</label>
+                                        </div>
+                                        <button class="btn btn-primary btn-sm w-100">Lưu</button>
+                                    </div>
+                                </div>
+                            </form>
+                        @endforeach
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endforeach
 
 @foreach($columns as $column)
     <div class="modal fade content-modal score-column-detail-modal" id="showScoreColumn{{ $column->id }}" tabindex="-1" aria-hidden="true">
@@ -296,7 +788,7 @@
                             </article>
                             <article>
                                 <span>Ngày khóa nhập</span>
-                                <strong>{{ $column->input_closes_at?->format('d/m/Y') ?? 'Chưa khóa' }}</strong>
+                                <strong>{{ $column->input_closes_at?->format('d/m/Y') ?? 'Vô thời hạn' }}</strong>
                             </article>
                         </div>
                     </section>
@@ -390,6 +882,56 @@
 @endforeach
 
 <script>
+    document.querySelectorAll('[data-score-grade-toggle]').forEach((header) => {
+        header.addEventListener('click', () => {
+            const grade = header.dataset.scoreGradeToggle;
+            const arrow = header.querySelector('[data-score-grade-arrow]');
+            const rows = document.querySelectorAll(`[data-score-grade-row="${grade}"]`);
+            const shouldCollapse = Array.from(rows).some((row) => !row.hidden);
+
+            rows.forEach((row) => {
+                row.hidden = shouldCollapse;
+            });
+
+            if (arrow) {
+                arrow.textContent = shouldCollapse ? '▸' : '▼';
+            }
+        });
+    });
+
+    document.querySelectorAll('[data-score-column-count-form]').forEach((form) => {
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const saveButton = form.querySelector('button[type="submit"], button:not([type])');
+            saveButton?.setAttribute('disabled', 'disabled');
+
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: new FormData(form),
+                });
+                const payload = await response.json().catch(() => ({}));
+
+                if (! response.ok) {
+                    const firstError = payload?.errors ? Object.values(payload.errors).flat()[0] : null;
+                    throw new Error(firstError || payload.message || 'Không thể lưu cấu hình số lượng cột điểm.');
+                }
+
+                showScoreColumnToast(payload.message || 'Đã lưu cấu hình số lượng cột điểm.');
+                window.setTimeout(() => window.location.reload(), 650);
+            } catch (error) {
+                showScoreColumnToast(error.message || 'Không thể lưu cấu hình số lượng cột điểm.', 'error');
+            } finally {
+                saveButton?.removeAttribute('disabled');
+            }
+        });
+    });
+
     document.querySelectorAll('[data-score-column-form]').forEach((form) => {
         form.addEventListener('submit', (event) => {
             const openInput = form.querySelector('[name="input_opens_at"]');
@@ -425,6 +967,63 @@
         }, 2800);
     };
 
+    document.querySelectorAll('[data-score-weight-form]').forEach((form) => {
+        const formula = form.querySelector('[data-score-weight-formula]');
+        const saveButton = form.querySelector('[data-score-weight-save]');
+        const inputs = {
+            gdtx: form.querySelector('[name="weight_gdtx"]'),
+            dggk: form.querySelector('[name="weight_dggk"]'),
+            dgck: form.querySelector('[name="weight_dgck"]'),
+        };
+
+        const numericValue = (input) => Math.max(1, Number.parseInt(input?.value || '1', 10) || 1);
+        const renderFormula = () => {
+            const w1 = numericValue(inputs.gdtx);
+            const w2 = numericValue(inputs.dggk);
+            const w3 = numericValue(inputs.dgck);
+            formula.textContent = `ĐTBmhk = (Tổng ĐGTX x ${w1} + Tổng ĐGGK x ${w2} + Tổng ĐGCK x ${w3}) / (Số cột ĐGTX x ${w1} + Số cột ĐGGK x ${w2} + Số cột ĐGCK x ${w3}). Kết quả làm tròn 1 chữ số thập phân bằng toFixed(1).`;
+        };
+
+        Object.values(inputs).forEach((input) => input?.addEventListener('input', renderFormula));
+        renderFormula();
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            saveButton?.setAttribute('disabled', 'disabled');
+
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: new FormData(form),
+                });
+                const payload = await response.json().catch(() => ({}));
+
+                if (! response.ok) {
+                    const firstError = payload?.errors ? Object.values(payload.errors).flat()[0] : null;
+                    throw new Error(firstError || payload.message || 'Không thể cập nhật cấu hình trọng số.');
+                }
+
+                if (payload?.settings) {
+                    inputs.gdtx.value = payload.settings.weight_gdtx;
+                    inputs.dggk.value = payload.settings.weight_dggk;
+                    inputs.dgck.value = payload.settings.weight_dgck;
+                    renderFormula();
+                }
+
+                showScoreColumnToast(payload.message || 'Đã cập nhật cấu hình trọng số tính điểm toàn trường.');
+            } catch (error) {
+                showScoreColumnToast(error.message || 'Không thể cập nhật cấu hình trọng số.', 'error');
+            } finally {
+                saveButton?.removeAttribute('disabled');
+            }
+        });
+    });
+
     const formatScoreColumnNow = () => {
         const now = new Date();
         const time = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -440,17 +1039,11 @@
             return;
         }
 
-        const openLabel = payload.input_opens_display || timeCell.dataset.openLabel || 'Vô thời hạn';
-        const closeLabel = payload.input_closes_display || timeCell.dataset.closeLabel || 'Chưa khóa';
-        const updatedLabel = payload.updated_at_display || timeCell.dataset.updatedLabel || formatScoreColumnNow();
-        const openElement = timeCell.querySelector('[data-time-open]');
+        const closeLabel = payload.input_closes_display || timeCell.dataset.closeLabel || '';
+        const deadlineLabel = payload.deadline_label || (closeLabel ? `⌛ Hạn: ${closeLabel}` : 'Vô thời hạn');
         const closeElement = timeCell.querySelector('[data-time-close]');
         const closeRow = timeCell.querySelector('[data-time-close-row]');
         const closeIcon = timeCell.querySelector('[data-time-close-icon]');
-
-        if (openElement) {
-            openElement.textContent = openLabel;
-        }
 
         if (! closeElement) {
             return;
@@ -460,19 +1053,10 @@
         closeRow?.classList.remove('is-manual-lock');
         closeIcon?.classList.remove('bi-lock-fill');
         closeIcon?.classList.add('bi-hourglass-split');
-
-        if (isActive) {
-            closeElement.textContent = closeLabel;
-            closeElement.classList.toggle('text-muted', closeLabel === 'Chưa khóa');
-            return;
-        }
-
-        timeCell.dataset.updatedLabel = updatedLabel;
-        closeElement.textContent = `Đã khóa thủ công lúc ${updatedLabel}`;
-        closeElement.classList.add('score-column-manual-lock');
-        closeRow?.classList.add('is-manual-lock');
-        closeIcon?.classList.remove('bi-hourglass-split');
-        closeIcon?.classList.add('bi-lock-fill');
+        timeCell.dataset.closeLabel = closeLabel;
+        timeCell.dataset.deadlineLabel = deadlineLabel;
+        closeElement.textContent = deadlineLabel;
+        closeElement.classList.toggle('text-muted', ! closeLabel);
     };
 
     const applyScoreColumnToggleState = (button, isActive, payload = {}) => {

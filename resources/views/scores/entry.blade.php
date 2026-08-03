@@ -5,7 +5,91 @@
 @php
     $isScoreAdmin = auth()->user()->isAdmin() || auth()->user()->isStaff();
     $usesPassFailAssessment = $subject->usesPassFailAssessment();
+    $renderRetestBadge = function ($detail) {
+        if (! $detail?->is_retest || $detail->original_value === null) {
+            return '';
+        }
+
+        $originalValue = rtrim(rtrim(number_format((float) $detail->original_value, 1, '.', ''), '0'), '.');
+        $tooltip = 'Điểm gốc: ' . $originalValue . '. Cập nhật ngày: ' . ($detail->retest_updated_at?->format('d/m/Y') ?? '-');
+
+        return '<span class="score-retest-badge" data-tooltip="' . e($tooltip) . '">Bù</span>';
+    };
 @endphp
+
+<style>
+    .score-sheet .form-control:disabled,
+    .score-sheet .form-select:disabled {
+        border-color: #e5e7eb;
+        color: #6b7280;
+        background: #f3f4f6;
+        box-shadow: none;
+        cursor: not-allowed;
+        opacity: 1;
+    }
+
+    .score-sheet th,
+    .score-sheet td {
+        font-size: 1rem;
+        font-weight: 400;
+    }
+
+    .score-sheet th {
+        color: #111827;
+        font-weight: 500;
+    }
+
+    .score-retest-badge {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        margin-left: .25rem;
+        padding: .05rem .28rem;
+        border-radius: 4px;
+        color: #c2410c;
+        background: #fff7ed;
+        font-size: 10px;
+        font-weight: 400;
+        line-height: 1.25;
+        cursor: help;
+    }
+
+    .score-retest-badge:hover::after {
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 8px);
+        z-index: 20;
+        min-width: 210px;
+        padding: .45rem .55rem;
+        border: 1px solid #fed7aa;
+        border-radius: 6px;
+        color: #7c2d12;
+        background: #fff;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
+        font-size: .75rem;
+        font-weight: 400;
+        line-height: 1.4;
+        white-space: normal;
+        transform: translateX(-50%);
+        content: attr(data-tooltip);
+    }
+
+    .score-annual-col {
+        background: rgba(255, 247, 237, .38) !important;
+    }
+
+    .score-annual-value {
+        color: #ea580c;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .score-annual-muted {
+        color: #9ca3af;
+        font-size: .92rem;
+        font-weight: 400;
+    }
+</style>
 
 <x-page-header
     :title="$isScoreAdmin
@@ -65,6 +149,11 @@
                             </th>
                         @endforeach
                         <th>TB</th>
+                        @if($isScoreAdmin)
+                            <th class="score-annual-col">Tổng kết HK1</th>
+                            <th class="score-annual-col">Tổng kết HK2</th>
+                            <th class="score-annual-col">Điểm Cả Năm</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody>
@@ -99,6 +188,7 @@
                                         @else
                                             {{ $displayValue !== '' ? $displayValue : '-' }}
                                         @endif
+                                        {!! $renderRetestBadge($detail) !!}
                                     </span>
                                 @elseif($usesPassFailAssessment)
                                     <select
@@ -113,6 +203,7 @@
                                     @if($errors->has($fieldKey))
                                         <div class="invalid-feedback">{{ $errors->first($fieldKey) }}</div>
                                     @endif
+                                    {!! $renderRetestBadge($detail) !!}
                                 @else
                                     <input
                                         type="text"
@@ -127,14 +218,42 @@
                                     @if($errors->has($fieldKey))
                                         <div class="invalid-feedback">{{ $errors->first($fieldKey) }}</div>
                                     @endif
+                                    {!! $renderRetestBadge($detail) !!}
                                 @endif
                             </td>
                         @endforeach
-                        <td class="fw-semibold text-primary">{{ $header?->average !== null ? rtrim(rtrim(number_format($header->average, 2), '0'), '.') : '-' }}</td>
+                        <td class="fw-semibold text-primary">{{ $header?->average !== null ? rtrim(rtrim(number_format($header->average, 1), '0'), '.') : '-' }}</td>
+                        @if($isScoreAdmin)
+                            @php
+                                $annualAverage = $subjectAnnualAverages->get($student->id, ['hk1' => null, 'hk2' => null, 'year' => null]);
+                                $formatAnnualAverage = fn ($value) => $value !== null ? number_format((float) $value, 1, '.', '') : null;
+                            @endphp
+                            <td class="score-annual-col">
+                                @if($annualAverage['hk1'] !== null)
+                                    <span class="score-annual-value">{{ $formatAnnualAverage($annualAverage['hk1']) }}</span>
+                                @else
+                                    <span class="score-annual-muted">-</span>
+                                @endif
+                            </td>
+                            <td class="score-annual-col">
+                                @if($annualAverage['hk2'] !== null)
+                                    <span class="score-annual-value">{{ $formatAnnualAverage($annualAverage['hk2']) }}</span>
+                                @else
+                                    <span class="score-annual-muted">-</span>
+                                @endif
+                            </td>
+                            <td class="score-annual-col">
+                                @if($annualAverage['year'] !== null)
+                                    <span class="score-annual-value">{{ $formatAnnualAverage($annualAverage['year']) }}</span>
+                                @else
+                                    <span class="score-annual-muted">-</span>
+                                @endif
+                            </td>
+                        @endif
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $scoreColumns->count() + 3 }}"><div class="empty-state"><i class="bi bi-person-dash"></i>Lớp chưa có học sinh.</div></td>
+                        <td colspan="{{ $scoreColumns->count() + ($isScoreAdmin ? 6 : 3) }}"><div class="empty-state"><i class="bi bi-person-dash"></i>Lớp chưa có học sinh.</div></td>
                     </tr>
                 @endforelse
                 </tbody>

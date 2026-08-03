@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Subject;
+use App\Models\ScoreColumn;
+use App\Models\ScoreSetting;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -70,11 +72,11 @@ return new class extends Migration
             ->pluck('id');
 
         $defaults = [
-            ['name' => 'Kiểm tra miệng', 'type' => 'regular', 'weight_group' => 1, 'sort_order' => 10],
-            ['name' => 'Kiểm tra 15 phút', 'type' => 'regular', 'weight_group' => 1, 'sort_order' => 20],
-            ['name' => 'Kiểm tra 1 tiết', 'type' => 'regular', 'weight_group' => 1, 'sort_order' => 30],
-            ['name' => 'Kiểm tra giữa kỳ', 'type' => 'midterm', 'weight_group' => 2, 'sort_order' => 40],
-            ['name' => 'Kiểm tra cuối kỳ', 'type' => 'final', 'weight_group' => 3, 'sort_order' => 50],
+            ['name' => 'Kiểm tra miệng', 'type' => ScoreColumn::TYPE_REGULAR, 'weight_group' => ScoreSetting::DEFAULT_WEIGHT_GDTX, 'sort_order' => 10],
+            ['name' => 'Kiểm tra 15 phút', 'type' => ScoreColumn::TYPE_REGULAR, 'weight_group' => ScoreSetting::DEFAULT_WEIGHT_GDTX, 'sort_order' => 20],
+            ['name' => 'Kiểm tra 1 tiết', 'type' => ScoreColumn::TYPE_REGULAR, 'weight_group' => ScoreSetting::DEFAULT_WEIGHT_GDTX, 'sort_order' => 30],
+            ['name' => 'Kiểm tra giữa kỳ', 'type' => ScoreColumn::TYPE_MIDTERM, 'weight_group' => ScoreSetting::DEFAULT_WEIGHT_DGGK, 'sort_order' => 40],
+            ['name' => 'Kiểm tra cuối kỳ', 'type' => ScoreColumn::TYPE_FINAL, 'weight_group' => ScoreSetting::DEFAULT_WEIGHT_DGCK, 'sort_order' => 50],
         ];
 
         $now = now();

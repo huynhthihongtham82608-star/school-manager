@@ -79,11 +79,12 @@
 
 <div class="card assignment-list-card">
     <div class="table-responsive">
-        <table class="table align-middle assignment-table assignment-group-table">
+        <table class="table align-middle assignment-table assignment-group-table assignment-compact-table">
             <thead>
                 <tr>
-                    <th style="width: 28%;">Giáo viên</th>
-                    <th>Danh sách lớp & Định mức</th>
+                    <th style="width: 30%;">Giáo viên</th>
+                    <th style="width: 18%;">Môn học</th>
+                    <th>Lớp giảng dạy</th>
                     <th class="text-end action-column-header" style="width: 110px;" aria-label="Thao tác"></th>
                 </tr>
             </thead>
@@ -92,16 +93,30 @@
                 @php
                     $firstAssignment = $teacherAssignments->first();
                     $teacher = $firstAssignment?->teacher;
+                    $subjectNames = $teacherAssignments
+                        ->pluck('subject.name')
+                        ->filter()
+                        ->unique()
+                        ->values();
+                    $primarySubjectName = $subjectNames->first() ?: '-';
                     $modalId = 'assignmentTeacherModal' . md5((string) $teacherKey);
                 @endphp
                 <tr>
                     <td>
-                        <div class="assignment-teacher-name">{{ $teacher?->name ?? 'Chưa xác định giáo viên' }}</div>
-                        <div class="assignment-muted">{{ $teacher?->teacher_code ?? '-' }}</div>
-                        <div class="assignment-muted">Tổ: {{ $teacher?->department?->name ?? 'Chưa phân tổ' }}</div>
+                        <div class="assignment-teacher-name assignment-teacher-inline">
+                            {{ $teacher?->name ?? 'Chưa xác định giáo viên' }}
+                            <span>- {{ $teacher?->teacher_code ?? '-' }}</span>
+                        </div>
+                        <div class="assignment-muted">{{ $teacher?->department?->name ?? 'Chưa phân tổ' }}</div>
                     </td>
                     <td>
-                        <div class="assignment-class-stack">
+                        <div class="assignment-subject-name">{{ $primarySubjectName }}</div>
+                        @if($subjectNames->count() > 1)
+                            <div class="assignment-muted">+{{ $subjectNames->count() - 1 }} môn khác</div>
+                        @endif
+                    </td>
+                    <td>
+                        <div class="assignment-class-badge-row">
                             @foreach($teacherAssignments as $assignment)
                                 @php
                                     $period = $periodProgress[(string) $assignment->getKey()] ?? [
@@ -113,33 +128,11 @@
                                         'progress_class' => 'bg-warning',
                                         'label' => 'Chưa cấu hình định mức',
                                     ];
-                                    $subjectDepartments = $assignment->subject?->departments ?? collect();
-                                    $teacherDepartmentId = $assignment->teacher?->department_id;
-                                    $teacherOutsideDepartment = $subjectDepartments->isNotEmpty()
-                                        && $teacherDepartmentId
-                                        && ! $subjectDepartments->pluck('id')->contains($teacherDepartmentId);
+                                    $periodText = $period['expected'] ? $period['expected'] . 'T' : '-';
                                 @endphp
-                                <div class="assignment-class-row">
-                                    <div class="assignment-class-main">
-                                        <span class="assignment-class-tag">{{ $assignment->classRoom?->name ?? '-' }}</span>
-                                        <span class="assignment-subject-chip">{{ $assignment->subject?->name ?? '-' }}</span>
-                                    </div>
-                                    <div class="assignment-class-meta">
-                                        <span>Định mức: <strong>{{ $period['expected'] ?: '-' }}</strong> tiết/tuần</span>
-                                        <span>Đã xếp: <strong>{{ $period['scheduled'] }}/{{ $period['expected'] ?: '-' }}</strong> tiết</span>
-                                        <span>Vai trò: <strong>{{ $assignment->roleLabel() }}</strong></span>
-                                        <span>Trạng thái: <strong>{{ $assignment->statusLabel() }}</strong></span>
-                                    </div>
-                                    <div class="assignment-class-progress">
-                                        <span class="badge {{ $period['badge_class'] }}">{{ $period['label'] }}</span>
-                                        @if($assignment->hasWeeklyPeriodOverride())
-                                            <span class="badge bg-info">Đã điều chỉnh</span>
-                                        @endif
-                                        @if($teacherOutsideDepartment)
-                                            <span class="badge bg-warning text-dark">Khác tổ phụ trách</span>
-                                        @endif
-                                    </div>
-                                </div>
+                                <span class="assignment-class-period-tag" title="{{ $assignment->classRoom?->name ?? '-' }} - {{ $assignment->subject?->name ?? '-' }} - {{ $assignment->roleLabel() }} - {{ $assignment->statusLabel() }}">
+                                    {{ $assignment->classRoom?->name ?? '-' }} <strong>({{ $periodText }})</strong>
+                                </span>
                             @endforeach
                         </div>
                     </td>
@@ -167,7 +160,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="3"><div class="empty-state"><i class="bi bi-diagram-3"></i>Chưa có phân công.</div></td>
+                    <td colspan="4"><div class="empty-state"><i class="bi bi-diagram-3"></i>Chưa có phân công.</div></td>
                 </tr>
             @endforelse
             </tbody>

@@ -72,6 +72,7 @@ class DashboardController extends Controller
                 $studentScores = ScoreHeader::where('student_id', $student->id)
                     ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
                     ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
+                    ->whereHas('subject', fn ($query) => $query->withEvaluatedAssessment())
                     ->with(['subject', 'semester'])
                     ->get();
                 $conduct = Conduct::where('student_id', $student->id)
@@ -89,6 +90,7 @@ class DashboardController extends Controller
                 $parentScores = ScoreHeader::where('student_id', $selectedParentStudent->id)
                     ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
                     ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
+                    ->whereHas('subject', fn ($query) => $query->withEvaluatedAssessment())
                     ->with(['subject', 'semester'])
                     ->get();
                 $parentConduct = Conduct::where('student_id', $selectedParentStudent->id)
@@ -507,6 +509,7 @@ class DashboardController extends Controller
 
         ScoreHeader::whereNotNull('average')
             ->when($schoolYearId ?? null, fn ($query) => $query->where('school_year_id', $schoolYearId))
+            ->whereHas('subject', fn ($query) => $query->withEvaluatedAssessment())
             ->pluck('average')
             ->each(function ($average) use (&$levels) {
             $average = (float) $average;
