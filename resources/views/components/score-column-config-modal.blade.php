@@ -72,7 +72,6 @@
 
         return '
             <div class="score-shortcut-point ' . e($visualType) . '" data-score-column-point>
-                <div class="score-shortcut-point-name">' . e($column->name) . '</div>
                 <button
                     type="button"
                     class="score-shortcut-toggle ' . ($column->is_active ? 'open' : 'locked') . '"
@@ -283,6 +282,7 @@
         background: rgba(255, 237, 213, .4);
         font-size: .9rem;
         font-weight: 700;
+        white-space: nowrap;
     }
 
     .score-shortcut-grade-arrow {
@@ -290,6 +290,13 @@
         display: inline-block;
         color: #c2410c;
         font-weight: 700;
+    }
+
+    .score-shortcut-grade-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        white-space: nowrap;
     }
 
     .score-shortcut-subject-row {
@@ -345,28 +352,22 @@
 
     .score-shortcut-point {
         display: grid;
-        gap: .32rem;
-        padding: .48rem;
+        gap: .22rem;
+        padding: .42rem 0 0;
         border: 1px solid #e5e7eb;
         border-radius: 8px;
-        background: #fff;
+        background: transparent;
+        border-color: transparent;
     }
 
     .score-shortcut-point.midterm {
-        border-color: #bfdbfe;
-        background: #eff6ff;
+        border-color: transparent;
+        background: transparent;
     }
 
     .score-shortcut-point.final {
-        border-color: #ddd6fe;
-        background: #f5f3ff;
-    }
-
-    .score-shortcut-point-name {
-        color: #111827;
-        font-size: .82rem;
-        font-weight: 500;
-        overflow-wrap: anywhere;
+        border-color: transparent;
+        background: transparent;
     }
 
     .score-shortcut-toggle {
@@ -411,6 +412,20 @@
     .score-shortcut-time .score-column-manual-lock {
         color: #b91c1c;
         font-weight: 500;
+    }
+
+    .score-shortcut-status-fallback {
+        width: fit-content;
+        display: inline-flex;
+        align-items: center;
+        padding: .2rem .5rem;
+        border: 1px solid #bbf7d0;
+        border-radius: 999px;
+        color: #15803d;
+        background: #f0fdf4;
+        font-size: .76rem;
+        font-weight: 400;
+        line-height: 1.2;
     }
 
     .score-shortcut-edit-btn {
@@ -607,10 +622,20 @@
                             </thead>
                             <tbody>
                             @forelse($scoreRowsByGrade as $grade => $rows)
+                                @php
+                                    $gradeYearNames = $rows
+                                        ->map(fn ($row) => $row['first']->schoolYear?->name)
+                                        ->filter()
+                                        ->unique()
+                                        ->values();
+                                    $gradeYearLabel = $gradeYearNames->count() === 1 ? $gradeYearNames->first() : $gradeYearNames->implode(', ');
+                                @endphp
                                 <tr class="score-shortcut-grade-header" data-score-grade-toggle="{{ $grade }}">
                                     <td colspan="6">
-                                        <span class="score-shortcut-grade-arrow" data-score-grade-arrow>▼</span>
-                                        Khối {{ $grade }} · {{ $rows->count() }} môn học · {{ $rows->sum(fn ($row) => $row['columns']->count()) }} đầu điểm
+                                        <span class="score-shortcut-grade-toggle">
+                                            <span class="score-shortcut-grade-arrow" data-score-grade-arrow>▼</span>
+                                            KHỐI {{ $grade }} @if($gradeYearLabel) (Niên khóa {{ $gradeYearLabel }}) @endif • Tổng số: {{ $rows->sum(fn ($row) => $row['columns']->count()) }} đầu điểm
+                                        </span>
                                     </td>
                                 </tr>
                                 @foreach($rows as $row)
@@ -629,24 +654,23 @@
                                     >
                                         <td class="score-shortcut-subject">
                                             <strong>📖 {{ $firstColumn->subject?->name ?? '-' }}</strong>
-                                            <span data-score-row-summary>{{ $row['columns']->count() }} đầu điểm · {{ $firstColumn->schoolYear?->name ?? '-' }}</span>
+                                            <span data-score-row-summary>{{ $row['columns']->count() }} đầu điểm</span>
                                         </td>
                                         @foreach(['oral' => 'regular', 'fifteen' => 'regular', 'midterm' => 'midterm', 'final' => 'final'] as $category => $visualType)
                                             <td data-score-category-cell="{{ $category }}" data-score-fixed-category="{{ in_array($category, ['midterm', 'final'], true) ? '1' : '0' }}">
                                                 <div class="score-shortcut-point-list" data-score-point-list>
                                                     @if(in_array($category, ['midterm', 'final'], true))
                                                         <span class="score-shortcut-count" data-score-category-count>x1 cột (Mặc định)</span>
-                                                    @elseif($row['categories'][$category]->isNotEmpty())
-                                                        <span class="score-shortcut-count" data-score-category-count>x{{ $row['categories'][$category]->count() }} cột</span>
                                                     @else
-                                                        <span class="score-shortcut-count d-none" data-score-category-count>x0 cột</span>
+                                                        <span class="score-shortcut-count" data-score-category-count>x{{ $row['categories'][$category]->count() }} cột</span>
                                                     @endif
                                                     @forelse($row['categories'][$category] as $column)
                                                         {!! $renderMatrixPoint($column, $visualType) !!}
                                                     @empty
-                                                        @unless(in_array($category, ['midterm', 'final'], true))
-                                                            <span class="score-shortcut-empty" data-score-empty-state>Chưa cấu hình</span>
-                                                        @endunless
+                                                        @if(in_array($category, ['midterm', 'final'], true))
+                                                            <span class="score-shortcut-status-fallback" data-score-empty-state>🟢 Đang mở</span>
+                                                            <span class="score-shortcut-empty" data-score-empty-state>Vô thời hạn</span>
+                                                        @endif
                                                     @endforelse
                                                 </div>
                                             </td>
@@ -878,11 +902,6 @@
             point.className = `score-shortcut-point ${column.visual_type || 'regular'}`;
             point.dataset.scoreColumnPoint = '1';
 
-            const name = document.createElement('div');
-            name.className = 'score-shortcut-point-name';
-            name.textContent = column.name || '-';
-            point.appendChild(name);
-
             const button = document.createElement('button');
             button.type = 'button';
             button.className = `score-shortcut-toggle ${column.is_active ? 'open' : 'locked'}`;
@@ -939,24 +958,29 @@
                 const columns = state.columns_by_family[family] || [];
                 const isFixed = cell.dataset.scoreFixedCategory === '1';
                 countLabel.textContent = isFixed ? 'x1 cột (Mặc định)' : `x${columns.length} cột`;
-                countLabel.classList.toggle('d-none', ! isFixed && columns.length === 0);
+                countLabel.classList.remove('d-none');
 
                 pointList.querySelectorAll('[data-score-column-point], [data-score-empty-state]').forEach((element) => element.remove());
                 columns.forEach((column) => pointList.appendChild(createMatrixPoint(column)));
 
-                if (! isFixed && columns.length === 0) {
-                    const empty = document.createElement('span');
-                    empty.className = 'score-shortcut-empty';
-                    empty.dataset.scoreEmptyState = '1';
-                    empty.textContent = 'Chưa cấu hình';
-                    pointList.appendChild(empty);
+                if (isFixed && columns.length === 0) {
+                    const status = document.createElement('span');
+                    status.className = 'score-shortcut-status-fallback';
+                    status.dataset.scoreEmptyState = '1';
+                    status.textContent = openLabel;
+                    pointList.appendChild(status);
+
+                    const deadline = document.createElement('span');
+                    deadline.className = 'score-shortcut-empty';
+                    deadline.dataset.scoreEmptyState = '1';
+                    deadline.textContent = 'Vô thời hạn';
+                    pointList.appendChild(deadline);
                 }
             });
 
             const summary = row.querySelector('[data-score-row-summary]');
             if (summary && Number.isFinite(Number(state.total_count))) {
-                const suffix = summary.textContent.includes('·') ? summary.textContent.slice(summary.textContent.indexOf('·')) : '';
-                summary.textContent = `${state.total_count} đầu điểm ${suffix}`.trim();
+                summary.textContent = `${state.total_count} đầu điểm`;
             }
         };
 

@@ -7,6 +7,7 @@
     subtitle="Giám sát danh sách tài khoản của cha mẹ, quản lý liên kết định danh giữa phụ huynh và học sinh."
 >
     <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+        <x-bulk-excel-actions module="parents" />
         <button type="button" class="btn btn-outline-primary" onclick="window.print()">
             <i class="bi bi-bar-chart me-1"></i>Xuất file liên kết
         </button>

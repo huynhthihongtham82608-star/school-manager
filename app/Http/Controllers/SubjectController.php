@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SchoolYear;
+use App\Models\ScoreColumn;
+use App\Models\ScoreSetting;
 use App\Models\Subject;
 use App\Models\SubjectPeriodNorm;
 use App\Support\AuditLogger;
@@ -19,7 +22,7 @@ class SubjectController extends Controller
         $selectedStatus = $request->query('status', 'all');
         $readOnly = $this->isHistoricalReadOnly();
 
-        $subjects = Subject::with(['periodNorms', 'departments'])
+        $subjects = Subject::with(['periodNorms', 'gradeMappings', 'departments'])
             ->when($selectedStatus !== 'all', function ($query) use ($selectedStatus) {
                 $query->where('status', $selectedStatus);
             })
@@ -53,11 +56,13 @@ class SubjectController extends Controller
     {
         $this->denyHistoricalWrite();
 
-        [$data, $periodNorms] = $this->validatedPayload($request);
+        [$data, $periodNorms, $gradeLevels] = $this->validatedPayload($request);
 
-        DB::transaction(function () use ($data, $periodNorms) {
+        DB::transaction(function () use ($data, $periodNorms, $gradeLevels) {
             $subject = Subject::create($data);
+            $this->syncGradeMappings($subject, $gradeLevels);
             $this->syncPeriodNorms($subject, $periodNorms);
+            $this->ensureDefaultScoreColumnsForMappings($subject, $gradeLevels);
 
             AuditLogger::log('subject_created', Subject::class, (string) $subject->getKey(), 'Tạo môn học ' . $subject->name);
         });
@@ -73,7 +78,7 @@ class SubjectController extends Controller
             ]);
         }
 
-        $subject->load(['periodNorms', 'departments']);
+        $subject->load(['periodNorms', 'gradeMappings', 'departments']);
 
         return view('subjects.edit', [
             'subject' => $subject,
@@ -86,7 +91,7 @@ class SubjectController extends Controller
     {
         $this->denyHistoricalWrite();
 
-        [$data, $periodNorms] = $this->validatedPayload($request, $subject);
+        [$data, $periodNorms, $gradeLevels] = $this->validatedPayload($request, $subject);
         $oldStatus = $subject->status;
 
         if ($subject->isUsed() && $data['code'] !== $subject->code) {
@@ -95,9 +100,11 @@ class SubjectController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($subject, $data, $periodNorms, $oldStatus) {
+        DB::transaction(function () use ($subject, $data, $periodNorms, $gradeLevels, $oldStatus) {
             $subject->update($data);
+            $this->syncGradeMappings($subject, $gradeLevels);
             $this->syncPeriodNorms($subject, $periodNorms);
+            $this->ensureDefaultScoreColumnsForMappings($subject, $gradeLevels);
             $this->detachDepartmentsWhenNotOfficial($subject);
 
             AuditLogger::log('subject_updated', Subject::class, (string) $subject->getKey(), 'Sửa môn học ' . $subject->name);
@@ -120,7 +127,7 @@ class SubjectController extends Controller
             ]);
         }
 
-        $subject->load('periodNorms');
+        $subject->load(['periodNorms', 'gradeMappings']);
         $subjectName = $subject->name;
         $subjectId = (string) $subject->getKey();
 
@@ -135,6 +142,7 @@ class SubjectController extends Controller
             }
 
             $subject->periodNorms()->delete();
+            $subject->gradeMappings()->delete();
             $subject->delete();
 
             AuditLogger::log('subject_deleted', Subject::class, $subjectId, 'Xóa môn học ' . $subjectName);
@@ -173,6 +181,8 @@ class SubjectController extends Controller
             'period_norms.10' => ['nullable', 'integer', 'min:1', 'max:10'],
             'period_norms.11' => ['nullable', 'integer', 'min:1', 'max:10'],
             'period_norms.12' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'applicable_grade_levels' => ['required', 'array', 'min:1'],
+            'applicable_grade_levels.*' => ['required', 'integer', Rule::in(self::GRADE_LEVELS)],
         ], [
             'code.unique' => 'Mã môn đã tồn tại.',
             'code.regex' => 'Mã môn phải theo định dạng MH001, MH002...',
@@ -182,17 +192,62 @@ class SubjectController extends Controller
             'period_norms.*.integer' => 'Định mức tiết phải là số nguyên.',
             'period_norms.*.min' => 'Định mức tiết tối thiểu là 1.',
             'period_norms.*.max' => 'Định mức tiết tối đa là 10.',
+            'applicable_grade_levels.required' => 'Vui lòng chọn ít nhất một khối học áp dụng.',
+            'applicable_grade_levels.min' => 'Vui lòng chọn ít nhất một khối học áp dụng.',
         ]);
+
+        $gradeLevels = collect($validated['applicable_grade_levels'])
+            ->map(fn ($gradeLevel) => (int) $gradeLevel)
+            ->filter(fn (int $gradeLevel) => in_array($gradeLevel, self::GRADE_LEVELS, true))
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
 
         $periodNorms = [];
         foreach (self::GRADE_LEVELS as $gradeLevel) {
             $value = $validated['period_norms'][$gradeLevel] ?? null;
-            $periodNorms[$gradeLevel] = $value === null || $value === '' ? null : (int) $value;
+            $periodNorms[$gradeLevel] = in_array($gradeLevel, $gradeLevels, true) && $value !== null && $value !== ''
+                ? (int) $value
+                : null;
         }
 
-        unset($validated['period_norms']);
+        unset($validated['period_norms'], $validated['applicable_grade_levels']);
 
-        return [$validated, $periodNorms];
+        return [$validated, $periodNorms, $gradeLevels];
+    }
+
+    private function syncGradeMappings(Subject $subject, array $gradeLevels): void
+    {
+        $existing = $subject->gradeMappings()
+            ->pluck('grade_level')
+            ->map(fn ($gradeLevel) => (int) $gradeLevel)
+            ->sort()
+            ->values()
+            ->all();
+        $desired = collect($gradeLevels)
+            ->map(fn ($gradeLevel) => (int) $gradeLevel)
+            ->filter(fn (int $gradeLevel) => in_array($gradeLevel, self::GRADE_LEVELS, true))
+            ->unique()
+            ->sort()
+            ->values();
+
+        $subject->gradeMappings()
+            ->whereNotIn('grade_level', $desired->all())
+            ->delete();
+
+        foreach ($desired as $gradeLevel) {
+            $subject->gradeMappings()->firstOrCreate(['grade_level' => $gradeLevel]);
+        }
+
+        if ($existing !== $desired->all()) {
+            AuditLogger::log(
+                'subject_grade_mapping_synced',
+                Subject::class,
+                (string) $subject->getKey(),
+                'Cập nhật khối học áp dụng cho môn ' . $subject->name . ': Khối ' . $desired->implode(', Khối ')
+            );
+        }
     }
 
     private function syncPeriodNorms(Subject $subject, array $periodNorms): void
@@ -249,6 +304,43 @@ class SubjectController extends Controller
                 (string) $created->getKey(),
                 'Tạo định mức tiết khối ' . $gradeLevel . ' của môn ' . $subject->name . ': ' . $value . ' tiết/tuần'
             );
+        }
+    }
+
+    private function ensureDefaultScoreColumnsForMappings(Subject $subject, array $gradeLevels): void
+    {
+        if (! $subject->isEvaluated()) {
+            return;
+        }
+
+        $setting = ScoreSetting::current();
+        $years = SchoolYear::query()->pluck('id');
+        $defaults = [
+            ['name' => 'Kiểm tra Miệng', 'type' => ScoreColumn::TYPE_REGULAR, 'weight_group' => $setting->weightForScoreType(ScoreColumn::TYPE_REGULAR), 'sort_order' => 10],
+            ['name' => 'Kiểm tra 15 phút', 'type' => ScoreColumn::TYPE_REGULAR, 'weight_group' => $setting->weightForScoreType(ScoreColumn::TYPE_REGULAR), 'sort_order' => 20],
+            ['name' => 'Kiểm tra Giữa kỳ', 'type' => ScoreColumn::TYPE_MIDTERM, 'weight_group' => $setting->weightForScoreType(ScoreColumn::TYPE_MIDTERM), 'sort_order' => 40],
+            ['name' => 'Kiểm tra Cuối kỳ', 'type' => ScoreColumn::TYPE_FINAL, 'weight_group' => $setting->weightForScoreType(ScoreColumn::TYPE_FINAL), 'sort_order' => 50],
+        ];
+
+        foreach ($years as $yearId) {
+            foreach ($gradeLevels as $gradeLevel) {
+                foreach ($defaults as $default) {
+                    ScoreColumn::firstOrCreate(
+                        [
+                            'school_year_id' => $yearId,
+                            'subject_id' => $subject->id,
+                            'grade_level' => (int) $gradeLevel,
+                            'name' => $default['name'],
+                        ],
+                        [
+                            'type' => $default['type'],
+                            'weight_group' => $default['weight_group'],
+                            'sort_order' => $default['sort_order'],
+                            'is_active' => true,
+                        ]
+                    );
+                }
+            }
         }
     }
 

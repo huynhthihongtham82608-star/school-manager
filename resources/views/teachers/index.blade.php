@@ -7,6 +7,7 @@
     subtitle="Quản lý hồ sơ nhân sự, thông tin liên lạc, chức vụ công tác và trạng thái giảng dạy của cán bộ giáo viên."
 >
     <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+        <x-bulk-excel-actions module="teachers" :context="['school_year_id' => $selectedYearId]" />
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#teacherCreateModal">
             <i class="bi bi-plus-lg me-1"></i>Thêm giáo viên mới
         </button>

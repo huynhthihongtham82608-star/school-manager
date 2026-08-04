@@ -46,6 +46,7 @@
                     <option value="{{ $subject->id }}"
                         data-departments="{{ $subject->departments->pluck('id')->implode(',') }}"
                         data-department-names="{{ $subject->departments->pluck('name')->join(', ') }}"
+                        data-grade-levels="{{ implode(',', $subject->applicableGradeLevels()) }}"
                         @selected(old('subject_id') === $subject->id)>
                         {{ $subject->code }} - {{ $subject->name }}
                     </option>

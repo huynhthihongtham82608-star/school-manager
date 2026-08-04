@@ -45,6 +45,7 @@
                     <th>Tên môn</th>
                     <th>Hệ số môn</th>
                     <th>Loại môn</th>
+                    <th>Khối áp dụng</th>
                     <th>Tổ phụ trách</th>
                     <th>Trạng thái</th>
                     <th></th>
@@ -61,6 +62,7 @@
                     <td>{{ $subject->name }}</td>
                     <td>{{ $subject->credit }}</td>
                     <td>{{ $subject->typeLabel() }}</td>
+                    <td>{{ collect($subject->applicableGradeLevels())->map(fn ($gradeLevel) => 'Khối ' . $gradeLevel)->join(' • ') ?: '-' }}</td>
                     <td>
                         @if($subject->isScorable())
                             {{ $subject->departments->pluck('name')->join(', ') ?: 'Chưa phân tổ' }}
@@ -110,7 +112,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7"><div class="empty-state"><i class="bi bi-book"></i>Chưa có môn học.</div></td>
+                    <td colspan="8"><div class="empty-state"><i class="bi bi-book"></i>Chưa có môn học.</div></td>
                 </tr>
             @endforelse
             </tbody>
@@ -147,6 +149,10 @@
                             <div>
                                 <span>Hình thức đánh giá</span>
                                 <strong>{{ $subject->assessmentTypeLabel() }}</strong>
+                            </div>
+                            <div>
+                                <span>Khối học áp dụng</span>
+                                <strong>{{ collect($subject->applicableGradeLevels())->map(fn ($gradeLevel) => 'Khối ' . $gradeLevel)->join(' • ') ?: '-' }}</strong>
                             </div>
                             <div class="wide">
                                 <span>Tổ phụ trách</span>

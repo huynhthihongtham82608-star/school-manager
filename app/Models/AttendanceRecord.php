@@ -11,8 +11,12 @@ class AttendanceRecord extends Model
 
     public const SESSION_DAILY = 'daily';
     public const SESSION_PERIOD = 'period';
+    public const SESSION_MORNING = 'morning';
+    public const SESSION_AFTERNOON = 'afternoon';
 
     public const SESSION_TYPES = [
+        self::SESSION_MORNING => 'Buổi Sáng',
+        self::SESSION_AFTERNOON => 'Buổi Chiều',
         self::SESSION_DAILY => 'Theo ngày',
         self::SESSION_PERIOD => 'Theo tiết học',
     ];

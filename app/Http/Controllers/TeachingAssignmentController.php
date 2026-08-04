@@ -250,7 +250,7 @@ class TeachingAssignmentController extends Controller
                 ->where('status', TeacherDepartment::STATUS_ACTIVE)
                 ->orderBy('name')
                 ->get(),
-            'subjects' => Subject::with('departments')
+            'subjects' => Subject::with(['departments', 'gradeMappings'])
                 ->where(function ($query) use ($currentSubjectId) {
                     $query->where(function ($activeQuery) {
                         $activeQuery->where('status', Subject::STATUS_ACTIVE)
@@ -361,6 +361,12 @@ class TeachingAssignmentController extends Controller
         if (! $subject->isOfficialSubject()) {
             throw ValidationException::withMessages([
                 'subject_id' => 'Chỉ môn chính khóa mới cần phân công giáo viên bộ môn.',
+            ]);
+        }
+
+        if (! $subject->appliesToGrade((int) $class->grade_level)) {
+            throw ValidationException::withMessages([
+                'subject_id' => 'Môn ' . $subject->name . ' không áp dụng cho khối ' . $class->grade_level . '.',
             ]);
         }
 

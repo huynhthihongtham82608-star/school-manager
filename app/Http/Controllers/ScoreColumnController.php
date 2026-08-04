@@ -26,11 +26,12 @@ class ScoreColumnController extends Controller
         $years = SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->get();
         $subjects = Subject::whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
             ->where('status', Subject::STATUS_ACTIVE)
+            ->when(in_array((string) $selectedGrade, ['10', '11', '12'], true), fn ($query) => $query->forGrade((int) $selectedGrade))
             ->withEvaluatedAssessment()
             ->orderBy('name')
             ->get();
 
-        $columns = ScoreColumn::with(['schoolYear', 'subject'])
+        $columns = ScoreColumn::with(['schoolYear', 'subject.gradeMappings'])
             ->whereHas('subject', fn ($query) => $query->withEvaluatedAssessment())
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->when(in_array((string) $selectedGrade, ['10', '11', '12'], true), fn ($query) => $query->where('grade_level', $selectedGrade))
@@ -46,6 +47,7 @@ class ScoreColumnController extends Controller
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
+            ->filter(fn (ScoreColumn $column) => $column->subject?->appliesToGrade((int) $column->grade_level))
             ->reject(fn (ScoreColumn $column) => $this->scoreColumnFamily($column) === 'one_period')
             ->values();
 
@@ -133,6 +135,9 @@ class ScoreColumnController extends Controller
         $subject = Subject::findOrFail($data['subject_id']);
         if (! $subject->isEvaluated()) {
             abort(422, 'Môn học Không đánh giá không được cấu hình cột điểm.');
+        }
+        if (! $subject->appliesToGrade((int) $data['grade_level'])) {
+            abort(422, 'Môn học này không được cấu hình áp dụng cho khối đã chọn.');
         }
 
         $result = DB::transaction(function () use ($data) {
@@ -311,6 +316,9 @@ class ScoreColumnController extends Controller
         $subject = Subject::find($data['subject_id']);
         if (! $subject?->isEvaluated()) {
             abort(422, 'Môn học Không đánh giá không được cấu hình cột điểm.');
+        }
+        if (! $subject->appliesToGrade((int) $data['grade_level'])) {
+            abort(422, 'Môn học này không được cấu hình áp dụng cho khối đã chọn.');
         }
 
         return $data;

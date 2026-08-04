@@ -538,7 +538,9 @@ class TimetableController extends Controller
                     ->orWhereIn('type', Subject::LEGACY_SCORABLE_TYPES);
             })
             ->orderBy('role')
-            ->get();
+            ->get()
+            ->filter(fn (TeachingAssignment $assignment) => $assignment->subject?->appliesToGrade((int) $class->grade_level))
+            ->values();
     }
 
     private function specialSubjectsForTimetable(): Collection

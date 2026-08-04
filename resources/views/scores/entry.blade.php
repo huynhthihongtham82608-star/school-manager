@@ -99,6 +99,16 @@
         ? 'Chế độ giám sát chỉ xem. Admin tra cứu điểm số toàn trường, không nhập hoặc sửa điểm trực tiếp tại màn hình này.'
         : 'Giáo viên bộ môn chỉ nhập điểm vào các cột điểm do Admin cấu hình và đang mở nhập.'"
 >
+    <x-bulk-excel-actions
+        module="scores"
+        :context="[
+            'school_year_id' => $semester->school_year_id,
+            'class_id' => $class->id,
+            'subject_id' => $subject->id,
+            'semester_id' => $semester->id,
+        ]"
+        :allow-import="! $isScoreAdmin"
+    />
     <a href="{{ route('scores.index') }}" class="btn btn-outline-secondary">Quay lại</a>
 </x-page-header>
 
@@ -194,6 +204,8 @@
                                     <select
                                         name="{{ $fieldName }}"
                                         class="form-select form-select-sm {{ $errors->has($fieldKey) ? 'is-invalid' : '' }}"
+                                        data-score-input
+                                        data-score-type="{{ $column->type }}"
                                         @disabled(! $permission['editable'])
                                     >
                                         <option value="">Chọn</option>
@@ -213,6 +225,7 @@
                                         inputmode="decimal"
                                         pattern="^(10(\.0)?|[0-9](\.[0-9])?)$"
                                         data-score-input
+                                        data-score-type="{{ $column->type }}"
                                         @disabled(! $permission['editable'])
                                     >
                                     @if($errors->has($fieldKey))
@@ -222,7 +235,7 @@
                                 @endif
                             </td>
                         @endforeach
-                        <td class="fw-semibold text-primary">{{ $header?->average !== null ? rtrim(rtrim(number_format($header->average, 1), '0'), '.') : '-' }}</td>
+                        <td class="fw-semibold text-primary" data-row-average>{{ $header?->average !== null ? rtrim(rtrim(number_format($header->average, 1), '0'), '.') : '-' }}</td>
                         @if($isScoreAdmin)
                             @php
                                 $annualAverage = $subjectAnnualAverages->get($student->id, ['hk1' => null, 'hk2' => null, 'year' => null]);
@@ -274,13 +287,50 @@
 @unless($isScoreAdmin)
 <script>
     document.querySelectorAll('[data-score-entry-form]').forEach((form) => {
+        const scoreWeights = {
+            regular: Number(@json($scoreSetting->weight_gdtx ?? 1)),
+            midterm: Number(@json($scoreSetting->weight_dggk ?? 2)),
+            final: Number(@json($scoreSetting->weight_dgck ?? 3)),
+        };
+        const usesPassFail = @json($usesPassFailAssessment);
+        const weightFor = (type) => scoreWeights[type] || scoreWeights.regular;
+        const recalculateRowAverage = (row) => {
+            if (usesPassFail) {
+                return;
+            }
+
+            let weightedSum = 0;
+            let totalWeight = 0;
+            row.querySelectorAll('[data-score-input]').forEach((input) => {
+                const value = input.value.trim();
+                if (value === '' || !/^(10(\.0)?|[0-9](\.[0-9])?)$/.test(value)) {
+                    return;
+                }
+
+                const weight = weightFor(input.dataset.scoreType);
+                weightedSum += Number(value) * weight;
+                totalWeight += weight;
+            });
+
+            const target = row.querySelector('[data-row-average]');
+            if (!target) {
+                return;
+            }
+
+            target.textContent = totalWeight > 0 ? (weightedSum / totalWeight).toFixed(1) : '-';
+        };
+
+        form.querySelectorAll('[data-score-input]').forEach((input) => {
+            input.addEventListener('blur', () => recalculateRowAverage(input.closest('tr')));
+        });
+
         form.addEventListener('submit', (event) => {
             let hasError = false;
             form.querySelectorAll('[data-score-input]:not(:disabled)').forEach((input) => {
                 const value = input.value.trim();
                 input.setCustomValidity('');
 
-                if (value === '') {
+                if (usesPassFail || value === '') {
                     return;
                 }
 

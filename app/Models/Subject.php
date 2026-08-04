@@ -96,6 +96,11 @@ class Subject extends Model
         return $this->hasMany(SubjectPeriodNorm::class);
     }
 
+    public function gradeMappings()
+    {
+        return $this->hasMany(SubjectGradeMapping::class);
+    }
+
     public function primaryTeachers()
     {
         return $this->hasMany(Teacher::class, 'primary_subject_id');
@@ -114,6 +119,34 @@ class Subject extends Model
         }
 
         return $this->periodNorms()->where('grade_level', $gradeLevel)->first();
+    }
+
+    public function applicableGradeLevels(): array
+    {
+        $levels = $this->relationLoaded('gradeMappings')
+            ? $this->gradeMappings->pluck('grade_level')
+            : $this->gradeMappings()->pluck('grade_level');
+
+        return $levels
+            ->map(fn ($gradeLevel) => (int) $gradeLevel)
+            ->filter(fn (int $gradeLevel) => in_array($gradeLevel, [10, 11, 12], true))
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    public function appliesToGrade(int $gradeLevel): bool
+    {
+        if (! in_array($gradeLevel, [10, 11, 12], true)) {
+            return false;
+        }
+
+        if ($this->relationLoaded('gradeMappings')) {
+            return $this->gradeMappings->contains('grade_level', $gradeLevel);
+        }
+
+        return $this->gradeMappings()->where('grade_level', $gradeLevel)->exists();
     }
 
     public function typeLabel(): string
@@ -164,6 +197,11 @@ class Subject extends Model
     public function statusLabel(): string
     {
         return self::STATUSES[$this->status] ?? self::STATUSES[self::STATUS_ACTIVE];
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE;
     }
 
     public function assessmentTypeLabel(): string
@@ -217,6 +255,11 @@ class Subject extends Model
             $inner->whereIn('assessment_type', self::evaluatedAssessmentValues())
                 ->orWhereNull('assessment_type');
         });
+    }
+
+    public function scopeForGrade($query, int $gradeLevel)
+    {
+        return $query->whereHas('gradeMappings', fn ($mappingQuery) => $mappingQuery->where('grade_level', $gradeLevel));
     }
 
     public function statusBadgeClass(): string

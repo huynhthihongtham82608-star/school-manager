@@ -113,7 +113,11 @@ class ParentLeaveRequestController extends Controller
 
         session(['selected_parent_student_id' => $student->id]);
 
-        return redirect()->route('parent.leave-requests.index')
+        $redirectRoute = $request->input('return_to') === 'attendance'
+            ? 'attendance.index'
+            : 'parent.leave-requests.index';
+
+        return redirect()->route($redirectRoute)
             ->with('success', 'Đã gửi đơn xin nghỉ học. Đơn đang chờ giáo viên chủ nhiệm phê duyệt.');
     }
 
@@ -223,24 +227,29 @@ class ParentLeaveRequestController extends Controller
                 ->get()
             : collect();
 
-        \App\Models\AttendanceRecord::updateOrCreate(
-            [
-                'student_id' => $student->id,
-                'attendance_date' => $leaveRequest->leave_date->toDateString(),
-                'session_key' => \App\Models\AttendanceRecord::SESSION_DAILY,
-            ],
-            [
-                'class_id' => $class->id,
-                'semester_id' => $semester?->id,
-                'session_type' => \App\Models\AttendanceRecord::SESSION_DAILY,
-                'timetable_entry_id' => null,
-                'session_label' => 'Điểm danh theo ngày',
-                'session_order' => 0,
-                'status' => 'excused',
-                'note' => 'Đã duyệt đơn xin nghỉ học của phụ huynh. Lý do: ' . $leaveRequest->reason,
-                'recorded_by' => $recordedBy,
-            ]
-        );
+        foreach ([
+            \App\Models\AttendanceRecord::SESSION_MORNING => ['label' => 'Điểm danh Buổi Sáng', 'order' => 1],
+            \App\Models\AttendanceRecord::SESSION_AFTERNOON => ['label' => 'Điểm danh Buổi Chiều', 'order' => 2],
+        ] as $sessionType => $sessionMeta) {
+            \App\Models\AttendanceRecord::updateOrCreate(
+                [
+                    'student_id' => $student->id,
+                    'attendance_date' => $leaveRequest->leave_date->toDateString(),
+                    'session_key' => $sessionType,
+                ],
+                [
+                    'class_id' => $class->id,
+                    'semester_id' => $semester?->id,
+                    'session_type' => $sessionType,
+                    'timetable_entry_id' => null,
+                    'session_label' => $sessionMeta['label'],
+                    'session_order' => $sessionMeta['order'],
+                    'status' => 'excused',
+                    'note' => 'Đã duyệt đơn xin nghỉ học của phụ huynh. Lý do: ' . $leaveRequest->reason,
+                    'recorded_by' => $recordedBy,
+                ]
+            );
+        }
 
         if ($entries->isEmpty()) {
             return;

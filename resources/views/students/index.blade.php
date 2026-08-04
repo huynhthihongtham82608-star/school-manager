@@ -14,12 +14,13 @@
 >
 	    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
 	        @unless($readOnly)
-	            <a class="btn btn-secondary" href="{{ route('students.import-template') }}">
-	                <i class="bi bi-download me-1"></i>Tải tệp mẫu
-	            </a>
-	            <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#studentImportModal">
-	                <i class="bi bi-upload me-1"></i>Nhập dữ liệu
-	            </button>
+            <x-bulk-excel-actions
+                module="students"
+                :context="[
+                    'school_year_id' => $selectedYearId,
+                    'class_id' => $selectedClassId !== 'all' ? $selectedClassId : null,
+                ]"
+            />
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#studentCreateModal">
                 <i class="bi bi-plus-lg me-1"></i>Tiếp nhận học sinh mới
             </button>
@@ -423,44 +424,5 @@
     </div>
 @endforeach
 
-@unless($readOnly)
-    <div class="modal fade" id="studentImportModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <form method="POST" action="{{ route('students.import') }}" enctype="multipart/form-data">
-                    @csrf
-                    <div class="modal-header">
-                        <div>
-                            <h5 class="modal-title">Nhập dữ liệu học sinh</h5>
-                            <div class="text-muted small">Tệp mẫu: Họ tên, Ngày sinh, Giới tính, Họ tên phụ huynh, Quan hệ, SĐT phụ huynh, Địa chỉ phụ huynh, Địa chỉ, Nơi sinh, Dân tộc, Tôn giáo, Ghi chú, Ngày nhập học, Loại nhập học, Trạng thái, Trường cũ, Khối hiện tại.</div>
-                        </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Lớp</label>
-                            <select name="class_id" class="form-select" required>
-                                @foreach($importClasses as $class)
-                                    <option value="{{ $class->id }}">{{ $class->name }} - {{ $class->schoolYear->name ?? '' }} ({{ $class->currentStudentCount() }}/{{ $class->maxCapacity() }})</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label">Tệp CSV/XLSX</label>
-                            <input type="file" name="file" class="form-control" accept=".csv,.txt,.xlsx" required>
-                        </div>
-	                    </div>
-	                    <div class="modal-footer">
-	                        <a class="btn btn-outline-primary" href="{{ route('students.import-template') }}">
-	                            <i class="bi bi-download me-1"></i>Tải tệp mẫu
-	                        </a>
-	                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-	                        <button class="btn btn-primary">Nhập dữ liệu</button>
-	                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-@endunless
 @include('students.partials.class-year-script')
 @endsection

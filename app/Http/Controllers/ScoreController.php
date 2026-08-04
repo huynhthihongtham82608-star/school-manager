@@ -48,6 +48,7 @@ class ScoreController extends Controller
             'year_gpa' => null,
         ];
         $scoreColumnConfig = null;
+        $adminMatrix = null;
 
         if ($user->isStudent() || $user->isParent()) {
             if ($user->isStudent()) {
@@ -89,6 +90,7 @@ class ScoreController extends Controller
                 ->whereHas('subject', fn ($query) => $query->withEvaluatedAssessment())
                 ->get(['teacher_id', 'class_id', 'subject_id', 'semester_id']);
             $scoreColumnConfig = $this->scoreColumnConfigData($request, $selectedYearId, $scoreSetting);
+            $adminMatrix = $this->adminScoreMatrixPayload($request);
         }
 
         if ($user->isTeacher() && $user->teacher) {
@@ -104,7 +106,7 @@ class ScoreController extends Controller
                 ->get();
         }
 
-        return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'teachers', 'assignments', 'selectedYearId', 'selectedSemesterId', 'scoreSetting', 'scoreColumnConfig'));
+        return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'teachers', 'assignments', 'selectedYearId', 'selectedSemesterId', 'scoreSetting', 'scoreColumnConfig', 'adminMatrix'));
     }
 
     public function reportCard(Request $request)
@@ -158,6 +160,547 @@ class ScoreController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
             'Cache-Control' => 'max-age=0, no-cache, no-store, must-revalidate',
         ]);
+    }
+
+    public function cascade(Request $request)
+    {
+        $this->authorizeScoreAdminStream();
+
+        $yearId = $request->query('school_year_id') ?: $this->selectedSchoolYearId($request);
+        $semesterId = $request->query('semester_id') ?: $this->selectedSemesterId($request);
+        $gradeLevel = $request->query('grade_level');
+        $teacherId = $request->query('teacher_id');
+        $class = $request->query('class_id')
+            ? SchoolClass::with(['homeroomTeacher', 'students'])->find($request->query('class_id'))
+            : null;
+        if ($class && (string) $class->school_year_id !== (string) $yearId) {
+            $yearId = $class->school_year_id;
+            $gradeLevel = $gradeLevel ?: $class->grade_level;
+        }
+        $classes = $this->adminLinkedClasses($yearId, $gradeLevel, $teacherId);
+        $subjects = $teacherId
+            ? $this->adminSubjectsForTeacher((string) $teacherId, $yearId, $semesterId, $class?->id)
+            : ($class
+                ? $this->adminSubjectsForClass($class, $yearId, $semesterId)
+                : $this->adminSubjectsForYear($yearId, $gradeLevel));
+        $requestedSubjectId = $request->query('subject_id');
+        $subjectId = $requestedSubjectId && $subjects->contains('id', $requestedSubjectId)
+            ? $requestedSubjectId
+            : ($subjects->first()?->id ?? null);
+        $teachers = $class && $subjectId
+            ? $this->adminSubjectTeachers($class, (string) $subjectId, $yearId, $semesterId)
+            : ($teacherId
+                ? $this->adminTeacherOption((string) $teacherId)
+                : $this->adminTeachersForScope($yearId, $semesterId, $class?->id, $subjectId));
+        $selectedTeacherId = $teacherId ?: ($teachers->count() === 1 ? $teachers->first()['id'] : null);
+
+        return response()->json([
+            'classes' => $classes,
+            'class_context' => $class ? $this->serializeAdminClassContext($class) : null,
+            'subjects' => $subjects->map(fn (Subject $subject) => [
+                'id' => $subject->id,
+                'name' => $subject->name,
+                'assessment_type' => $subject->normalizedAssessmentType(),
+            ])->values(),
+            'teachers' => $teachers,
+            'selected_subject_id' => $subjectId,
+            'selected_teacher_id' => $selectedTeacherId,
+        ]);
+    }
+
+    public function adminMatrix(Request $request)
+    {
+        $this->authorizeScoreAdminStream();
+
+        return response()->json($this->adminScoreMatrixPayload($request));
+    }
+
+    private function authorizeScoreAdminStream(): void
+    {
+        $user = Auth::user();
+
+        if (! $user?->isAdmin() && ! $user?->isStaff()) {
+            abort(403);
+        }
+    }
+
+    private function adminScoreMatrixPayload(Request $request): array
+    {
+        $yearId = $request->query('school_year_id') ?: $this->selectedSchoolYearId($request);
+        $years = SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->get();
+        $selectedYearId = $years->contains('id', $yearId) ? $yearId : ($years->first()?->id ?? $yearId);
+        $semesters = Semester::where('school_year_id', $selectedYearId)
+            ->orderBy('order')
+            ->orderBy('name')
+            ->get();
+        $semesterId = $request->query('semester_id') ?: $this->selectedSemesterId($request);
+        $selectedSemester = $semesters->firstWhere('id', $semesterId)
+            ?: ($semesters->firstWhere('status', Semester::STATUS_ACTIVE) ?: $semesters->first());
+        $selectedSemesterId = $selectedSemester?->id;
+        $selectedTermIndex = $selectedSemester?->termIndex() ?? 1;
+        $gradeLevel = $request->query('grade_level') ?: null;
+        $classId = $request->query('class_id') ?: null;
+        $selectedSubjectId = $request->query('subject_id') ?: null;
+        $keyword = Str::lower(trim((string) $request->query('q', '')));
+        $class = $classId
+            ? SchoolClass::with(['homeroomTeacher', 'students'])->find($classId)
+            : null;
+        if ($class && (string) $class->school_year_id !== (string) $selectedYearId) {
+            $selectedYearId = $class->school_year_id;
+            $semesters = Semester::where('school_year_id', $selectedYearId)
+                ->orderBy('order')
+                ->orderBy('name')
+                ->get();
+            $selectedSemester = $semesters->firstWhere('id', $semesterId)
+                ?: ($semesters->firstWhere('status', Semester::STATUS_ACTIVE) ?: $semesters->first());
+            $selectedSemesterId = $selectedSemester?->id;
+            $selectedTermIndex = $selectedSemester?->termIndex() ?? 1;
+            $gradeLevel = $gradeLevel ?: $class->grade_level;
+        }
+
+        $teacherId = $request->query('teacher_id') ?: null;
+        $classes = $this->adminLinkedClasses($selectedYearId, $gradeLevel, $teacherId);
+        $availableSubjects = $class
+            ? $this->adminSubjectsForClass($class, $selectedYearId, $selectedSemesterId)
+            : ($gradeLevel ? $this->adminSubjectsForYear($selectedYearId, $gradeLevel) : collect());
+        $selectedSubject = $selectedSubjectId ? $availableSubjects->firstWhere('id', $selectedSubjectId) : null;
+        $mode = match (true) {
+            (bool) $class && (bool) $selectedSubject => 'subject_details',
+            (bool) $class => 'class_subjects',
+            (bool) $gradeLevel => 'grade_summary',
+            default => 'empty',
+        };
+        $subjects = $selectedSubject ? collect([$selectedSubject]) : $availableSubjects;
+        $students = $this->adminMatrixStudents($selectedYearId, $gradeLevel, $class, $teacherId);
+
+        if ($keyword !== '') {
+            $students = $students
+                ->filter(fn (Student $student) => str_contains(Str::lower((string) $student->student_code), $keyword)
+                    || str_contains(Str::lower($student->name), $keyword))
+                ->values();
+        }
+
+        $headers = $mode === 'class_subjects' ? $this->adminMatrixHeaders($subjects) : collect();
+        $rows = in_array($mode, ['grade_summary', 'class_subjects', 'subject_details'], true)
+            ? $this->adminMatrixRows($students, $subjects, $selectedYearId, $selectedSemesterId, $mode)
+            : collect();
+        $summary = $this->adminMatrixSummary($rows);
+        $perPage = 45;
+
+        return [
+            'mode' => $mode,
+            'filters' => [
+                'school_year_id' => $selectedYearId,
+                'semester_id' => $selectedSemesterId,
+                'grade_level' => $gradeLevel,
+                'class_id' => $class?->id,
+                'subject_id' => $selectedSubject?->id,
+                'q' => $request->query('q', ''),
+            ],
+            'years' => $years->map(fn (SchoolYear $year) => [
+                'id' => $year->id,
+                'name' => $year->name,
+            ])->values(),
+            'semesters' => $semesters->map(fn (Semester $semester) => [
+                'id' => $semester->id,
+                'name' => $semester->normalizedName(),
+                'term_index' => $semester->termIndex(),
+            ])->values(),
+            'classes' => $classes,
+            'class_context' => $class ? $this->serializeAdminClassContext($class) : null,
+            'subjects' => $availableSubjects->map(fn (Subject $subject) => [
+                'id' => $subject->id,
+                'name' => $subject->name,
+                'assessment_type' => $subject->normalizedAssessmentType(),
+            ])->values(),
+            'headers' => $headers,
+            'rows' => $rows->values(),
+            'summary' => $summary,
+            'selected_term_index' => $selectedTermIndex,
+            'pagination' => [
+                'total' => $rows->count(),
+                'visible' => $rows->count(),
+                'per_page' => $perPage,
+                'show_controls' => $rows->count() > $perPage,
+                'label' => 'Hiển thị ' . $rows->count() . ' trong tổng số ' . $rows->count() . ' học sinh',
+            ],
+        ];
+    }
+
+    private function adminLinkedClasses(?string $yearId, $gradeLevel, ?string $teacherId = null): Collection
+    {
+        $assignedClassIds = $teacherId
+            ? TeachingAssignment::query()
+                ->where('teacher_id', $teacherId)
+                ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
+                ->where('status', TeachingAssignment::STATUS_ACTIVE)
+                ->pluck('class_id')
+                ->unique()
+            : collect();
+
+        return SchoolClass::with('homeroomTeacher')
+            ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
+            ->when($gradeLevel, fn ($query) => $query->where('grade_level', $gradeLevel))
+            ->when($teacherId, fn ($query) => $query->whereIn('id', $assignedClassIds))
+            ->whereIn('status', [SchoolClass::STATUS_ACTIVE, SchoolClass::STATUS_LOCKED, SchoolClass::STATUS_DRAFT])
+            ->orderBy('grade_level')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (SchoolClass $class) => [
+                'id' => $class->id,
+                'name' => $class->name,
+                'grade_level' => (string) $class->grade_level,
+                'homeroom_teacher' => $class->homeroomTeacher?->name,
+            ])
+            ->values();
+    }
+
+    private function serializeAdminClassContext(SchoolClass $class): array
+    {
+        return [
+            'id' => $class->id,
+            'name' => $class->name,
+            'grade_level' => (string) $class->grade_level,
+            'class_teacher' => $class->homeroomTeacher ? [
+                'id' => $class->homeroomTeacher->id,
+                'name' => $class->homeroomTeacher->name,
+                'teacher_code' => $class->homeroomTeacher->teacher_code,
+            ] : null,
+            'students' => $class->students
+                ->sortBy('student_code')
+                ->map(fn (Student $student) => [
+                    'id' => $student->id,
+                    'student_code' => $student->student_code,
+                    'name' => $student->name,
+                ])
+                ->values(),
+        ];
+    }
+
+    private function adminSubjectsForYear(?string $yearId, $gradeLevel): Collection
+    {
+        return Subject::whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
+            ->where('status', Subject::STATUS_ACTIVE)
+            ->when(in_array((int) $gradeLevel, [10, 11, 12], true), fn ($query) => $query->forGrade((int) $gradeLevel))
+            ->withEvaluatedAssessment()
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function adminSubjectsForClass(SchoolClass $class, ?string $yearId, ?string $semesterId): Collection
+    {
+        return Subject::whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
+            ->where('status', Subject::STATUS_ACTIVE)
+            ->forGrade((int) $class->grade_level)
+            ->withEvaluatedAssessment()
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function adminSubjectsForTeacher(string $teacherId, ?string $yearId, ?string $semesterId, ?string $classId = null): Collection
+    {
+        $assignedSubjectIds = TeachingAssignment::query()
+            ->where('teacher_id', $teacherId)
+            ->when($classId, fn ($query) => $query->where('class_id', $classId))
+            ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
+            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
+            ->where('status', TeachingAssignment::STATUS_ACTIVE)
+            ->pluck('subject_id')
+            ->unique();
+
+        return Subject::whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
+            ->where('status', Subject::STATUS_ACTIVE)
+            ->whereIn('id', $assignedSubjectIds)
+            ->when($classId, function ($query) use ($classId) {
+                $class = SchoolClass::find($classId);
+                if ($class) {
+                    $query->forGrade((int) $class->grade_level);
+                }
+            })
+            ->withEvaluatedAssessment()
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function adminSubjectTeachers(SchoolClass $class, string $subjectId, ?string $yearId, ?string $semesterId): Collection
+    {
+        return TeachingAssignment::with('teacher')
+            ->where('class_id', $class->id)
+            ->where('subject_id', $subjectId)
+            ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
+            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
+            ->where('status', TeachingAssignment::STATUS_ACTIVE)
+            ->get()
+            ->map(fn (TeachingAssignment $assignment) => [
+                'id' => $assignment->teacher?->id,
+                'name' => $assignment->teacher?->name,
+                'teacher_code' => $assignment->teacher?->teacher_code,
+                'subject_id' => $assignment->subject_id,
+            ])
+            ->filter(fn (array $teacher) => $teacher['id'])
+            ->unique('id')
+            ->values();
+    }
+
+    private function adminTeacherOption(string $teacherId): Collection
+    {
+        $teacher = Teacher::find($teacherId);
+
+        if (! $teacher) {
+            return collect();
+        }
+
+        return collect([[
+            'id' => $teacher->id,
+            'name' => $teacher->name,
+            'teacher_code' => $teacher->teacher_code,
+            'subject_id' => null,
+        ]]);
+    }
+
+    private function adminTeachersForScope(?string $yearId, ?string $semesterId, ?string $classId = null, ?string $subjectId = null): Collection
+    {
+        $teacherIds = TeachingAssignment::query()
+            ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
+            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
+            ->when($classId, fn ($query) => $query->where('class_id', $classId))
+            ->when($subjectId, fn ($query) => $query->where('subject_id', $subjectId))
+            ->where('status', TeachingAssignment::STATUS_ACTIVE)
+            ->pluck('teacher_id')
+            ->unique()
+            ->filter();
+
+        return Teacher::whereIn('id', $teacherIds)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Teacher $teacher) => [
+                'id' => $teacher->id,
+                'name' => $teacher->name,
+                'teacher_code' => $teacher->teacher_code,
+                'subject_id' => null,
+            ])
+            ->values();
+    }
+
+    private function adminMatrixHeaders(Collection $subjects): Collection
+    {
+        return $subjects
+            ->reject(fn (Subject $subject) => $subject->isNotEvaluated())
+            ->map(fn (Subject $subject) => [
+                'id' => $subject->id,
+                'name' => $subject->name,
+                'assessment_type' => $subject->normalizedAssessmentType(),
+            ])
+            ->values();
+    }
+
+    private function adminMatrixStudents(?string $yearId, $gradeLevel, ?SchoolClass $class = null, ?string $teacherId = null): Collection
+    {
+        if ($class) {
+            return $class->students()
+                ->with('classRoom')
+                ->where('status', Student::STATUS_STUDYING)
+                ->orderBy('student_code')
+                ->orderBy('name')
+                ->get();
+        }
+
+        if (! $gradeLevel) {
+            return collect();
+        }
+
+        $classIds = SchoolClass::query()
+            ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
+            ->where('grade_level', $gradeLevel)
+            ->when($teacherId, function ($query) use ($teacherId, $yearId) {
+                $assignedClassIds = TeachingAssignment::query()
+                    ->where('teacher_id', $teacherId)
+                    ->when($yearId, fn ($assignmentQuery) => $assignmentQuery->where('school_year_id', $yearId))
+                    ->where('status', TeachingAssignment::STATUS_ACTIVE)
+                    ->pluck('class_id')
+                    ->unique();
+
+                $query->whereIn('id', $assignedClassIds);
+            })
+            ->pluck('id');
+
+        return Student::with('classRoom')
+            ->whereIn('class_id', $classIds)
+            ->where('status', Student::STATUS_STUDYING)
+            ->orderBy('class_id')
+            ->orderBy('student_code')
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function adminMatrixRows(Collection $students, Collection $subjects, ?string $yearId, ?string $semesterId, string $mode = 'class_subjects'): Collection
+    {
+        $studentIds = $students->pluck('id');
+        $subjectIds = $subjects->pluck('id');
+        $scoreHeaders = ScoreHeader::with(['subject', 'semester', 'details.scoreColumn'])
+            ->whereIn('student_id', $studentIds)
+            ->whereIn('subject_id', $subjectIds)
+            ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
+            ->get();
+        $currentScores = ($semesterId ? $scoreHeaders->where('semester_id', $semesterId) : $scoreHeaders)
+            ->keyBy(fn (ScoreHeader $header) => $header->student_id . ':' . $header->subject_id);
+        $currentScoresByStudent = ($semesterId ? $scoreHeaders->where('semester_id', $semesterId) : $scoreHeaders)
+            ->groupBy('student_id');
+        $scoresByStudent = $scoreHeaders->groupBy('student_id');
+
+        return $students->map(function (Student $student) use ($subjects, $currentScores, $currentScoresByStudent, $scoresByStudent, $mode) {
+            $studentScores = collect($scoresByStudent->get($student->id, []));
+            $currentStudentScores = collect($currentScoresByStudent->get($student->id, []));
+            $annual = $this->studentAnnualAveragesBySubject($subjects, $studentScores);
+            $cells = $subjects->map(function (Subject $subject) use ($currentScores, $student) {
+                $header = $currentScores->get($student->id . ':' . $subject->id);
+
+                return [
+                    'subject_id' => $subject->id,
+                    'value' => $this->adminScoreCellText($header, $subject),
+                    'numeric' => $subject->usesNumericAssessment(),
+                    'muted' => ! $header || ($header->average === null && $subject->usesNumericAssessment()),
+                ];
+            })->values();
+
+            return [
+                'student' => [
+                    'id' => $student->id,
+                    'student_code' => $student->student_code,
+                    'name' => $student->name,
+                    'class_name' => $student->classRoom?->name,
+                ],
+                'cells' => $cells,
+                'detail_cells' => $mode === 'subject_details'
+                    ? $this->adminSubjectDetailCells($subjects->first(), $currentStudentScores->firstWhere('subject_id', $subjects->first()?->id))
+                    : [],
+                'summary' => $this->serializeAnnualSummary($annual['summary']),
+                'ledger' => $this->adminStudentLedger($subjects, $currentStudentScores),
+            ];
+        })->values();
+    }
+
+    private function adminSubjectDetailCells(?Subject $subject, ?ScoreHeader $header): array
+    {
+        if (! $subject || $subject->isNotEvaluated()) {
+            return [
+                'oral' => null,
+                'fifteen_1' => null,
+                'fifteen_2' => null,
+                'midterm' => null,
+                'final' => null,
+                'average' => null,
+            ];
+        }
+
+        if ($subject->usesPassFailAssessment()) {
+            return [
+                'oral' => null,
+                'fifteen_1' => null,
+                'fifteen_2' => null,
+                'midterm' => null,
+                'final' => null,
+                'average' => $this->adminScoreCellText($header, $subject),
+            ];
+        }
+
+        $detailsByFamily = collect($header?->details ?? [])
+            ->filter(fn (ScoreDetail $detail) => $detail->value !== null)
+            ->groupBy(fn (ScoreDetail $detail) => $detail->scoreColumn ? $this->scoreColumnReportFamily($detail->scoreColumn) : $detail->type)
+            ->map(fn ($details) => $details
+                ->sortBy(fn (ScoreDetail $detail) => [$detail->scoreColumn?->sort_order ?? 999, $detail->name])
+                ->values());
+        $format = fn (?ScoreDetail $detail) => $detail
+            ? rtrim(rtrim(number_format((float) $detail->value, 1, '.', ''), '0'), '.')
+            : null;
+
+        return [
+            'oral' => $format($detailsByFamily->get('oral', collect())->get(0)),
+            'fifteen_1' => $format($detailsByFamily->get('fifteen', collect())->get(0)),
+            'fifteen_2' => $format($detailsByFamily->get('fifteen', collect())->get(1)),
+            'midterm' => $format($detailsByFamily->get('midterm', collect())->get(0)),
+            'final' => $format($detailsByFamily->get('final', collect())->get(0)),
+            'average' => $this->adminScoreCellText($header, $subject) ?: null,
+        ];
+    }
+
+    private function adminScoreCellText(?ScoreHeader $header, Subject $subject): string
+    {
+        if (! $header) {
+            return '';
+        }
+
+        if ($subject->usesNumericAssessment()) {
+            return $header->average !== null ? number_format((float) $header->average, 1, '.', '') : '';
+        }
+
+        if ($subject->usesPassFailAssessment()) {
+            $details = $header->details->whereNotNull('value');
+
+            if ($details->isEmpty()) {
+                return '';
+            }
+
+            return (float) $details->avg('value') >= 0.5 ? 'Đ' : 'CĐ';
+        }
+
+        return '';
+    }
+
+    private function adminStudentLedger(Collection $subjects, Collection $studentScores): array
+    {
+        $scoresBySubject = $studentScores->keyBy('subject_id');
+
+        return $subjects->map(function (Subject $subject) use ($scoresBySubject) {
+            $header = $scoresBySubject->get($subject->id);
+            $details = $header?->details
+                ? $header->details
+                    ->filter(fn (ScoreDetail $detail) => $detail->value !== null)
+                    ->sortBy(fn (ScoreDetail $detail) => [$detail->scoreColumn?->sort_order ?? 999, $detail->name])
+                    ->map(fn (ScoreDetail $detail) => [
+                        'label' => $detail->scoreColumn?->name ?: ($detail->name ?: $detail->type),
+                        'family' => $detail->scoreColumn ? $this->scoreColumnReportFamily($detail->scoreColumn) : $detail->type,
+                        'value' => $subject->usesPassFailAssessment()
+                            ? ((float) $detail->value >= 0.5 ? 'Đ' : 'CĐ')
+                            : rtrim(rtrim(number_format((float) $detail->value, 1, '.', ''), '0'), '.'),
+                        'is_retest' => (bool) $detail->is_retest,
+                        'tooltip' => $detail->is_retest ? ($this->serializedRetestMeta($detail)['retest_tooltip'] ?? null) : null,
+                    ])
+                    ->values()
+                : collect();
+
+            return [
+                'subject_name' => $subject->name,
+                'assessment_type' => $subject->normalizedAssessmentType(),
+                'average' => $subject->usesPassFailAssessment()
+                    ? match ($this->adminScoreCellText($header, $subject)) {
+                        'Đ' => 'Đạt',
+                        'CĐ' => 'Chưa đạt',
+                        default => '',
+                    }
+                    : $this->adminScoreCellText($header, $subject),
+                'details' => $details,
+            ];
+        })->values()->all();
+    }
+
+    private function adminMatrixSummary(Collection $rows): array
+    {
+        $termAverage = function (string $key) use ($rows): ?string {
+            $values = $rows
+                ->map(fn (array $row) => $row['summary'][$key] ?? null)
+                ->filter(fn ($value) => $value !== null)
+                ->map(fn ($value) => (float) $value)
+                ->values();
+
+            return $values->isNotEmpty() ? number_format((float) $values->avg(), 1, '.', '') : null;
+        };
+
+        return [
+            'hk1_gpa' => $termAverage('hk1_gpa'),
+            'hk2_gpa' => $termAverage('hk2_gpa'),
+            'year_gpa' => $termAverage('year_gpa'),
+        ];
     }
 
     private function reportCardExportHtml(array $payload): string
@@ -234,11 +777,12 @@ class ScoreController extends Controller
         $scoreColumnYears = SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->get();
         $scoreColumnSubjects = Subject::whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
             ->where('status', Subject::STATUS_ACTIVE)
+            ->when(in_array((string) $selectedScoreColumnGrade, ['10', '11', '12'], true), fn ($query) => $query->forGrade((int) $selectedScoreColumnGrade))
             ->withEvaluatedAssessment()
             ->orderBy('name')
             ->get();
 
-        $scoreColumnColumns = ScoreColumn::with(['schoolYear', 'subject'])
+        $scoreColumnColumns = ScoreColumn::with(['schoolYear', 'subject.gradeMappings'])
             ->whereHas('subject', fn ($query) => $query->withEvaluatedAssessment())
             ->when($selectedScoreColumnYearId, fn ($query) => $query->where('school_year_id', $selectedScoreColumnYearId))
             ->when(in_array((string) $selectedScoreColumnGrade, ['10', '11', '12'], true), fn ($query) => $query->where('grade_level', $selectedScoreColumnGrade))
@@ -254,6 +798,7 @@ class ScoreController extends Controller
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
+            ->filter(fn (ScoreColumn $column) => $column->subject?->appliesToGrade((int) $column->grade_level))
             ->reject(fn (ScoreColumn $column) => $this->scoreColumnReportFamily($column) === 'one_period')
             ->values();
 
@@ -333,6 +878,7 @@ class ScoreController extends Controller
 
         $studentSubjects = Subject::whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
             ->where('status', Subject::STATUS_ACTIVE)
+            ->when($gradeLevel > 0, fn ($query) => $query->forGrade($gradeLevel))
             ->withEvaluatedAssessment()
             ->when($assignedSubjectIds->isNotEmpty(), fn ($query) => $query->whereIn('id', $assignedSubjectIds))
             ->when($assignedSubjectIds->isEmpty() && $yearScores->isNotEmpty(), fn ($query) => $query->whereIn('id', $yearScores->pluck('subject_id')->unique()))
@@ -654,6 +1200,7 @@ class ScoreController extends Controller
         $subject = Subject::findOrFail($data['subject_id']);
         $semester = Semester::with('schoolYear')->findOrFail($data['semester_id']);
         $this->ensureScorableSubject($subject);
+        $this->ensureSubjectAppliesToClass($class, $subject);
         $this->authorizeScoreView($class, $subject->id, $semester);
 
         $students = Student::where('class_id', $class->id)
@@ -661,6 +1208,7 @@ class ScoreController extends Controller
             ->orderBy('student_code')
             ->get();
         $scoreColumns = $this->scoreColumnsFor($class, $subject, $semester);
+        $scoreSetting = ScoreSetting::current();
         $headers = ScoreHeader::where('subject_id', $subject->id)
             ->where('semester_id', $semester->id)
             ->whereIn('student_id', $students->pluck('id'))
@@ -672,7 +1220,7 @@ class ScoreController extends Controller
         $columnPermissions = $this->scoreColumnPermissions($class, $subject, $semester, $scoreColumns);
         $canSubmitScores = collect($columnPermissions)->contains(fn ($meta) => $meta['editable']);
 
-        return view('scores.entry', compact('class', 'subject', 'semester', 'students', 'headers', 'scoreColumns', 'columnPermissions', 'canSubmitScores', 'subjectAnnualAverages'));
+        return view('scores.entry', compact('class', 'subject', 'semester', 'students', 'headers', 'scoreColumns', 'columnPermissions', 'canSubmitScores', 'subjectAnnualAverages', 'scoreSetting'));
     }
 
     public function store(Request $request)
@@ -688,6 +1236,7 @@ class ScoreController extends Controller
         $subject = Subject::findOrFail($data['subject_id']);
         $semester = Semester::with('schoolYear')->findOrFail($data['semester_id']);
         $this->ensureScorableSubject($subject);
+        $this->ensureSubjectAppliesToClass($class, $subject);
         $this->authorizeScoreEdit($class, $subject->id, $semester);
 
         $scoreColumns = $this->scoreColumnsFor($class, $subject, $semester);
@@ -777,6 +1326,12 @@ class ScoreController extends Controller
                     ];
 
                     if ($detail) {
+                        if ($detail->value !== null && round((float) $detail->value, 1) !== round((float) $value, 1)) {
+                            $payload['is_retest'] = true;
+                            $payload['original_value'] = $detail->original_value ?? $detail->value;
+                            $payload['retest_updated_at'] = now();
+                        }
+
                         $detail->update($payload);
                         continue;
                     }
@@ -960,6 +1515,13 @@ class ScoreController extends Controller
     {
         if (! $subject->isEvaluated()) {
             abort(403, 'Môn học này chỉ dùng trong thời khóa biểu, không nhập điểm và không tính điểm trung bình.');
+        }
+    }
+
+    protected function ensureSubjectAppliesToClass(SchoolClass $class, Subject $subject): void
+    {
+        if (! $subject->appliesToGrade((int) $class->grade_level)) {
+            abort(403, 'Môn học này không được phân phối cho khối ' . $class->grade_level . '.');
         }
     }
 

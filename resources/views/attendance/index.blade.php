@@ -3,7 +3,35 @@
 
 @section('content')
 @php
-    $canManageAttendance = auth()->user()->isAdmin() || (auth()->user()->isTeacher() && ! $readOnly);
+    $currentUser = auth()->user();
+    $canViewAttendanceRoster = $currentUser->isAdmin() || $currentUser->isStaff() || $currentUser->isTeacher();
+    $attendanceEditWindowOpen = (bool) ($attendanceEditWindowOpen ?? false);
+    $attendanceEditDeadlineLabel = isset($attendanceEditDeadline) && $attendanceEditDeadline
+        ? $attendanceEditDeadline->format('H:i d/m/Y')
+        : null;
+    $editableAttendanceClassIds = $currentUser->isTeacher()
+        && ! $currentUser->isAdmin()
+        && ! $currentUser->isStaff()
+        && $currentUser->teacher
+        ? $currentUser->teacher->homeroomClasses()->pluck('id')->map(fn ($id) => (string) $id)
+        : collect();
+    $isHomeroomForSelectedClass = $selectedClass
+        && $currentUser->isHomeroom()
+        && $editableAttendanceClassIds->contains((string) $selectedClass->id);
+    $attendanceWindowExpiredForHomeroom = $selectedClass
+        && $isHomeroomForSelectedClass
+        && in_array($selectedSessionType, [\App\Models\AttendanceRecord::SESSION_MORNING, \App\Models\AttendanceRecord::SESSION_AFTERNOON], true)
+        && ! $attendanceEditWindowOpen;
+    $canEditAttendanceRoster = $currentUser->isTeacher()
+        && ! $currentUser->isAdmin()
+        && ! $currentUser->isStaff()
+        && ! $readOnly
+        && $selectedClass
+        && in_array($selectedSessionType, [\App\Models\AttendanceRecord::SESSION_MORNING, \App\Models\AttendanceRecord::SESSION_AFTERNOON], true)
+        && $attendanceEditWindowOpen
+        && $isHomeroomForSelectedClass;
+    $isAdminAttendanceView = $currentUser->isAdmin() || $currentUser->isStaff();
+    $isSubjectTeacherAttendanceView = $currentUser->isTeacher() && ! $currentUser->isHomeroom();
     $statusLabels = \App\Models\AttendanceRecord::STATUSES;
     $sessionTypes = \App\Models\AttendanceRecord::SESSION_TYPES;
     $statusBadge = [
@@ -19,6 +47,230 @@
     ];
 @endphp
 
+<style>
+    .attendance-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: .75rem;
+        width: 100%;
+        padding: 1rem;
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+
+    @media (min-width: 992px) {
+        .attendance-toolbar {
+            flex-wrap: nowrap;
+        }
+    }
+
+    .attendance-toolbar-field {
+        min-width: 150px;
+        flex: 0 0 auto;
+    }
+
+    .attendance-toolbar-field.search {
+        min-width: 230px;
+        flex: 1 1 230px;
+    }
+
+    .attendance-toolbar-field.period {
+        min-width: 260px;
+        flex: 1 1 260px;
+    }
+
+    .attendance-toolbar label {
+        color: #374151;
+        font-size: .88rem;
+        font-weight: 400;
+    }
+
+    .attendance-toolbar .form-control,
+    .attendance-toolbar .form-select,
+    .attendance-note-input {
+        border-color: #e5e7eb;
+        border-radius: 8px;
+        color: #374151;
+        font-size: 1rem;
+        font-weight: 400;
+    }
+
+    .attendance-toolbar .form-control:focus,
+    .attendance-toolbar .form-select:focus,
+    .attendance-note-input:focus {
+        border-color: #f97316;
+        box-shadow: 0 0 0 .25rem rgba(255, 237, 213, .65);
+    }
+
+    .attendance-search-wrap {
+        position: relative;
+    }
+
+    .attendance-search-wrap i {
+        position: absolute;
+        left: .75rem;
+        top: 50%;
+        color: #9ca3af;
+        transform: translateY(-50%);
+    }
+
+    .attendance-search-wrap .form-control {
+        padding-left: 2.15rem;
+        border-color: rgba(254, 215, 170, .5);
+        background: rgba(249, 250, 251, .8);
+        color: #374151;
+    }
+
+    .attendance-search-wrap .form-control::placeholder {
+        color: #9ca3af;
+        font-size: .88rem;
+        font-weight: 400;
+    }
+
+    .attendance-search-wrap .form-control:focus {
+        border-color: #f97316;
+        background: #fff;
+        box-shadow: 0 0 0 .25rem rgba(255, 237, 213, .5);
+    }
+
+    .attendance-register-table th,
+    .attendance-register-table td {
+        color: #1f2937;
+        font-size: 1rem;
+        font-weight: 400;
+        text-align: left;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .attendance-register-table th {
+        color: #111827;
+        font-weight: 500;
+        background: #fff;
+    }
+
+    .attendance-inline-option input:disabled + span,
+    .attendance-row-readonly .attendance-note-input {
+        cursor: not-allowed;
+        opacity: .72;
+    }
+
+    .attendance-readonly-status {
+        display: inline-flex;
+        align-items: center;
+        padding: .34rem .65rem;
+        border-radius: 999px;
+        font-size: .9rem;
+        font-weight: 400;
+        white-space: nowrap;
+    }
+
+    .attendance-readonly-status.present {
+        color: #15803d;
+        background: #f0fdf4;
+    }
+
+    .attendance-readonly-status.late {
+        color: #c2410c;
+        background: #fff7ed;
+    }
+
+    .attendance-readonly-status.absent {
+        color: #b91c1c;
+        background: #fef2f2;
+    }
+
+    .attendance-readonly-status.excused {
+        color: #1d4ed8;
+        background: #eff6ff;
+    }
+
+    .attendance-readonly-status.empty {
+        color: #9ca3af;
+        background: #f9fafb;
+    }
+
+    .attendance-readonly-status.expired {
+        color: #6b7280;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+    }
+
+    .attendance-approved-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .25rem .62rem;
+        border: 1px solid #bfdbfe;
+        border-radius: 6px;
+        color: #1d4ed8;
+        background: #eff6ff;
+        font-size: .92rem;
+        font-weight: 400;
+        white-space: nowrap;
+    }
+
+    .attendance-save-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .attendance-save-count {
+        color: #6b7280;
+        font-size: .88rem;
+        font-weight: 400;
+    }
+
+    .attendance-form[aria-disabled="true"] {
+        pointer-events: none;
+    }
+
+    .attendance-readonly-note {
+        color: #6b7280;
+        font-size: .88rem;
+        font-weight: 400;
+    }
+
+    .attendance-note-input:disabled {
+        color: #6b7280;
+        background: #f3f4f6;
+        cursor: not-allowed;
+    }
+
+    .attendance-window-note {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .36rem .65rem;
+        border: 1px solid #fed7aa;
+        border-radius: 6px;
+        color: #c2410c;
+        background: #fff7ed;
+        font-size: .88rem;
+        font-weight: 400;
+    }
+
+    .attendance-parent-leave-card .form-control,
+    .attendance-parent-leave-card .form-select {
+        border-color: #e5e7eb;
+        border-radius: 8px;
+        color: #374151;
+        font-size: 1rem;
+        font-weight: 400;
+    }
+
+    .attendance-parent-leave-card .form-control:focus,
+    .attendance-parent-leave-card .form-select:focus {
+        border-color: #f97316;
+        box-shadow: 0 0 0 .25rem rgba(255, 237, 213, .55);
+    }
+</style>
+
 <x-page-header
     title="Điểm danh"
     :subtitle="auth()->user()->isStudent()
@@ -26,15 +278,29 @@
         : (auth()->user()->isParent()
             ? 'Theo dõi tình trạng chuyên cần của học sinh đang chọn theo năm học và học kỳ.'
             : 'Ghi nhận và theo dõi tình trạng chuyên cần của học sinh theo từng lớp.')"
-/>
+>
+    @if($canViewAttendanceRoster)
+        <x-bulk-excel-actions
+            module="attendance"
+            :context="[
+                'school_year_id' => $selectedYearId,
+                'class_id' => $selectedClassId,
+                'semester_id' => $selectedSemesterId,
+                'attendance_date' => $date,
+                'attendance_type' => $selectedSessionType,
+            ]"
+            :allow-import="$canEditAttendanceRoster"
+        />
+    @endif
+</x-page-header>
 
 @if(auth()->user()->isStudent() || auth()->user()->isParent())
     <div class="student-stat-grid mb-3">
         <div class="student-stat-card">
             <span class="student-stat-icon text-primary"><i class="bi bi-calendar-check"></i></span>
             <div>
-                <div class="student-stat-label">Tổng số phiên</div>
-                <div class="student-stat-value">{{ $attendanceSummary['total'] ?? 0 }}</div>
+                <div class="student-stat-label">Tổng ngày đi học</div>
+                <div class="student-stat-value">{{ $attendanceSummary['present'] ?? 0 }}</div>
             </div>
         </div>
         <div class="student-stat-card">
@@ -60,17 +326,52 @@
         </div>
     </div>
 
+    @if(auth()->user()->isParent())
+        <div class="card attendance-parent-leave-card mb-3">
+            <div class="card-header">
+                <div class="fw-semibold">Đơn xin nghỉ học</div>
+                <div class="text-muted small">Gửi trực tiếp đến giáo viên chủ nhiệm của học sinh đang chọn.</div>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ route('parent.leave-requests.store') }}" class="row g-3 align-items-end">
+                    @csrf
+                    <input type="hidden" name="return_to" value="attendance">
+                    <div class="col-md-3">
+                        <label class="form-label">Học sinh</label>
+                        <select name="student_id" class="form-select" required>
+                            @foreach(($parentLeaveChildren ?? collect()) as $child)
+                                <option value="{{ $child->id }}" @selected(($selectedParentStudent?->id ?? null) === $child->id)>
+                                    {{ $child->student_code }} - {{ $child->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Ngày nghỉ</label>
+                        <input type="date" name="leave_date" class="form-control" value="{{ now()->toDateString() }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Lý do</label>
+                        <input type="text" name="reason" class="form-control" maxlength="2000" placeholder="Nhập lý do xin nghỉ học" required>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary w-100">
+                            <i class="bi bi-send me-1"></i>
+                            Gửi đơn
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    @if(auth()->user()->isParent())
     <div class="card mb-3">
         <div class="card-header d-flex flex-column flex-md-row justify-content-between gap-2">
             <div>
                 <div class="fw-semibold">Chi tiết chuyên cần</div>
                 <div class="text-muted small">Theo dõi từng ngày, từng tiết học và lý do được ghi nhận.</div>
             </div>
-            @if(auth()->user()->isParent())
-                <a href="{{ route('parent.leave-requests.index') }}" class="btn btn-primary btn-sm align-self-start">
-                    <i class="bi bi-envelope-paper me-1"></i>Xin nghỉ học
-                </a>
-            @endif
         </div>
         <div class="table-responsive">
             <table class="table align-middle">
@@ -94,7 +395,7 @@
                         </td>
                         <td>{{ $record->classRoom?->name ?? '-' }}</td>
                         <td>
-                            <div>{{ $record->session_type === \App\Models\AttendanceRecord::SESSION_PERIOD ? 'Theo tiết học' : 'Theo ngày' }}</div>
+                            <div>{{ $record->sessionTypeLabel() }}</div>
                             <div class="text-muted small">{{ $record->displaySessionLabel() }}</div>
                         </td>
                         <td>
@@ -118,66 +419,77 @@
             </table>
         </div>
     </div>
+    @endif
 @endif
 
-@if($canManageAttendance)
-    <div class="card mb-3">
-        <div class="card-header">Chọn thông tin điểm danh</div>
-        <div class="card-body">
-            <form method="GET" action="{{ route('attendance.index') }}" class="row g-3 align-items-end">
-                <input type="hidden" name="school_year_id" value="{{ $selectedYearId }}">
-                <div class="col-md-2">
-                    <label class="form-label">Học kỳ</label>
-                    <select name="semester_id" class="form-select" required>
-                        <option value="">Chọn học kỳ</option>
-                        @foreach($semesters as $semester)
-                            <option value="{{ $semester->id }}" @selected($selectedSemesterId === $semester->id)>
-                                {{ $semester->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Lớp</label>
-                    <select name="class_id" class="form-select" required>
-                        <option value="">Chọn lớp</option>
-                        @foreach($classes as $class)
-                            <option value="{{ $class->id }}" @selected($selectedClassId === $class->id)>{{ $class->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Ngày điểm danh</label>
-                    <input type="date" name="date" class="form-control" value="{{ $date }}" required>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Kiểu điểm danh</label>
-                    <select name="attendance_type" class="form-select" data-attendance-type-select>
-                        @foreach($allowedSessionTypes as $typeValue => $typeLabel)
-                            <option value="{{ $typeValue }}" @selected($selectedSessionType === $typeValue)>{{ $typeLabel }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-3" data-timetable-entry-filter @class(['d-none' => $selectedSessionType !== \App\Models\AttendanceRecord::SESSION_PERIOD])>
-                    <label class="form-label">Tiết học</label>
-                    <select name="timetable_entry_id" class="form-select" @disabled($selectedSessionType !== \App\Models\AttendanceRecord::SESSION_PERIOD)>
-                        @forelse($availableTimetableEntries as $entry)
-                            <option value="{{ $entry->id }}" @selected($selectedTimetableEntryId === $entry->id)>
-                                {{ $entry->displayPeriod() }} - {{ $entry->subject?->name ?? 'Môn học' }} - {{ $entry->teacher?->name ?? 'Giáo viên' }}
-                            </option>
-                        @empty
-                            <option value="">Không có tiết học phù hợp</option>
-                        @endforelse
-                    </select>
-                </div>
-                <div class="col-md-1">
-                    <button class="btn btn-primary w-100" title="Tải danh sách">
-                        <i class="bi bi-search"></i>
-                    </button>
-                </div>
-            </form>
+@if($canViewAttendanceRoster)
+    <form method="GET" action="{{ route('attendance.index') }}" class="attendance-toolbar mb-3">
+        <input type="hidden" name="school_year_id" value="{{ $selectedYearId }}">
+        @if(! $isAdminAttendanceView && ! $isSubjectTeacherAttendanceView && $selectedClassId)
+            <input type="hidden" name="class_id" value="{{ $selectedClassId }}">
+        @endif
+        @if(! $isAdminAttendanceView && ! $isSubjectTeacherAttendanceView && $selectedSemesterId)
+            <input type="hidden" name="semester_id" value="{{ $selectedSemesterId }}">
+        @endif
+        <div class="attendance-toolbar-field search">
+            <label class="form-label">Tìm kiếm</label>
+            <div class="attendance-search-wrap">
+                <i class="bi bi-search"></i>
+                <input type="search" class="form-control" placeholder="Tìm mã HS hoặc họ tên" data-attendance-search>
+            </div>
         </div>
-    </div>
+        <div class="attendance-toolbar-field">
+            <label class="form-label">Ngày điểm danh</label>
+            <input type="date" name="date" class="form-control" value="{{ $date }}" required>
+        </div>
+        <div class="attendance-toolbar-field">
+            <label class="form-label">Phiên điểm danh</label>
+            <select name="attendance_type" class="form-select" data-attendance-type-select>
+                @foreach($allowedSessionTypes as $typeValue => $typeLabel)
+                    <option value="{{ $typeValue }}" @selected($selectedSessionType === $typeValue)>{{ $typeLabel }}</option>
+                @endforeach
+            </select>
+        </div>
+        @if($isAdminAttendanceView || $isSubjectTeacherAttendanceView)
+            <div class="attendance-toolbar-field">
+                <label class="form-label">Học kỳ</label>
+                <select name="semester_id" class="form-select" required>
+                    <option value="">Chọn học kỳ</option>
+                    @foreach($semesters as $semester)
+                        <option value="{{ $semester->id }}" @selected($selectedSemesterId === $semester->id)>
+                            {{ $semester->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="attendance-toolbar-field">
+                <label class="form-label">Lớp</label>
+                <select name="class_id" class="form-select" required>
+                    <option value="">Chọn lớp</option>
+                    @foreach($classes as $class)
+                        <option value="{{ $class->id }}" @selected($selectedClassId === $class->id)>{{ $class->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
+        <div class="attendance-toolbar-field period" data-timetable-entry-filter @class(['d-none' => $selectedSessionType !== \App\Models\AttendanceRecord::SESSION_PERIOD])>
+            <label class="form-label">Tiết học</label>
+            <select name="timetable_entry_id" class="form-select" @disabled($selectedSessionType !== \App\Models\AttendanceRecord::SESSION_PERIOD)>
+                @forelse($availableTimetableEntries as $entry)
+                    <option value="{{ $entry->id }}" @selected($selectedTimetableEntryId === $entry->id)>
+                        {{ $entry->displayPeriod() }} - {{ $entry->subject?->name ?? 'Môn học' }} - {{ $entry->teacher?->name ?? 'Giáo viên' }}
+                    </option>
+                @empty
+                    <option value="">Không có tiết học phù hợp</option>
+                @endforelse
+            </select>
+        </div>
+        <div class="attendance-toolbar-field" style="min-width: 52px;">
+            <button class="btn btn-primary w-100" title="Tải danh sách">
+                <i class="bi bi-search"></i>
+            </button>
+        </div>
+    </form>
 
     @if($selectedClassId && $selectedSemesterId && $date)
         <div class="card mb-3">
@@ -194,10 +506,21 @@
                         @endif
                     </div>
                 </div>
-                <button type="button" class="btn btn-secondary align-self-start" data-mark-all-present>
-                    <i class="bi bi-check2-circle"></i>
-                    Điểm danh tất cả
-                </button>
+                @if($canEditAttendanceRoster)
+                    <button type="button" class="btn btn-secondary align-self-start" data-mark-all-present>
+                        <i class="bi bi-check2-circle"></i>
+                        Điểm danh tất cả
+                    </button>
+                @elseif($attendanceWindowExpiredForHomeroom)
+                    <span class="attendance-window-note align-self-start">
+                        <i class="bi bi-lock"></i>
+                        Đã quá 24 giờ, khóa sửa từ {{ $attendanceEditDeadlineLabel }}
+                    </span>
+                @else
+                    <span class="attendance-readonly-note align-self-start">
+                        Chế độ chỉ xem, không cho phép sửa trạng thái điểm danh.
+                    </span>
+                @endif
             </div>
 
             @if($selectedSessionType === \App\Models\AttendanceRecord::SESSION_PERIOD && ! $selectedTimetableEntry)
@@ -206,9 +529,13 @@
                 </div>
             @endif
 
-            @if($isEditingSession)
+            @if($isEditingSession && $canEditAttendanceRoster)
                 <div class="alert alert-info m-3 mb-0">
                     Dữ liệu điểm danh của phiên này đã tồn tại. Hệ thống đang mở ở chế độ chỉnh sửa.
+                </div>
+            @elseif($isEditingSession && $attendanceWindowExpiredForHomeroom)
+                <div class="alert alert-warning m-3 mb-0">
+                    Dữ liệu điểm danh của ngày này đã quá hạn 24 giờ. GVCN chỉ được xem, không thể chỉnh sửa lịch sử quá khứ.
                 </div>
             @endif
 
@@ -222,7 +549,7 @@
                 <input type="hidden" name="timetable_entry_id" value="{{ $selectedTimetableEntryId }}">
 
                 <div class="table-responsive">
-                    <table class="table">
+                    <table class="table attendance-register-table">
                         <thead>
                             <tr>
                                 <th>Học sinh</th>
@@ -240,8 +567,17 @@
                                     ? 'excused'
                                     : old("status.{$student->id}", $record?->status ?? 'present');
                                 $leaveRequest = ($approvedLeaveRequests ?? collect())->get($student->id);
+                                $searchText = \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii(trim($student->student_code . ' ' . $student->name)));
                             @endphp
-                            <tr @class(['attendance-row-locked' => $isLockedByApprovedLeave])>
+                            <tr
+                                @class([
+                                    'attendance-row-locked' => $isLockedByApprovedLeave,
+                                    'attendance-row-readonly' => ! $canEditAttendanceRoster,
+                                    'attendance-row-expired' => $attendanceWindowExpiredForHomeroom,
+                                ])
+                                data-attendance-roster-row
+                                data-attendance-search-text="{{ $searchText }}"
+                            >
                                 <td class="fw-semibold">
                                     <button
                                         type="button"
@@ -260,8 +596,7 @@
                                             <i class="bi bi-patch-check"></i>
                                             Nghỉ có phép (P)
                                         </span>
-                                    @endif
-                                    @unless($isLockedByApprovedLeave)
+                                    @elseif($canEditAttendanceRoster)
                                         <div class="attendance-inline-actions">
                                             @foreach($inlineAttendanceStatuses as $value => $option)
                                                 <label class="attendance-inline-option {{ $option['class'] }}">
@@ -271,6 +606,7 @@
                                                         value="{{ $value }}"
                                                         @checked($currentStatus === $value)
                                                         @if($value === 'present') data-attendance-present @endif
+                                                        @disabled(! $canEditAttendanceRoster)
                                                     >
                                                     <span>
                                                         <strong>{{ $option['label'] }}</strong>
@@ -279,7 +615,15 @@
                                                 </label>
                                             @endforeach
                                         </div>
-                                    @endunless
+                                    @else
+                                        <span @class([
+                                            'attendance-readonly-status',
+                                            $record?->status ?: 'empty',
+                                            'expired' => $attendanceWindowExpiredForHomeroom,
+                                        ])>
+                                            {{ $record?->status ? ($statusLabels[$record->status] ?? $record->status) : 'Chưa ghi nhận' }}
+                                        </span>
+                                    @endif
                                     @if($isLockedByApprovedLeave)
                                         <div class="text-info small mt-2">
                                             Học sinh đã có đơn nghỉ được GVCN phê duyệt. Phiên điểm danh này được khóa ở trạng thái nghỉ có phép.
@@ -289,10 +633,10 @@
                                 <td>
                                     <input
                                         name="note[{{ $student->id }}]"
-                                        class="form-control"
+                                        class="form-control attendance-note-input"
                                         value="{{ old("note.{$student->id}", $record?->note ?: ($leaveRequest ? 'Đã duyệt đơn xin nghỉ học của phụ huynh. Lý do: ' . $leaveRequest->reason : null)) }}"
                                         placeholder="Ghi chú nếu có"
-                                        @readonly($isLockedByApprovedLeave)
+                                        @disabled(! $canEditAttendanceRoster || $isLockedByApprovedLeave)
                                     >
                                 </td>
                             </tr>
@@ -311,10 +655,15 @@
                 </div>
 
                 <div class="card-body border-top attendance-save-footer">
-                    <button class="btn attendance-save-btn" @disabled($students->isEmpty() || ($selectedSessionType === \App\Models\AttendanceRecord::SESSION_PERIOD && ! $selectedTimetableEntry))>
-                        <i class="bi bi-save"></i>
-                        Lưu kết quả điểm danh
-                    </button>
+                    <span class="attendance-save-count" data-attendance-visible-count>
+                        Hiển thị {{ $students->count() }} trong tổng số {{ $students->count() }} học sinh
+                    </span>
+                    @if($canEditAttendanceRoster)
+                        <button class="btn attendance-save-btn" @disabled($students->isEmpty())>
+                            <i class="bi bi-save"></i>
+                            Lưu kết quả điểm danh ngày {{ \Illuminate\Support\Carbon::parse($date)->format('d/m/Y') }}
+                        </button>
+                    @endif
                 </div>
             </form>
         </div>
@@ -378,7 +727,7 @@
                                                 @if($historyRecord->status === 'late')
                                                     Đi muộn
                                                 @else
-                                                    {{ $historyRecord->session_type === \App\Models\AttendanceRecord::SESSION_PERIOD ? ($historyRecord->timetableEntry?->displayPeriod() ?? $historyRecord->session_label) : 'Theo ngày' }}
+                                                    {{ $historyRecord->session_type === \App\Models\AttendanceRecord::SESSION_PERIOD ? ($historyRecord->timetableEntry?->displayPeriod() ?? $historyRecord->session_label) : $historyRecord->sessionTypeLabel() }}
                                                 @endif
                                             </td>
                                             <td>{{ $historyRecord->timetableEntry?->subject?->name ?? '-' }}</td>
@@ -528,7 +877,7 @@
     @endif
 @endif
 
-@if($canManageAttendance)
+@if($canViewAttendanceRoster)
 <div class="card">
     <div class="card-header">Danh sách điểm danh</div>
     <div class="table-responsive">
@@ -553,7 +902,16 @@
                     $absentRecords = $session->records->where('status', 'absent')->values();
                     $bulkModalId = 'attendanceBulkEdit' . $session->key;
                     $expandRowId = 'attendanceExpand' . $session->key;
-                    $canAdjustSession = $canManageAttendance && $session->school_year_id && $session->semester_id && $session->class_id;
+                    $sessionEditWindowOpen = $session->date
+                        ? now()->lte($session->date->copy()->startOfDay()->addHours(24))
+                        : false;
+                    $canAdjustSession = ! $readOnly
+                        && $sessionEditWindowOpen
+                        && in_array($session->session_type, [\App\Models\AttendanceRecord::SESSION_MORNING, \App\Models\AttendanceRecord::SESSION_AFTERNOON], true)
+                        && $session->school_year_id
+                        && $session->semester_id
+                        && $session->class_id
+                        && $editableAttendanceClassIds->contains((string) $session->class_id);
                 @endphp
                 <tr class="attendance-expand-trigger" data-attendance-expand-row data-target="#{{ $expandRowId }}" tabindex="0" role="button" aria-expanded="false">
                     <td>
@@ -567,7 +925,7 @@
                     </td>
                     <td>{{ optional($session->date)->format('d/m/Y') }}</td>
                     <td>
-                        <div class="fw-semibold">{{ $session->session_type === \App\Models\AttendanceRecord::SESSION_PERIOD ? 'Theo tiết học' : 'Theo ngày' }}</div>
+                        <div class="fw-semibold">{{ $sessionTypes[$session->session_type] ?? 'Theo ngày' }}</div>
                         <div class="text-muted small">{{ $session->session_label }}</div>
                     </td>
                     <td>{{ $session->total }}</td>
@@ -633,14 +991,23 @@
     </div>
 </div>
 
-@if(method_exists($attendanceSessions, 'links'))
+@if(method_exists($attendanceSessions, 'links') && $attendanceSessions->hasPages())
     <div class="mt-3">{{ $attendanceSessions->links() }}</div>
 @endif
 
 @foreach($attendanceSessions as $session)
     @php
         $bulkModalId = 'attendanceBulkEdit' . $session->key;
-        $canAdjustSession = $canManageAttendance && $session->school_year_id && $session->semester_id && $session->class_id;
+        $sessionEditWindowOpen = $session->date
+            ? now()->lte($session->date->copy()->startOfDay()->addHours(24))
+            : false;
+        $canAdjustSession = ! $readOnly
+            && $sessionEditWindowOpen
+            && in_array($session->session_type, [\App\Models\AttendanceRecord::SESSION_MORNING, \App\Models\AttendanceRecord::SESSION_AFTERNOON], true)
+            && $session->school_year_id
+            && $session->semester_id
+            && $session->class_id
+            && $editableAttendanceClassIds->contains((string) $session->class_id);
     @endphp
     @if($canAdjustSession)
         <div class="modal fade content-modal attendance-bulk-modal" id="{{ $bulkModalId }}" tabindex="-1" aria-hidden="true">
@@ -757,6 +1124,47 @@
 @endif
 
 <script>
+    document.querySelectorAll('[data-attendance-search]').forEach((input) => {
+        const rows = Array.from(document.querySelectorAll('[data-attendance-roster-row]'));
+        const countLabel = document.querySelector('[data-attendance-visible-count]');
+        let debounceTimer = null;
+
+        const normalizeText = (value) => value
+            .toString()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+
+        const applyFilter = () => {
+            const keyword = normalizeText(input.value.trim());
+            let visibleCount = 0;
+
+            rows.forEach((row) => {
+                const matched = ! keyword || (row.dataset.attendanceSearchText || '').includes(keyword);
+                row.hidden = ! matched;
+
+                if (matched) {
+                    visibleCount += 1;
+                }
+            });
+
+            if (countLabel) {
+                countLabel.textContent = `Hiển thị ${visibleCount} trong tổng số ${rows.length} học sinh`;
+            }
+        };
+
+        input.addEventListener('input', () => {
+            window.clearTimeout(debounceTimer);
+            debounceTimer = window.setTimeout(applyFilter, 300);
+        });
+
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+            }
+        });
+    });
+
     document.querySelectorAll('[data-attendance-type-select]').forEach((select) => {
         const form = select.closest('form');
         const wrapper = form?.querySelector('[data-timetable-entry-filter]');

@@ -9,6 +9,7 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BackupController;
+use App\Http\Controllers\BulkExcelController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\ConductController;
 use App\Http\Controllers\DashboardController;
@@ -151,6 +152,11 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::get('scores/report-card/export', [ScoreController::class, 'exportReportCard'])->name('scores.report-card.export');
     });
 
+    Route::middleware('role:admin,staff')->group(function () {
+        Route::get('scores/cascade', [ScoreController::class, 'cascade'])->name('scores.cascade');
+        Route::get('scores/admin-matrix', [ScoreController::class, 'adminMatrix'])->name('scores.admin-matrix');
+    });
+
     Route::middleware('role:admin,staff,teacher')->group(function () {
         Route::get('scores/entry', [ScoreController::class, 'entry'])->middleware('score.assignment')->name('scores.entry');
         Route::post('scores/entry', [ScoreController::class, 'store'])->middleware('score.assignment')->name('scores.store');
@@ -158,6 +164,12 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
     });
 
     Route::middleware('role:admin,staff,teacher')->group(function () {
+        Route::get('bulk-excel/{module}/template', [BulkExcelController::class, 'template'])->name('bulk-excel.template');
+        Route::get('bulk-excel/{module}/fields', [BulkExcelController::class, 'fields'])->name('bulk-excel.fields');
+        Route::get('bulk-excel/{module}/export', [BulkExcelController::class, 'export'])->name('bulk-excel.export');
+        Route::post('bulk-excel/{module}/preview', [BulkExcelController::class, 'preview'])->name('bulk-excel.preview');
+        Route::post('bulk-excel/{module}/commit', [BulkExcelController::class, 'commit'])->name('bulk-excel.commit');
+
         Route::post('documents', [LearningDocumentController::class, 'store'])->name('documents.store');
         Route::put('documents/{document}', [LearningDocumentController::class, 'update'])->name('documents.update');
         Route::delete('documents/{document}', [LearningDocumentController::class, 'destroy'])->name('documents.destroy');
@@ -180,7 +192,7 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::post('conduct', [ConductController::class, 'store'])->name('conduct.store');
     });
 
-    Route::middleware('role:admin,staff,teacher')->group(function () {
+    Route::middleware('role:teacher')->group(function () {
         Route::post('attendance', [AttendanceController::class, 'store'])->name('attendance.store');
     });
 

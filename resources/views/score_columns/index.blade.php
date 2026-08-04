@@ -124,6 +124,7 @@
         background: rgba(255, 237, 213, .4);
         font-size: .9rem;
         font-weight: 700;
+        white-space: nowrap;
     }
 
     .score-matrix-subject-row {
@@ -147,6 +148,7 @@
         display: inline-flex;
         align-items: center;
         gap: .5rem;
+        white-space: nowrap;
     }
 
     .score-grade-arrow {
@@ -194,35 +196,42 @@
     .score-matrix-point {
         min-width: 0;
         display: grid;
-        gap: .35rem;
-        padding: .55rem;
+        gap: .22rem;
+        padding: .42rem 0 0;
         border: 1px solid #e5e7eb;
         border-radius: 8px;
-        background: #fff;
+        background: transparent;
+        border-color: transparent;
     }
 
     .score-matrix-point.midterm {
-        border-color: #bfdbfe;
-        background: #eff6ff;
+        border-color: transparent;
+        background: transparent;
     }
 
     .score-matrix-point.final {
-        border-color: #ddd6fe;
-        background: #f5f3ff;
-    }
-
-    .score-matrix-point-name {
-        color: #111827;
-        font-size: .86rem;
-        font-weight: 500;
-        line-height: 1.35;
-        overflow-wrap: anywhere;
+        border-color: transparent;
+        background: transparent;
     }
 
     .score-matrix-point-empty {
         color: #9ca3af;
         font-size: .86rem;
         font-weight: 400;
+    }
+
+    .score-matrix-status-fallback {
+        width: fit-content;
+        display: inline-flex;
+        align-items: center;
+        padding: .2rem .5rem;
+        border: 1px solid #bbf7d0;
+        border-radius: 999px;
+        color: #15803d;
+        background: #f0fdf4;
+        font-size: .78rem;
+        font-weight: 400;
+        line-height: 1.2;
     }
 
     .score-matrix-time {
@@ -556,7 +565,6 @@
 
         return '
             <div class="score-matrix-point ' . e($visualType) . '">
-                <div class="score-matrix-point-name">' . e($column->name) . '</div>
                 <button
                     type="button"
                     class="score-column-toggle ' . ($column->is_active ? 'open' : 'locked') . '"
@@ -611,11 +619,19 @@
                 </thead>
                 <tbody>
                 @forelse($scoreRowsByGrade as $grade => $rows)
+                    @php
+                        $gradeYearNames = $rows
+                            ->map(fn ($row) => $row['first']->schoolYear?->name)
+                            ->filter()
+                            ->unique()
+                            ->values();
+                        $gradeYearLabel = $gradeYearNames->count() === 1 ? $gradeYearNames->first() : $gradeYearNames->implode(', ');
+                    @endphp
                     <tr class="score-grade-header" data-score-grade-toggle="{{ $grade }}">
                         <td colspan="6">
                             <span class="score-grade-toggle">
                                 <span class="score-grade-arrow" data-score-grade-arrow>▼</span>
-                                Khối {{ $grade }} · {{ $rows->count() }} môn học · {{ $rows->sum(fn ($row) => $row['columns']->count()) }} đầu điểm
+                                KHỐI {{ $grade }} @if($gradeYearLabel) (Niên khóa {{ $gradeYearLabel }}) @endif • Tổng số: {{ $rows->sum(fn ($row) => $row['columns']->count()) }} đầu điểm
                             </span>
                         </td>
                     </tr>
@@ -627,18 +643,23 @@
                         <tr class="score-matrix-subject-row {{ $loop->even ? 'is-even' : 'is-odd' }}" data-score-grade-row="{{ $grade }}">
                             <td class="score-subject-cell">
                                 <strong>📖 {{ $firstColumn->subject?->name ?? '-' }}</strong>
-                                <span>{{ $row['columns']->count() }} đầu điểm · {{ $firstColumn->schoolYear?->name ?? '-' }}</span>
+                                <span>{{ $row['columns']->count() }} đầu điểm</span>
                             </td>
                             @foreach(['oral' => 'regular', 'fifteen' => 'regular', 'midterm' => 'midterm', 'final' => 'final'] as $category => $visualType)
                                 <td>
                                     <div class="score-matrix-point-list">
-                                        @if($row['categories'][$category]->isNotEmpty())
-                                            <span class="score-matrix-count">x{{ $row['categories'][$category]->count() }}</span>
+                                        @if(in_array($category, ['midterm', 'final'], true))
+                                            <span class="score-matrix-count">x1 cột (Mặc định)</span>
+                                        @else
+                                            <span class="score-matrix-count">x{{ $row['categories'][$category]->count() }} cột</span>
                                         @endif
                                         @forelse($row['categories'][$category] as $column)
                                             {!! $renderMatrixPoint($column, $visualType) !!}
                                         @empty
-                                            <span class="score-matrix-point-empty">Chưa cấu hình</span>
+                                            @if(in_array($category, ['midterm', 'final'], true))
+                                                <span class="score-matrix-status-fallback">🟢 Đang mở</span>
+                                                <span class="score-matrix-point-empty">Vô thời hạn</span>
+                                            @endif
                                         @endforelse
                                     </div>
                                 </td>

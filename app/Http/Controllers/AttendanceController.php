@@ -31,6 +31,8 @@ class AttendanceController extends Controller
         $readOnly = $this->isHistoricalReadOnly();
         $selectedSessionType = $request->query('attendance_type');
         $selectedTimetableEntryId = $request->query('timetable_entry_id');
+        $attendanceEditDeadline = $this->attendanceEditDeadline($date);
+        $attendanceEditWindowOpen = $this->attendanceEditWindowOpen($date);
 
         $schoolYears = Schema::hasTable('school_years')
             ? SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->get()
@@ -54,9 +56,15 @@ class AttendanceController extends Controller
         $semesters = Schema::hasTable('semesters')
             ? Semester::with('schoolYear')
                 ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+                ->orderBy('order')
                 ->orderBy('name')
                 ->get()
             : collect();
+
+        if (! $selectedSemesterId && $semesters->isNotEmpty()) {
+            $selectedSemesterId = optional($semesters->first(fn ($semester) => $semester->isActive()))->id
+                ?? $semesters->first()->id;
+        }
 
         $classesQuery = Schema::hasTable('classes')
             ? SchoolClass::with(['students', 'schoolYear'])->orderBy('name')
@@ -66,11 +74,15 @@ class AttendanceController extends Controller
             $classesQuery->where('school_year_id', $selectedYearId);
         }
 
-        if ($classesQuery && $user->isTeacher() && ! $user->isAdmin()) {
+        if ($classesQuery && $user->isTeacher() && ! $user->isAdmin() && ! $user->isStaff()) {
             $classesQuery->whereIn('id', $this->teacherAttendanceClassIds($user));
         }
 
         $classes = $classesQuery ? $classesQuery->get() : collect();
+
+        if (! $selectedClassId && $user->isHomeroom() && ! $user->isAdmin() && ! $user->isStaff() && $classes->isNotEmpty()) {
+            $selectedClassId = $classes->first()->id;
+        }
         $students = collect();
         $existingRecords = collect();
         $selectedClass = null;
@@ -79,8 +91,23 @@ class AttendanceController extends Controller
         $availableTimetableEntries = collect();
         $approvedLeaveRequests = collect();
         $approvedLeaveStudentIds = collect();
-        $allowedSessionTypes = AttendanceRecord::SESSION_TYPES;
+        $allowedSessionTypes = $user->isTeacher() && ! $user->isHomeroom()
+            ? [AttendanceRecord::SESSION_PERIOD => AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_PERIOD]]
+            : [
+                AttendanceRecord::SESSION_MORNING => AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_MORNING],
+                AttendanceRecord::SESSION_AFTERNOON => AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_AFTERNOON],
+            ];
         $isEditingSession = false;
+        $parentLeaveChildren = collect();
+        $selectedParentStudent = null;
+
+        if ($user->isParent() && $user->parentProfile) {
+            $parentLeaveChildren = $user->parentProfile->students()
+                ->with('classRoom.homeroomTeacher')
+                ->orderBy('student_code')
+                ->get();
+            $selectedParentStudent = $this->selectedParentStudent($parentLeaveChildren);
+        }
 
         if ($selectedClassId && $selectedSemesterId && $date && Schema::hasTable('students')) {
             $selectedClass = $classes->firstWhere('id', $selectedClassId);
@@ -97,6 +124,7 @@ class AttendanceController extends Controller
                     $selectedTimetableEntry = $availableTimetableEntries->firstWhere('id', $selectedTimetableEntryId)
                         ?: $availableTimetableEntries->first();
                     $selectedTimetableEntryId = $selectedTimetableEntry?->id;
+                    $this->authorizePeriodAttendanceView($user, $selectedClass, $selectedSemester, $date, $selectedTimetableEntryId);
                 }
 
                 $students = $selectedClass->students()
@@ -119,7 +147,7 @@ class AttendanceController extends Controller
                 $approvedLeaveStudentIds = $approvedLeaveRequests->pluck('student_id')->unique()->values();
             }
         } else {
-            $selectedSessionType = $selectedSessionType ?: AttendanceRecord::SESSION_DAILY;
+            $selectedSessionType = $selectedSessionType ?: AttendanceRecord::SESSION_MORNING;
         }
 
         $recordsQuery = Schema::hasTable('attendance_records')
@@ -132,8 +160,14 @@ class AttendanceController extends Controller
             } elseif ($user->isParent() && $user->parentProfile) {
                 $studentIds = $this->selectedParentStudentIds($user);
                 $recordsQuery->whereIn('student_id', $studentIds);
-            } elseif ($user->isTeacher() && ! $user->isAdmin()) {
-                $recordsQuery->whereIn('class_id', $this->teacherAttendanceClassIds($user));
+            } elseif ($user->isTeacher() && ! $user->isAdmin() && ! $user->isStaff()) {
+                if ($user->isHomeroom()) {
+                    $recordsQuery->whereIn('class_id', $this->teacherAttendanceClassIds($user));
+                } elseif ($user->teacher) {
+                    $recordsQuery->whereHas('timetableEntry', fn ($query) => $query->where('teacher_id', $user->teacher->id));
+                } else {
+                    $recordsQuery->whereRaw('1 = 0');
+                }
             }
 
             if ($selectedYearId) {
@@ -189,18 +223,22 @@ class AttendanceController extends Controller
             'isEditingSession',
             'date',
             'readOnly',
+            'attendanceEditDeadline',
+            'attendanceEditWindowOpen',
             'attendanceSummary',
             'attendanceDetailRows',
             'approvedLeaveRequests',
             'approvedLeaveStudentIds',
             'weeklyMatrix',
-            'pendingLeaveRequests'
+            'pendingLeaveRequests',
+            'parentLeaveChildren',
+            'selectedParentStudent'
         ));
     }
 
     public function store(Request $request)
     {
-        abort_unless($request->user()->isAdmin() || $request->user()->isTeacher(), 403);
+        abort_unless($request->user()->isTeacher() && ! $request->user()->isAdmin() && ! $request->user()->isStaff(), 403);
 
         if (! Schema::hasTable('attendance_records')) {
             return back()->with('error', 'Chưa có bảng attendance_records. Vui lòng chạy migration trước.');
@@ -224,9 +262,9 @@ class AttendanceController extends Controller
         $timetableEntry = null;
 
         $this->ensureSelectionMatchesYear($data['school_year_id'], $class, $semester);
-        $this->authorizeAttendanceSession($request->user(), $class, $semester, $data['attendance_date'], $data['attendance_type'], $data['timetable_entry_id'] ?? null);
+        $this->authorizeAttendanceMutation($request->user(), $class, $semester, $data['attendance_date'], $data['attendance_type'], $data['timetable_entry_id'] ?? null);
 
-        if (! $semester->isActive() && ! $request->user()->isAdmin()) {
+        if (! $semester->isActive()) {
             abort(403, 'Học kỳ không ở trạng thái Hoạt động nên không thể nhập hoặc chỉnh sửa điểm danh.');
         }
 
@@ -251,11 +289,7 @@ class AttendanceController extends Controller
                 $status = $data['status'][$student->id] ?? null;
                 $note = $data['note'][$student->id] ?? null;
 
-                if (
-                    ! $request->user()->isAdmin()
-                    && $data['attendance_type'] === AttendanceRecord::SESSION_PERIOD
-                    && $approvedLeaveStudentIds->contains($student->id)
-                ) {
+                if ($approvedLeaveStudentIds->contains($student->id)) {
                     $status = 'excused';
                     $leaveReason = optional($approvedLeaveRequests->firstWhere('student_id', $student->id))->reason;
                     $note = 'Đã duyệt đơn xin nghỉ học của phụ huynh.' . ($leaveReason ? ' Lý do: ' . $leaveReason : '');
@@ -300,22 +334,45 @@ class AttendanceController extends Controller
             ->with('success', 'Đã lưu điểm danh.');
     }
 
-    private function authorizeAttendanceSession($user, SchoolClass $class, Semester $semester, string $attendanceDate, string $sessionType, ?string $timetableEntryId): void
+    private function authorizeAttendanceMutation($user, SchoolClass $class, Semester $semester, string $attendanceDate, string $sessionType, ?string $timetableEntryId): void
     {
-        if ($user->isAdmin() && $sessionType === AttendanceRecord::SESSION_DAILY) {
+        if (! ($user->isHomeroom() && optional($user->teacher)->id === $class->homeroom_teacher_id)) {
+            abort(403, 'Chỉ giáo viên chủ nhiệm của lớp mới được lưu sổ điểm danh ngày.');
+        }
+
+        if (! in_array($sessionType, [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON], true)) {
+            abort(403, 'Giáo viên bộ môn chỉ được xem điểm danh theo tiết, không được lưu sổ tổng hợp lớp.');
+        }
+
+        if (! $this->attendanceEditWindowOpen($attendanceDate)) {
+            abort(403, 'Đã quá 24 giờ kể từ ngày điểm danh. Sổ điểm danh đã chuyển sang chế độ chỉ xem.');
+        }
+    }
+
+    private function attendanceEditDeadline(string $attendanceDate): Carbon
+    {
+        return Carbon::parse($attendanceDate)
+            ->startOfDay()
+            ->addHours(24);
+    }
+
+    private function attendanceEditWindowOpen(string $attendanceDate): bool
+    {
+        return now()->lte($this->attendanceEditDeadline($attendanceDate));
+    }
+
+    private function authorizePeriodAttendanceView($user, SchoolClass $class, Semester $semester, string $attendanceDate, ?string $timetableEntryId): void
+    {
+        if ($user->isAdmin() || $user->isStaff()) {
             return;
         }
 
-        if ($sessionType === AttendanceRecord::SESSION_DAILY) {
+        if (! $timetableEntryId) {
             if ($user->isHomeroom() && optional($user->teacher)->id === $class->homeroom_teacher_id) {
                 return;
             }
 
-            abort(403, 'Chỉ Admin hoặc giáo viên chủ nhiệm của lớp mới được điểm danh theo ngày.');
-        }
-
-        if (! $timetableEntryId) {
-            abort(403, 'Vui lòng chọn tiết học cần điểm danh.');
+            abort(403, 'Giáo viên bộ môn chỉ được xem điểm danh khi chọn đúng tiết học được phân công.');
         }
 
         $entry = TimetableEntry::with('timetable')->findOrFail($timetableEntryId);
@@ -331,7 +388,7 @@ class AttendanceController extends Controller
             abort(403, 'Tiết học không phù hợp với lớp, học kỳ hoặc ngày điểm danh đã chọn.');
         }
 
-        if ($user->isAdmin()) {
+        if ($user->isHomeroom() && optional($user->teacher)->id === $class->homeroom_teacher_id) {
             return;
         }
 
@@ -339,22 +396,27 @@ class AttendanceController extends Controller
             return;
         }
 
-        abort(403, 'Giáo viên chỉ được điểm danh đúng tiết học mình được phân công.');
+        abort(403, 'Giáo viên bộ môn chỉ được xem điểm danh đúng tiết học mình được phân công.');
     }
 
     private function allowedSessionTypes($user, ?SchoolClass $class): array
     {
-        if ($user->isAdmin()) {
-            return AttendanceRecord::SESSION_TYPES;
+        if ($user->isAdmin() || $user->isStaff()) {
+            return [
+                AttendanceRecord::SESSION_MORNING => AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_MORNING],
+                AttendanceRecord::SESSION_AFTERNOON => AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_AFTERNOON],
+                AttendanceRecord::SESSION_PERIOD => AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_PERIOD],
+            ];
         }
 
         $types = [];
 
         if ($class && $user->isHomeroom() && optional($user->teacher)->id === $class->homeroom_teacher_id) {
-            $types[AttendanceRecord::SESSION_DAILY] = AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_DAILY];
+            $types[AttendanceRecord::SESSION_MORNING] = AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_MORNING];
+            $types[AttendanceRecord::SESSION_AFTERNOON] = AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_AFTERNOON];
         }
 
-        if ($user->isTeacher()) {
+        if ($user->isTeacher() && ! ($class && $user->isHomeroom() && optional($user->teacher)->id === $class->homeroom_teacher_id)) {
             $types[AttendanceRecord::SESSION_PERIOD] = AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_PERIOD];
         }
 
@@ -471,10 +533,20 @@ class AttendanceController extends Controller
             return collect();
         }
 
+        $homeroomClassIds = SchoolClass::where('homeroom_teacher_id', $user->teacher->id)
+            ->pluck('id');
+
+        if ($user->isHomeroom()) {
+            return $homeroomClassIds
+                ->filter()
+                ->unique()
+                ->values();
+        }
+
         return $user->teacher->assignments()
             ->where('status', TeachingAssignment::STATUS_ACTIVE)
             ->pluck('class_id')
-            ->merge(SchoolClass::where('homeroom_teacher_id', $user->teacher->id)->pluck('id'))
+            ->merge($homeroomClassIds)
             ->filter()
             ->unique()
             ->values();
@@ -492,6 +564,15 @@ class AttendanceController extends Controller
         $selected = $students->firstWhere('id', $selectedId) ?: $students->first();
 
         return collect([$selected->id]);
+    }
+
+    private function selectedParentStudent($children): ?Student
+    {
+        if ($children->isEmpty()) {
+            return null;
+        }
+
+        return $children->firstWhere('id', session('selected_parent_student_id')) ?: $children->first();
     }
 
     private function availableTimetableEntries($user, SchoolClass $class, string $semesterId, string $attendanceDate)
@@ -606,6 +687,10 @@ class AttendanceController extends Controller
             return 'period:' . $timetableEntryId;
         }
 
+        if (in_array($sessionType, [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON], true)) {
+            return $sessionType;
+        }
+
         return 'daily';
     }
 
@@ -623,11 +708,27 @@ class AttendanceController extends Controller
             return implode(' - ', $parts);
         }
 
+        if ($sessionType === AttendanceRecord::SESSION_MORNING) {
+            return 'Điểm danh Buổi Sáng';
+        }
+
+        if ($sessionType === AttendanceRecord::SESSION_AFTERNOON) {
+            return 'Điểm danh Buổi Chiều';
+        }
+
         return 'Điểm danh theo ngày';
     }
 
     private function sessionOrder(string $sessionType, ?TimetableEntry $entry = null): int
     {
+        if ($sessionType === AttendanceRecord::SESSION_MORNING) {
+            return 1;
+        }
+
+        if ($sessionType === AttendanceRecord::SESSION_AFTERNOON) {
+            return 2;
+        }
+
         return $sessionType === AttendanceRecord::SESSION_PERIOD && $entry
             ? (int) $entry->period
             : 0;
