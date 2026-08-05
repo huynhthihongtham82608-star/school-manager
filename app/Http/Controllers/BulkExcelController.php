@@ -1115,6 +1115,10 @@ class BulkExcelController extends Controller
         $rows = AttendanceRecord::with(['student.classRoom', 'classRoom'])
             ->when($context['semester_id'] ?? null, fn ($query) => $query->where('semester_id', $context['semester_id']))
             ->when($context['class_id'] ?? null, fn ($query) => $query->where('class_id', $context['class_id']))
+            ->where(function ($query) {
+                $query->whereIn('session_type', [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON])
+                    ->orWhereIn('session_key', [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON]);
+            })
             ->latest('attendance_date')
             ->get()
             ->map(fn (AttendanceRecord $record) => [

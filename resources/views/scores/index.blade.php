@@ -23,7 +23,7 @@
     }
 
     .score-formula-modal .modal-dialog {
-        max-width: 448px;
+        max-width: 576px;
     }
 
     .score-formula-modal .modal-content {
@@ -629,12 +629,7 @@
                         <h5 class="score-formula-title">Quy tắc tính điểm số học kỳ</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                     </div>
-                    <div class="score-formula-text">
-                        Nhà trường đang áp dụng hệ số W1 = {{ $scoreSetting->weight_gdtx }} cho các cột đánh giá thường xuyên, W2 = {{ $scoreSetting->weight_dggk }} cho đánh giá giữa kỳ và W3 = {{ $scoreSetting->weight_dgck }} cho đánh giá cuối kỳ. Điểm trung bình môn học kỳ được tính theo tổng điểm thành phần đã nhân hệ số chia cho tổng hệ số của các cột có điểm.
-                    </div>
-                    <div class="score-formula-box">
-                        ĐTBmhk = {{ $scoreSetting->formulaLabel() }}. Kết quả được làm tròn 1 chữ số thập phân.
-                    </div>
+                    <x-score-formula-box :score-setting="$scoreSetting" class="mt-0" />
                 </div>
             </div>
         </div>

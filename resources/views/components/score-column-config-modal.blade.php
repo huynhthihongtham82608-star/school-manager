@@ -166,13 +166,70 @@
 
     .score-shortcut-formula {
         margin-top: .8rem;
-        padding: .68rem .8rem;
-        border: 1px solid rgba(253, 186, 116, .65);
+        display: flex;
+        width: 100%;
+        flex-direction: column;
+        gap: .5rem;
+        padding: 1rem;
+        border: 1px solid #ffedd5;
         border-radius: 8px;
-        color: #9a3412;
-        background: rgba(255, 247, 237, .78);
-        font-size: .88rem;
+        color: #374151;
+        background: rgba(255, 247, 237, .4);
         font-weight: 400;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+
+    .score-formula-equation {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: .75rem;
+        color: #111827;
+        font-size: .96rem;
+        font-weight: 500;
+        line-height: 1.35;
+        text-align: center;
+    }
+
+    .score-formula-fraction {
+        display: inline-grid;
+        grid-template-rows: auto auto;
+        gap: .28rem;
+        min-width: min(100%, 680px);
+    }
+
+    .score-formula-numerator,
+    .score-formula-denominator {
+        display: block;
+        padding: .2rem .7rem;
+        white-space: normal;
+    }
+
+    .score-formula-numerator {
+        border-bottom: 1px solid #fb923c;
+    }
+
+    .score-formula-weight-token {
+        display: inline-flex;
+        align-items: center;
+        gap: .16rem;
+        color: #9a3412;
+        font-size: .8rem;
+        font-weight: 500;
+    }
+
+    .score-formula-weight-token small {
+        color: #9ca3af;
+        font-size: .68rem;
+        font-weight: 400;
+    }
+
+    .score-formula-note {
+        margin: 0;
+        color: #6b7280;
+        font-size: .8rem;
+        font-weight: 400;
+        text-align: left;
     }
 
     .score-shortcut-filter-card {
@@ -521,15 +578,15 @@
                             <h3 class="score-shortcut-title mb-3">Cấu hình trọng số và công thức tính điểm toàn trường</h3>
                             <div class="score-shortcut-weight-grid">
                                 <div>
-                                    <label class="form-label">Trọng số ĐGTX</label>
+                                    <label class="form-label">Trọng số Đánh giá thường xuyên</label>
                                     <input type="number" name="weight_gdtx" class="form-control" value="{{ $scoreSetting->weight_gdtx }}" min="1" max="20" required data-score-weight-input>
                                 </div>
                                 <div>
-                                    <label class="form-label">Trọng số Giữa kỳ</label>
+                                    <label class="form-label">Trọng số Đánh giá giữa kỳ</label>
                                     <input type="number" name="weight_dggk" class="form-control" value="{{ $scoreSetting->weight_dggk }}" min="1" max="20" required data-score-weight-input>
                                 </div>
                                 <div>
-                                    <label class="form-label">Trọng số Cuối kỳ</label>
+                                    <label class="form-label">Trọng số Đánh giá cuối kỳ</label>
                                     <input type="number" name="weight_dgck" class="form-control" value="{{ $scoreSetting->weight_dgck }}" min="1" max="20" required data-score-weight-input>
                                 </div>
                             </div>
@@ -540,9 +597,7 @@
                             </button>
                         </div>
                     </div>
-                    <div class="score-shortcut-formula" data-score-weight-formula>
-                        ĐTBmhk = {{ $scoreSetting->formulaLabel() }}. Kết quả làm tròn 1 chữ số thập phân.
-                    </div>
+                    <x-score-formula-box :score-setting="$scoreSetting" />
                 </form>
 
                 <div class="score-shortcut-filter-card">
@@ -1118,7 +1173,12 @@
                 const w1 = numericValue(inputs.gdtx);
                 const w2 = numericValue(inputs.dggk);
                 const w3 = numericValue(inputs.dgck);
-                formula.textContent = `ĐTBmhk = (Tổng ĐGTX x ${w1} + Tổng ĐGGK x ${w2} + Tổng ĐGCK x ${w3}) / (Số cột ĐGTX x ${w1} + Số cột ĐGGK x ${w2} + Số cột ĐGCK x ${w3}). Kết quả làm tròn 1 chữ số thập phân bằng toFixed(1).`;
+                const values = {gdtx: w1, dggk: w2, dgck: w3};
+                Object.entries(values).forEach(([key, value]) => {
+                    formula.querySelectorAll(`[data-score-weight-label="${key}"]`).forEach((label) => {
+                        label.textContent = value;
+                    });
+                });
             };
 
             Object.values(inputs).forEach((input) => input?.addEventListener('input', renderFormula));

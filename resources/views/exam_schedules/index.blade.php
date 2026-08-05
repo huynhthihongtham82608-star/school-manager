@@ -62,6 +62,56 @@
         border-color: #f97316;
         box-shadow: 0 0 0 .2rem rgba(255, 237, 213, .9);
     }
+
+    .exam-filter-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        width: 100%;
+        padding: 1rem;
+        border: 1px solid #ffedd5;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+
+    .exam-filter-toolbar .admin-table-tools-left {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: .75rem;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .exam-filter-toolbar .form-select {
+        width: 100%;
+        min-width: 0;
+        height: 40px;
+        border-color: #e5e7eb;
+        border-radius: 8px;
+        color: #374151;
+        background-color: #fff;
+        font-size: 1rem;
+        font-weight: 400;
+    }
+
+    .exam-filter-toolbar .form-select:focus {
+        border-color: #f97316;
+        box-shadow: 0 0 0 .22rem rgba(255, 237, 213, .75);
+    }
+
+    @media (max-width: 991.98px) {
+        .exam-filter-toolbar .admin-table-tools-left {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .exam-filter-toolbar .admin-table-tools-left {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 
 <x-page-header
@@ -216,7 +266,7 @@
             <p>Trạng thái thời gian được hệ thống tự động xác định theo ngày giờ kiểm tra.</p>
         </div>
     </div>
-    <div class="unified-table-toolbar mb-3" data-exam-filter-toolbar>
+    <div class="unified-table-toolbar exam-filter-toolbar mb-3" data-exam-filter-toolbar>
         <div class="admin-table-tools-left">
             <select class="form-select form-select-sm" data-exam-filter="class">
                 <option value="">Tất cả lớp</option>

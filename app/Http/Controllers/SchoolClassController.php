@@ -59,6 +59,23 @@ class SchoolClassController extends Controller
                 ->orderBy('name')
                 ->get()
             : collect();
+        $years = SchoolYear::whereNull('archived_at')
+            ->orderByDesc('start_date')
+            ->orderByDesc('created_at')
+            ->get();
+        $currentHomeroomTeacherIds = $classes->pluck('homeroom_teacher_id')->filter();
+        $teachers = Teacher::query()
+            ->where(function ($query) use ($currentHomeroomTeacherIds) {
+                $query->where('work_status', Teacher::STATUS_WORKING)
+                    ->when($currentHomeroomTeacherIds->isNotEmpty(), fn ($teacherQuery) => $teacherQuery->orWhereIn('id', $currentHomeroomTeacherIds));
+            })
+            ->orderBy('name')
+            ->get();
+        $homeroomTeacherIdsByYear = SchoolClass::query()
+            ->whereIn('school_year_id', $years->pluck('id'))
+            ->whereNotNull('homeroom_teacher_id')
+            ->get(['id', 'school_year_id', 'homeroom_teacher_id'])
+            ->groupBy('school_year_id');
 
         return view('classes.index', [
             'classes' => $classes,
@@ -69,6 +86,9 @@ class SchoolClassController extends Controller
             'classStudents' => $classStudents,
             'unassignedStudents' => $unassignedStudents,
             'transferClasses' => $transferClasses,
+            'years' => $years,
+            'teachers' => $teachers,
+            'homeroomTeacherIdsByYear' => $homeroomTeacherIdsByYear,
         ]);
     }
 

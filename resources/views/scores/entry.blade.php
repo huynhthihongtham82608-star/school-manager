@@ -89,6 +89,57 @@
         font-size: .92rem;
         font-weight: 400;
     }
+
+    .score-formula-rule-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .32rem;
+        padding: .38rem .65rem;
+        border: 1px solid #fed7aa;
+        border-radius: 6px;
+        color: #c2410c;
+        background: #fff7ed;
+        font-size: .75rem;
+        font-weight: 400;
+        line-height: 1.2;
+        text-decoration: none;
+        transition: all .18s ease;
+        white-space: nowrap;
+    }
+
+    .score-formula-rule-btn:hover {
+        color: #ea580c;
+        background: #ffedd5;
+    }
+
+    .score-formula-rule-modal .modal-dialog {
+        max-width: 576px;
+    }
+
+    .score-formula-rule-modal .modal-content {
+        padding: 1.5rem;
+        border: 0;
+        border-radius: 8px;
+        box-shadow: 0 24px 56px rgba(15, 23, 42, .28);
+    }
+
+    .score-formula-rule-title {
+        display: flex;
+        align-items: center;
+        margin: 0;
+        color: #111827;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .score-formula-rule-title::before {
+        width: 4px;
+        height: 16px;
+        margin-right: .5rem;
+        border-radius: 999px;
+        background: #f97316;
+        content: "";
+    }
 </style>
 
 <x-page-header
@@ -99,6 +150,11 @@
         ? 'Chế độ giám sát chỉ xem. Admin tra cứu điểm số toàn trường, không nhập hoặc sửa điểm trực tiếp tại màn hình này.'
         : 'Giáo viên bộ môn chỉ nhập điểm vào các cột điểm do Admin cấu hình và đang mở nhập.'"
 >
+    @if(! $isScoreAdmin)
+        <button type="button" class="score-formula-rule-btn" data-bs-toggle="modal" data-bs-target="#scoreFormulaRuleModal">
+            👁️ Quy tắc tính điểm số
+        </button>
+    @endif
     <x-bulk-excel-actions
         module="scores"
         :context="[
@@ -111,6 +167,20 @@
     />
     <a href="{{ route('scores.index') }}" class="btn btn-outline-secondary">Quay lại</a>
 </x-page-header>
+
+@if(! $isScoreAdmin)
+    <div class="modal fade score-formula-rule-modal" id="scoreFormulaRuleModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                    <h5 class="score-formula-rule-title">Quy tắc tính điểm số</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <x-score-formula-box :score-setting="$scoreSetting" class="mt-0" />
+            </div>
+        </div>
+    </div>
+@endif
 
 <div class="card mb-3">
     <div class="card-body d-flex flex-wrap gap-2">
