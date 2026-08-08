@@ -263,13 +263,36 @@ class ScoreController extends Controller
         $availableSubjects = $class
             ? $this->adminSubjectsForClass($class, $selectedYearId, $selectedSemesterId)
             : ($gradeLevel ? $this->adminSubjectsForYear($selectedYearId, $gradeLevel) : collect());
-        $selectedSubject = $selectedSubjectId ? $availableSubjects->firstWhere('id', $selectedSubjectId) : null;
+        $allClassSubjects = $availableSubjects;
+
+        $hinhThuc = Str::upper(trim((string) ($request->query('hinh_thuc_danh_gia') ?: ($request->query('evaluation_type') ?: Subject::ASSESSMENT_GRADE_10))));
+
+        $selectedSubject = $selectedSubjectId ? $allClassSubjects->firstWhere('id', $selectedSubjectId) : null;
         $mode = match (true) {
             (bool) $class && (bool) $selectedSubject => 'subject_details',
             (bool) $class => 'class_subjects',
             (bool) $gradeLevel => 'grade_summary',
             default => 'empty',
         };
+
+        if (! $selectedSubjectId && $mode === 'class_subjects') {
+            $filteredSubjects = $availableSubjects->filter(function (Subject $subject) use ($hinhThuc) {
+                $type = Str::upper(trim((string) $subject->assessment_type));
+                $normType = Str::upper(trim((string) $subject->normalizedAssessmentType()));
+                $isPassFail = $subject->usesPassFailAssessment()
+                    || in_array($type, ['ASSESSMENT', 'PASS_FAIL', 'PASSFAIL', 'CD'], true)
+                    || in_array($normType, ['ASSESSMENT', 'PASS_FAIL', 'PASSFAIL', 'CD'], true);
+
+                if (in_array($hinhThuc, ['ASSESSMENT', 'PASS_FAIL', 'PASSFAIL', 'CD'], true)) {
+                    return $isPassFail;
+                }
+
+                return ! $isPassFail && ! $subject->isNotEvaluated();
+            })->values();
+
+            $availableSubjects = $filteredSubjects->isNotEmpty() ? $filteredSubjects : $allClassSubjects;
+        }
+
         $subjects = $selectedSubject ? collect([$selectedSubject]) : $availableSubjects;
         $students = $this->adminMatrixStudents($selectedYearId, $gradeLevel, $class, $teacherId);
 
@@ -282,7 +305,7 @@ class ScoreController extends Controller
 
         $headers = $mode === 'class_subjects' ? $this->adminMatrixHeaders($subjects) : collect();
         $rows = in_array($mode, ['grade_summary', 'class_subjects', 'subject_details'], true)
-            ? $this->adminMatrixRows($students, $subjects, $selectedYearId, $selectedSemesterId, $mode)
+            ? $this->adminMatrixRows($students, $subjects, $selectedYearId, $selectedSemesterId, $mode, $allClassSubjects)
             : collect();
         $summary = $this->adminMatrixSummary($rows);
         $perPage = 45;
@@ -295,6 +318,7 @@ class ScoreController extends Controller
                 'grade_level' => $gradeLevel,
                 'class_id' => $class?->id,
                 'subject_id' => $selectedSubject?->id,
+                'hinh_thuc_danh_gia' => $hinhThuc,
                 'q' => $request->query('q', ''),
             ],
             'years' => $years->map(fn (SchoolYear $year) => [
@@ -490,16 +514,22 @@ class ScoreController extends Controller
                 'id' => $subject->id,
                 'name' => $subject->name,
                 'assessment_type' => $subject->normalizedAssessmentType(),
+                'uses_pass_fail' => $subject->usesPassFailAssessment(),
             ])
             ->values();
     }
 
     private function adminMatrixStudents(?string $yearId, $gradeLevel, ?SchoolClass $class = null, ?string $teacherId = null): Collection
     {
+        $statusFilter = function ($query) {
+            $query->whereIn('status', [Student::STATUS_STUDYING, 'studying', 'active', '1'])
+                ->orWhereNull('status');
+        };
+
         if ($class) {
             return $class->students()
                 ->with('classRoom')
-                ->where('status', Student::STATUS_STUDYING)
+                ->where($statusFilter)
                 ->orderBy('student_code')
                 ->orderBy('name')
                 ->get();
@@ -511,7 +541,7 @@ class ScoreController extends Controller
 
         $classIds = SchoolClass::query()
             ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
-            ->where('grade_level', $gradeLevel)
+            ->where(fn ($q) => $q->where('grade_level', (string) $gradeLevel)->orWhere('grade_level', (int) $gradeLevel))
             ->when($teacherId, function ($query) use ($teacherId, $yearId) {
                 $assignedClassIds = TeachingAssignment::query()
                     ->where('teacher_id', $teacherId)
@@ -526,20 +556,21 @@ class ScoreController extends Controller
 
         return Student::with('classRoom')
             ->whereIn('class_id', $classIds)
-            ->where('status', Student::STATUS_STUDYING)
+            ->where($statusFilter)
             ->orderBy('class_id')
             ->orderBy('student_code')
             ->orderBy('name')
             ->get();
     }
 
-    private function adminMatrixRows(Collection $students, Collection $subjects, ?string $yearId, ?string $semesterId, string $mode = 'class_subjects'): Collection
+    private function adminMatrixRows(Collection $students, Collection $subjects, ?string $yearId, ?string $semesterId, string $mode = 'class_subjects', ?Collection $allSubjects = null): Collection
     {
         $studentIds = $students->pluck('id');
-        $subjectIds = $subjects->pluck('id');
+        $ledgerSubjects = $allSubjects && $allSubjects->isNotEmpty() ? $allSubjects : $subjects;
+        $allSubjectIds = $ledgerSubjects->pluck('id');
         $scoreHeaders = ScoreHeader::with(['subject', 'semester', 'details.scoreColumn'])
             ->whereIn('student_id', $studentIds)
-            ->whereIn('subject_id', $subjectIds)
+            ->whereIn('subject_id', $allSubjectIds)
             ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
             ->get();
         $currentScores = ($semesterId ? $scoreHeaders->where('semester_id', $semesterId) : $scoreHeaders)
@@ -548,10 +579,10 @@ class ScoreController extends Controller
             ->groupBy('student_id');
         $scoresByStudent = $scoreHeaders->groupBy('student_id');
 
-        return $students->map(function (Student $student) use ($subjects, $currentScores, $currentScoresByStudent, $scoresByStudent, $mode) {
+        return $students->map(function (Student $student) use ($subjects, $ledgerSubjects, $currentScores, $currentScoresByStudent, $scoresByStudent, $mode) {
             $studentScores = collect($scoresByStudent->get($student->id, []));
             $currentStudentScores = collect($currentScoresByStudent->get($student->id, []));
-            $annual = $this->studentAnnualAveragesBySubject($subjects, $studentScores);
+            $annual = $this->studentAnnualAveragesBySubject($ledgerSubjects, $studentScores);
             $cells = $subjects->map(function (Subject $subject) use ($currentScores, $student) {
                 $header = $currentScores->get($student->id . ':' . $subject->id);
 
@@ -575,7 +606,7 @@ class ScoreController extends Controller
                     ? $this->adminSubjectDetailCells($subjects->first(), $currentStudentScores->firstWhere('subject_id', $subjects->first()?->id))
                     : [],
                 'summary' => $this->serializeAnnualSummary($annual['summary']),
-                'ledger' => $this->adminStudentLedger($subjects, $currentStudentScores),
+                'ledger' => $this->adminStudentLedger($ledgerSubjects, $currentStudentScores),
             ];
         })->values();
     }
@@ -641,7 +672,7 @@ class ScoreController extends Controller
                 return '';
             }
 
-            return (float) $details->avg('value') >= 0.5 ? 'Đ' : 'CĐ';
+            return (float) $details->avg('value') >= 0.5 ? 'Đạt' : 'Chưa đạt';
         }
 
         return '';

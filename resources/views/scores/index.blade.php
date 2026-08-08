@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 @section('title', (auth()->user()->isStudent() || auth()->user()->isParent()) ? 'Điểm số' : (auth()->user()->isAdmin() ? 'Quản lý bảng điểm tập trung' : 'Nhập điểm số'))
 
 @section('content')
@@ -358,6 +358,22 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    .w-full { width: 100% !important; }
+    .table-fixed { table-layout: fixed !important; }
+    .text-xs { font-size: 0.75rem !important; line-height: 1rem !important; }
+    .text-orange-700 { color: #c2410c !important; }
+    .text-orange-800 { color: #9a3412 !important; }
+    .bg-orange-50 { background-color: #fff7ed !important; }
+    .bg-orange-100 { background-color: #ffedd5 !important; }
+    .bg-orange-50\/20 { background-color: rgba(255, 247, 237, 0.2) !important; }
+    .border-orange-100 { border-color: #ffedd5 !important; }
+    .border-orange-200 { border-color: #fed7aa !important; }
+
+    .admin-score-grid {
+        width: 100% !important;
+        table-layout: fixed !important;
     }
 
     .admin-score-grid th,
@@ -1064,6 +1080,14 @@
                         <option value="{{ $semesterOption['id'] }}" @selected((string) ($adminMatrix['filters']['semester_id'] ?? '') === (string) $semesterOption['id'])>{{ $semesterOption['name'] }}</option>
                     @endforeach
                 </select>
+                <div class="admin-eval-toggle d-inline-flex align-items-center gap-1 ms-auto" data-admin-eval-toggle style="display: none;">
+                    <button type="button" class="btn text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs" data-eval-tab="GRADE_10">
+                        📊 Môn chấm điểm
+                    </button>
+                    <button type="button" class="btn text-xs font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all" data-eval-tab="ASSESSMENT">
+                        ☑️ Môn nhận xét
+                    </button>
+                </div>
                 <button type="button" class="admin-score-reset-btn" data-admin-score-reset>
                     <i class="bi bi-arrow-counterclockwise"></i>Đặt lại lọc
                 </button>
@@ -1075,7 +1099,7 @@
 
             <div class="card">
                 <div class="table-responsive">
-                    <table class="table align-middle admin-score-grid">
+                    <table class="table align-middle admin-score-grid w-full table-fixed mb-0">
                         <thead data-admin-score-head></thead>
                         <tbody data-admin-score-body></tbody>
                     </table>
@@ -1156,9 +1180,14 @@
                     const modalSubtitle = app.querySelector('[data-admin-score-modal-subtitle]');
                     const modalLedger = app.querySelector('[data-admin-score-ledger]');
                     const modalClose = app.querySelector('[data-admin-score-modal-close]');
+                    const evalToggleEl = app.querySelector('[data-admin-eval-toggle]');
+                    const grade10TabBtn = app.querySelector('[data-eval-tab="GRADE_10"]') || app.querySelector('[data-eval-tab="numeric"]');
+                    const assessmentTabBtn = app.querySelector('[data-eval-tab="ASSESSMENT"]') || app.querySelector('[data-eval-tab="pass_fail"]');
+
                     let matrix = initial;
                     let debounceTimer = null;
                     let isResettingFilters = false;
+                    let activeEvaluationType = initial.filters?.hinh_thuc_danh_gia || 'GRADE_10';
 
                     const params = () => new URLSearchParams({
                         school_year_id: controls.year?.value || '',
@@ -1167,6 +1196,7 @@
                         subject_id: controls.subject?.value || '',
                         teacher_id: controls.teacher?.value || '',
                         semester_id: controls.semester?.value || '',
+                        hinh_thuc_danh_gia: activeEvaluationType,
                         q: controls.search?.value || '',
                     });
 
@@ -1183,14 +1213,14 @@
                             select.appendChild(option);
                         }
 
-                        items.forEach((item) => {
+                        (items || []).forEach((item) => {
                             const option = document.createElement('option');
                             const fullLabel = item.name || '';
                             const shortLabel = fullLabel.length > 24 ? `${fullLabel.slice(0, 23)}…` : fullLabel;
                             option.value = item.id;
                             option.textContent = shortLabel;
                             option.title = fullLabel;
-                            option.selected = String(item.id) === String(selectedValue);
+                            option.selected = String(item.id).trim() == String(selectedValue).trim();
                             select.appendChild(option);
                         });
                     };
@@ -1238,24 +1268,46 @@
                         const termIndex = Number(payload.selected_term_index || 1);
                         const lockYearColumns = termIndex === 1;
                         const mode = payload.mode || 'empty';
+                        const allHeaders = payload.headers || [];
+
+                        let visibleHeaderIndices = [];
+                        let visibleHeaders = [];
+
+                        if (mode === 'class_subjects') {
+                            if (evalToggleEl) {
+                                evalToggleEl.style.display = 'inline-flex';
+                            }
+
+                            if (grade10TabBtn && assessmentTabBtn) {
+                                const activeClass = 'btn text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs';
+                                const inactiveClass = 'btn text-xs font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all';
+                                grade10TabBtn.className = (activeEvaluationType === 'GRADE_10' || activeEvaluationType === 'numeric') ? activeClass : inactiveClass;
+                                assessmentTabBtn.className = (activeEvaluationType === 'ASSESSMENT' || activeEvaluationType === 'pass_fail') ? activeClass : inactiveClass;
+                            }
+                        } else {
+                            if (evalToggleEl) {
+                                evalToggleEl.style.display = 'none';
+                            }
+                        }
+
                         const appendTermHeaders = (row) => {
-                            row.appendChild(cell('th', 'Điểm TB Học kỳ 1', 'admin-score-term'));
-                            row.appendChild(cell('th', 'Điểm TB Học kỳ 2', 'admin-score-term'));
-                            row.appendChild(cell('th', 'Điểm TB Cả Năm Tổng hợp', 'admin-score-term'));
+                            row.appendChild(cell('th', 'HK1', 'admin-score-term bg-orange-50/20'));
+                            row.appendChild(cell('th', 'HK2', 'admin-score-term bg-orange-50/20'));
+                            row.appendChild(cell('th', 'Cả Năm', 'admin-score-term bg-orange-50/20'));
                         };
                         const appendSummaryCells = (rowEl, row) => {
                             const hk1 = document.createElement('td');
-                            hk1.className = 'admin-score-term';
+                            hk1.className = 'admin-score-term bg-orange-50/20';
                             hk1.appendChild(termText(row.summary?.hk1_gpa));
                             rowEl.appendChild(hk1);
 
                             const hk2 = document.createElement('td');
-                            hk2.className = 'admin-score-term';
+                            hk2.className = 'admin-score-term bg-orange-50/20';
                             hk2.appendChild(termText(row.summary?.hk2_gpa, lockYearColumns));
                             rowEl.appendChild(hk2);
 
                             const year = document.createElement('td');
-                            year.className = 'admin-score-term';
+                            year.className = 'admin-score-term bg-orange-50/20';
                             year.appendChild(termText(row.summary?.year_gpa, lockYearColumns));
                             rowEl.appendChild(year);
                         };
@@ -1268,20 +1320,20 @@
 
                         head.innerHTML = '';
                         const tr = document.createElement('tr');
-                        tr.appendChild(cell('th', 'Mã HS'));
-                        tr.appendChild(cell('th', 'Họ tên'));
+                        tr.appendChild(cell('th', 'Mã HS', 'w-24'));
+                        tr.appendChild(cell('th', 'Họ tên', 'w-44'));
                         switch (mode) {
                             case 'grade_summary':
                                 tr.appendChild(cell('th', 'Tên Lớp'));
                                 appendTermHeaders(tr);
                                 break;
                             case 'subject_details':
-                                ['Điểm Miệng', '15 phút (Lần 1)', '15 phút (Lần 2)', 'Điểm Giữa kỳ', 'Điểm Cuối kỳ', 'Điểm TB Môn này'].forEach((label) => {
+                                ['Điểm Miệng', '15 phút (1)', '15 phút (2)', 'Giữa kỳ', 'Cuối kỳ', 'TB Môn'].forEach((label) => {
                                     tr.appendChild(cell('th', label));
                                 });
                                 break;
                             case 'class_subjects':
-                                (payload.headers || []).forEach((header) => {
+                                allHeaders.forEach((header) => {
                                     tr.appendChild(cell('th', header.name));
                                 });
                                 appendTermHeaders(tr);
@@ -1290,6 +1342,7 @@
                                 appendTermHeaders(tr);
                                 break;
                         }
+                        tr.appendChild(cell('th', 'Thao tác', 'text-end w-16'));
                         head.appendChild(tr);
 
                         body.innerHTML = '';
@@ -1300,22 +1353,18 @@
                                 : 'Không có học sinh phù hợp bộ lọc.';
                             const emptyCell = cell('td', emptyMessage, 'text-muted');
                             emptyCell.colSpan = mode === 'subject_details'
-                                ? 8
-                                : ((payload.headers || []).length + (mode === 'grade_summary' ? 6 : 5));
+                                ? 9
+                                : (allHeaders.length + (mode === 'grade_summary' ? 7 : 6));
                             empty.appendChild(emptyCell);
                             body.appendChild(empty);
                         } else {
                             payload.rows.forEach((row, index) => {
                                 const rowEl = document.createElement('tr');
-                                rowEl.appendChild(cell('td', row.student.student_code || '', 'fw-semibold'));
+                                rowEl.appendChild(cell('td', row.student.student_code || '', 'fw-semibold text-gray-900'));
 
                                 const nameCell = document.createElement('td');
-                                const button = document.createElement('button');
-                                button.type = 'button';
-                                button.className = 'btn btn-link p-0 admin-score-student';
-                                button.textContent = row.student.name || '-';
-                                button.addEventListener('click', () => openLedger(index));
-                                nameCell.appendChild(button);
+                                nameCell.className = 'font-semibold text-gray-900';
+                                nameCell.textContent = row.student.name || '-';
                                 rowEl.appendChild(nameCell);
 
                                 switch (mode) {
@@ -1333,7 +1382,7 @@
                                         break;
                                     }
                                     case 'class_subjects':
-                                    default:
+                                    default: {
                                         (row.cells || []).forEach((scoreCell) => {
                                             const valueCell = document.createElement('td');
                                             valueCell.appendChild(scoreText(scoreCell.value));
@@ -1341,7 +1390,20 @@
                                         });
                                         appendSummaryCells(rowEl, row);
                                         break;
+                                    }
                                 }
+
+                                const actionTd = document.createElement('td');
+                                actionTd.className = 'text-end';
+                                const eyeBtn = document.createElement('button');
+                                eyeBtn.type = 'button';
+                                eyeBtn.className = 'text-gray-500 bg-gray-50 p-2 rounded-md hover:bg-orange-50 hover:text-orange-600 transition-all shadow-xs inline-flex items-center justify-center border-0 cursor-pointer';
+                                eyeBtn.title = 'Xem chi tiết';
+                                eyeBtn.setAttribute('aria-label', 'Xem chi tiết');
+                                eyeBtn.innerHTML = '👁️';
+                                eyeBtn.addEventListener('click', () => openLedger(index));
+                                actionTd.appendChild(eyeBtn);
+                                rowEl.appendChild(actionTd);
 
                                 body.appendChild(rowEl);
                             });
@@ -1349,7 +1411,7 @@
 
                         count.textContent = payload.pagination?.label || 'Hiển thị 0 trong tổng số 0 học sinh';
                         pager.innerHTML = '';
-                        if (payload.pagination?.show_controls) {
+                        if (payload.pagination?.show_controls && payload.pagination?.total_pages > 1) {
                             ['Trước', 'Sau'].forEach((label) => {
                                 const button = document.createElement('button');
                                 button.type = 'button';
@@ -1418,7 +1480,7 @@
 
                     const emptyMark = () => {
                         const span = document.createElement('span');
-                        span.className = 'empty-mark';
+                        span.className = 'empty-mark text-gray-300 font-normal';
                         span.textContent = '—';
                         return span;
                     };
@@ -1435,7 +1497,8 @@
                             return td;
                         }
 
-                        td.textContent = detail.value;
+                        const num = Number(detail.value);
+                        td.textContent = isNaN(num) ? detail.value : num.toFixed(1);
                         return td;
                     };
 
@@ -1448,7 +1511,8 @@
 
                         const span = document.createElement('span');
                         span.className = 'average-mark';
-                        span.textContent = item.average;
+                        const num = Number(item.average);
+                        span.textContent = isNaN(num) ? item.average : num.toFixed(1);
                         td.appendChild(span);
                         return td;
                     };
@@ -1459,11 +1523,11 @@
                             return;
                         }
 
-                        const selectedYear = (matrix.years || []).find((year) => String(year.id) === String(matrix.filters?.school_year_id));
+                        const selectedYear = (matrix.years || []).find((year) => String(year.id).trim() == String(matrix.filters?.school_year_id).trim());
                         modalTitle.textContent = `${(row.student.name || '').toUpperCase()} - ${row.student.student_code || ''}`;
                         modalSubtitle.textContent = `Lớp: ${matrix.class_context?.name || '-'} • Năm học: ${selectedYear?.name || '-'}`;
                         modalLedger.innerHTML = '';
-                        const ledger = (row.ledger || []).filter((item) => item.assessment_type !== 'NONE');
+                        const ledger = (row.ledger || []).filter((item) => String(item.assessment_type).trim().toUpperCase() !== 'NONE');
 
                         if (ledger.length === 0) {
                             const tr = document.createElement('tr');
@@ -1554,6 +1618,36 @@
                                 isResettingFilters = false;
                             });
                     });
+
+                    if (evalToggleEl) {
+                        evalToggleEl.addEventListener('click', (e) => {
+                            const btn = e.target.closest('[data-eval-tab]');
+                            if (!btn) return;
+                            const targetTab = String(btn.dataset.evalTab).trim().toUpperCase();
+                            if (targetTab && activeEvaluationType !== targetTab) {
+                                activeEvaluationType = targetTab;
+                                refreshMatrix().catch(console.error);
+                            }
+                        });
+                    }
+
+                    if (grade10TabBtn) {
+                        grade10TabBtn.addEventListener('click', () => {
+                            if (activeEvaluationType !== 'GRADE_10') {
+                                activeEvaluationType = 'GRADE_10';
+                                refreshMatrix().catch(console.error);
+                            }
+                        });
+                    }
+
+                    if (assessmentTabBtn) {
+                        assessmentTabBtn.addEventListener('click', () => {
+                            if (activeEvaluationType !== 'ASSESSMENT') {
+                                activeEvaluationType = 'ASSESSMENT';
+                                refreshMatrix().catch(console.error);
+                            }
+                        });
+                    }
 
                     renderMatrix(initial);
                     if (controls.classRoom?.value) {

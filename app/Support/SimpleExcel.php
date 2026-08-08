@@ -40,12 +40,10 @@ class SimpleExcel
 
     public static function downloadPdf(string $filename, array $headers, array $rows)
     {
-        $pdf = self::buildPdf($headers, $rows);
+        $html = self::buildPdfHtml($filename, $headers, $rows);
 
-        return response($pdf, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . addslashes(Str::finish($filename, '.pdf')) . '"',
-            'Content-Length' => strlen($pdf),
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
         ]);
     }
 
@@ -182,81 +180,119 @@ class SimpleExcel
         return array_filter($row, fn ($value) => trim((string) $value) !== '') !== [];
     }
 
-    private static function buildPdf(array $headers, array $rows): string
+    private static function buildPdfHtml(string $filename, array $headers, array $rows): string
     {
-        $objects = [];
-        $pages = [];
-        $linesPerPage = 28;
-        $chunks = array_chunk($rows, $linesPerPage);
-        if ($chunks === []) {
-            $chunks = [[]];
+        $cleanHeaders = array_map(fn ($header) => self::cleanHeaderLabel((string) $header), $headers);
+        $titleName = Str::headline(preg_replace('/\.[A-Za-z0-9]+$/', '', $filename));
+
+        $headerColsHtml = implode('', array_map(fn ($h) => '<th style="padding: 10px 14px; font-weight: 600; color: #111827; background-color: #fff7ed; border-bottom: 2px solid #fed7aa; text-align: left; font-size: 13px;">' . htmlspecialchars($h, ENT_QUOTES, 'UTF-8') . '</th>', $cleanHeaders));
+
+        $rowsHtml = '';
+        foreach ($rows as $rowIndex => $row) {
+            $bgColor = $rowIndex % 2 === 0 ? '#ffffff' : '#fafafa';
+            $rowsHtml .= '<tr style="background-color: ' . $bgColor . ';">';
+            $rowValues = is_array($row) ? array_values($row) : (array) $row;
+            foreach ($rowValues as $cell) {
+                $val = trim((string) ($cell === '' || $cell === null ? '—' : $cell));
+                $rowsHtml .= '<td style="padding: 9px 14px; border-bottom: 1px solid #e5e7eb; color: #1f2937; text-align: left; font-size: 13px;">' . htmlspecialchars($val, ENT_QUOTES, 'UTF-8') . '</td>';
+            }
+            $rowsHtml .= '</tr>';
         }
 
-        $objects[] = '<< /Type /Catalog /Pages 2 0 R >>';
-        $objects[] = '';
-        $fontObjectNumber = 3;
-        $objects[] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+        $nowStr = now()->format('d/m/Y H:i');
 
-        foreach ($chunks as $pageIndex => $chunk) {
-            $contentObjectNumber = count($objects) + 2;
-            $pageObjectNumber = count($objects) + 1;
-            $pages[] = $pageObjectNumber . ' 0 R';
-            $objects[] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 ' . $fontObjectNumber . ' 0 R >> >> /Contents ' . $contentObjectNumber . ' 0 R >>';
-            $objects[] = self::pdfStream(self::pdfPageContent($headers, $chunk, $pageIndex + 1, count($chunks)));
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{$titleName}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+        @page { size: A4 landscape; margin: 12mm; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', 'Arial', sans-serif;
+            color: #1f2937;
+            background: #ffffff;
+            margin: 0;
+            padding: 24px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
-
-        $objects[1] = '<< /Type /Pages /Kids [' . implode(' ', $pages) . '] /Count ' . count($pages) . ' >>';
-
-        $pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
-        $offsets = [0];
-        foreach ($objects as $index => $object) {
-            $offsets[] = strlen($pdf);
-            $pdf .= ($index + 1) . " 0 obj\n" . $object . "\nendobj\n";
+        .header {
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #ea580c;
         }
-
-        $xrefOffset = strlen($pdf);
-        $pdf .= "xref\n0 " . (count($objects) + 1) . "\n0000000000 65535 f \n";
-        foreach (array_slice($offsets, 1) as $offset) {
-            $pdf .= str_pad((string) $offset, 10, '0', STR_PAD_LEFT) . " 00000 n \n";
+        .title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #111827;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0 0 6px 0;
         }
-
-        return $pdf
-            . "trailer\n<< /Size " . (count($objects) + 1) . " /Root 1 0 R >>\n"
-            . "startxref\n" . $xrefOffset . "\n%%EOF";
+        .meta {
+            font-size: 13px;
+            color: #6b7280;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+        @media print {
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 class="title">📋 BÁO CÁO: {$titleName}</h1>
+        <div class="meta">Trường THPT • Thời gian kết xuất: {$nowStr}</div>
+    </div>
+    <table>
+        <thead>
+            <tr>{$headerColsHtml}</tr>
+        </thead>
+        <tbody>
+            {$rowsHtml}
+        </tbody>
+    </table>
+    <script>
+        window.onload = function() {
+            setTimeout(function() { window.print(); }, 300);
+        };
+    </script>
+</body>
+</html>
+HTML;
     }
 
-    private static function pdfPageContent(array $headers, array $rows, int $page, int $totalPages): string
+    private static function cleanHeaderLabel(string $header): string
     {
-        $content = "BT\n/F1 14 Tf\n50 552 Td\n" . self::pdfText('BÁO CÁO DỮ LIỆU HỌC VỤ') . " Tj\n";
-        $content .= "/F1 8 Tf\n0 -18 Td\n" . self::pdfText('Trang ' . $page . '/' . $totalPages . ' - Xuất ngày ' . now()->format('d/m/Y H:i')) . " Tj\n";
-        $content .= "/F1 8 Tf\n0 -24 Td\n" . self::pdfText(self::pdfRow($headers, 150)) . " Tj\n";
+        $normalized = Str::lower(trim($header));
 
-        foreach ($rows as $row) {
-            $content .= "0 -16 Td\n" . self::pdfText(self::pdfRow($row, 150)) . " Tj\n";
-        }
-
-        return $content . "ET";
-    }
-
-    private static function pdfRow(array $row, int $limit): string
-    {
-        $text = collect($row)
-            ->map(fn ($value) => trim((string) ($value === '' || $value === null ? '—' : $value)))
-            ->implode(' | ');
-
-        return Str::limit($text, $limit, '');
-    }
-
-    private static function pdfStream(string $content): string
-    {
-        return '<< /Length ' . strlen($content) . " >>\nstream\n" . $content . "\nendstream";
-    }
-
-    private static function pdfText(string $value): string
-    {
-        $value = str_replace(["\\", '(', ')', "\r", "\n"], ["\\\\", "\\(", "\\)", ' ', ' '], $value);
-
-        return '(' . $value . ')';
+        return match ($normalized) {
+            'ma_hs', 'student_code', 'ma_hoc_sinh' => 'Mã HS',
+            'ho_ten', 'name', 'full_name', 'ho_va_ten' => 'Họ và tên',
+            'ngay_sinh', 'dob', 'birth_date' => 'Ngày sinh',
+            'gioi_tinh', 'gender', 'sex' => 'Giới tính',
+            'lop', 'class_name', 'class' => 'Lớp học',
+            'que_quan', 'hometown' => 'Quê quán',
+            'dan_toc', 'ethnicity' => 'Dân tộc',
+            'trang_thai', 'status' => 'Trạng thái',
+            'diem_so', 'score', 'average', 'gpa' => 'Điểm số',
+            'hanh_kiem', 'conduct' => 'Hạnh kiểm',
+            'mon_hoc', 'subject' => 'Môn học',
+            'giao_vien', 'teacher' => 'Giáo viên',
+            'created_at', 'ngay_tao' => 'Ngày tạo',
+            'updated_at', 'ngay_cap_nhat' => 'Ngày cập nhật',
+            'note', 'ghi_chu' => 'Ghi chú',
+            default => function_exists('mb_convert_case') ? mb_convert_case(str_replace(['_', '-'], ' ', $header), MB_CASE_TITLE, 'UTF-8') : title_case(str_replace(['_', '-'], ' ', $header)),
+        };
     }
 
     private static function excelColumnIndex(string $letters): int

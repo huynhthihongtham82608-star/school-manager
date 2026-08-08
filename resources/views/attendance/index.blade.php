@@ -345,6 +345,31 @@
         margin: 0 .38rem;
     }
 
+    .text-gray-200 { color: #e5e7eb !important; }
+    .text-gray-500 { color: #6b7280 !important; }
+    .text-gray-900 { color: #111827 !important; }
+    .text-green-600 { color: #16a34a !important; }
+    .text-orange-600 { color: #ea580c !important; }
+    .text-blue-600 { color: #2563eb !important; }
+    .text-red-600 { color: #dc2626 !important; }
+    .mx-1\.5 { margin-left: 0.375rem !important; margin-right: 0.375rem !important; }
+    .text-sm { font-size: 0.875rem !important; line-height: 1.25rem !important; }
+    .font-normal { font-weight: 400 !important; }
+    .font-semibold { font-weight: 600 !important; }
+    .whitespace-nowrap { white-space: nowrap !important; }
+    .text-left { text-align: left !important; }
+
+    .attendance-session-table tbody tr:hover {
+        background-color: #fff7ed !important;
+    }
+    .attendance-session-table tbody tr:hover .text-gray-900 { color: #111827 !important; }
+    .attendance-session-table tbody tr:hover .text-green-600 { color: #16a34a !important; }
+    .attendance-session-table tbody tr:hover .text-orange-600 { color: #ea580c !important; }
+    .attendance-session-table tbody tr:hover .text-blue-600 { color: #2563eb !important; }
+    .attendance-session-table tbody tr:hover .text-red-600 { color: #dc2626 !important; }
+    .attendance-session-table tbody tr:hover .text-gray-500 { color: #6b7280 !important; }
+    .attendance-session-table tbody tr:hover .text-gray-200 { color: #e5e7eb !important; }
+
     .attendance-session-badge,
     .attendance-status-badge {
         display: inline-flex;
@@ -1062,31 +1087,31 @@
                             {{ $isMorningSession ? '🌅 Buổi Sáng' : '🌆 Buổi Chiều' }}
                         </span>
                     </td>
-                    <td class="attendance-session-stats-cell">
-                        <div class="attendance-session-stats" aria-label="Thống kê nề nếp phiên điểm danh">
+                    <td class="whitespace-nowrap text-left attendance-session-stats-cell">
+                        <div class="attendance-session-stats d-inline-flex align-items-center" aria-label="Thống kê nề nếp phiên điểm danh">
                             <span>
-                                <span class="attendance-session-stat-label">Tổng số:</span>
-                                <span class="attendance-session-stat-value total">{{ $session->total }}</span>
+                                <span class="text-sm font-normal text-gray-500">Tổng số:</span>
+                                <span class="text-gray-900 font-semibold">{{ $session->total }}</span>
                             </span>
-                            <span class="attendance-session-stat-separator">|</span>
+                            <span class="text-gray-200 mx-1.5">|</span>
                             <span>
-                                <span class="attendance-session-stat-label">Có mặt:</span>
-                                <span class="attendance-session-stat-value present">{{ $session->present }}</span>
+                                <span class="text-sm font-normal text-gray-500">Có mặt:</span>
+                                <span class="text-green-600 font-semibold">{{ $session->present }}</span>
                             </span>
-                            <span class="attendance-session-stat-separator">|</span>
+                            <span class="text-gray-200 mx-1.5">|</span>
                             <span>
-                                <span class="attendance-session-stat-label">Đi muộn:</span>
-                                <span class="attendance-session-stat-value late">{{ $session->late }}</span>
+                                <span class="text-sm font-normal text-gray-500">Muộn:</span>
+                                <span class="text-orange-600 font-semibold">{{ $session->late }}</span>
                             </span>
-                            <span class="attendance-session-stat-separator">|</span>
+                            <span class="text-gray-200 mx-1.5">|</span>
                             <span>
-                                <span class="attendance-session-stat-label">Có phép:</span>
-                                <span class="attendance-session-stat-value excused">{{ $session->excused }}</span>
+                                <span class="text-sm font-normal text-gray-500">Có phép:</span>
+                                <span class="text-blue-600 font-semibold">{{ $session->excused }}</span>
                             </span>
-                            <span class="attendance-session-stat-separator">|</span>
+                            <span class="text-gray-200 mx-1.5">|</span>
                             <span>
-                                <span class="attendance-session-stat-label">Vắng không phép:</span>
-                                <span class="attendance-session-stat-value absent">{{ $session->absent }}</span>
+                                <span class="text-sm font-normal text-gray-500">Vắng:</span>
+                                <span class="text-red-600 font-semibold">{{ $session->absent }}</span>
                             </span>
                         </div>
                     </td>
@@ -1097,16 +1122,94 @@
                             <span class="attendance-status-badge pending">🟡 Chưa điểm danh</span>
                         @endif
                     </td>
-                    <td class="text-end">
-                        <button
-                            type="button"
-                            class="attendance-session-action"
-                            title="M&#7903; b&#7843;ng &#273;i&#7875;m danh chi ti&#7871;t"
-                            aria-label="M&#7903; b&#7843;ng &#273;i&#7875;m danh chi ti&#7871;t"
-                            onclick='handleNavigateToRegister(@json($session->class_id), @json(optional($session->date)->toDateString()), @json($session->session_type), @json($session->semester_id), @json($session->school_year_id))'
-                        >
-                            <i class="bi bi-pencil-square"></i>
-                        </button>
+                    <td class="text-end whitespace-nowrap">
+                        <div class="d-inline-flex align-items-center gap-1 justify-content-end">
+                            <button
+                                type="button"
+                                class="text-gray-500 bg-gray-50 p-2 rounded-md hover:bg-orange-50 hover:text-orange-600 transition-all border-0 shadow-xs inline-flex items-center justify-center cursor-pointer"
+                                title="Xem chi tiết phiên điểm danh"
+                                aria-label="Xem chi tiết phiên điểm danh"
+                                data-bs-toggle="modal"
+                                data-bs-target="#sessionDetailModal{{ $session->key }}"
+                            >
+                                👁️
+                            </button>
+                            <button
+                                type="button"
+                                class="text-orange-600 bg-orange-50/50 p-2 rounded-md hover:bg-orange-100 transition-all border-0 shadow-xs inline-flex items-center justify-center cursor-pointer"
+                                title="Chỉnh sửa phiên điểm danh"
+                                aria-label="Chỉnh sửa phiên điểm danh"
+                                onclick='handleNavigateToRegister(@json($session->class_id), @json(optional($session->date)->toDateString()), @json($session->session_type), @json($session->semester_id), @json($session->school_year_id))'
+                            >
+                                ✏️
+                            </button>
+                        </div>
+
+                        <div class="modal fade content-modal" id="sessionDetailModal{{ $session->key }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered modal-lg">
+                                <div class="modal-content border-0 shadow-2xl rounded-lg p-3">
+                                    <div class="modal-header border-bottom pb-3">
+                                        <div class="text-start">
+                                            <h5 class="modal-title font-bold text-gray-900 text-lg">NHẬT KÝ ĐIỂM DANH - LỚP {{ $session->class_name }}</h5>
+                                            <div class="text-sm text-gray-500 mt-1">{{ $session->session_label }} · Ngày {{ optional($session->date)->format('d/m/Y') }}</div>
+                                        </div>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                                    </div>
+                                    <div class="modal-body py-3">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm align-middle mb-0 text-left">
+                                                <thead>
+                                                    <tr class="bg-gray-50">
+                                                        <th class="text-left font-medium text-gray-700">Mã HS & Họ tên</th>
+                                                        <th class="text-left font-medium text-gray-700">Trạng thái chuyên cần</th>
+                                                        <th class="text-left font-medium text-gray-700">Ghi chú</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                @foreach($session->records as $sessionRecord)
+                                                    @php
+                                                        $recStudent = $sessionRecord->student;
+                                                        $statusKey = $sessionRecord->status ?? 'present';
+                                                        $statusBadgeClass = match($statusKey) {
+                                                            'present' => 'text-green-600 bg-green-50',
+                                                            'late' => 'text-orange-600 bg-orange-50',
+                                                            'excused' => 'text-blue-600 bg-blue-50',
+                                                            'absent' => 'text-red-600 bg-red-50',
+                                                            default => 'text-gray-500 bg-gray-50',
+                                                        };
+                                                        $statusText = match($statusKey) {
+                                                            'present' => 'Có mặt',
+                                                            'late' => 'Đi muộn',
+                                                            'excused' => 'Nghỉ có phép',
+                                                            'absent' => 'Vắng không phép',
+                                                            default => 'Chưa rõ',
+                                                        };
+                                                    @endphp
+                                                    <tr>
+                                                        <td class="text-left whitespace-nowrap">
+                                                            <span class="font-semibold text-gray-900 me-2">{{ $recStudent->student_code ?? '-' }}</span>
+                                                            <span class="text-gray-700">{{ $recStudent->name ?? '-' }}</span>
+                                                        </td>
+                                                        <td class="text-left whitespace-nowrap">
+                                                            <span class="px-2 py-1 rounded-md text-sm font-medium {{ $statusBadgeClass }}">
+                                                                {{ $statusText }}
+                                                            </span>
+                                                        </td>
+                                                        <td class="text-left text-sm text-gray-500 whitespace-normal">
+                                                            {{ $sessionRecord->note ?: '—' }}
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer border-top pt-2">
+                                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng nhật ký</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </td>
                 </tr>
             @empty
@@ -1244,16 +1347,6 @@
             document.querySelectorAll('[data-attendance-present]:not(:disabled)').forEach((input) => {
                 input.checked = true;
             });
-        });
-    });
-
-        row.addEventListener('keydown', (event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') {
-                return;
-            }
-
-            event.preventDefault();
-            toggleRow();
         });
     });
 </script>

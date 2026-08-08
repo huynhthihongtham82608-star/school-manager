@@ -49,8 +49,8 @@
     <div class="bulk-excel-modal bulk-excel-export-modal">
         <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
             <div>
-                <h5 class="bulk-excel-title">Tùy chọn xuất dữ liệu</h5>
-                <div class="bulk-excel-note">Chọn định dạng và các cột thông tin cần đưa vào file tải xuống.</div>
+                <h5 class="bulk-excel-title">👁️ XEM TRƯỚC BẢN IN VÀ FILE XUẤT BÁO CÁO</h5>
+                <div class="bulk-excel-note">Mô phỏng cấu trúc các trường dữ liệu và định dạng file báo cáo sẽ tải về theo bộ lọc hiện tại.</div>
             </div>
             <button type="button" class="btn-close" data-bulk-export-cancel aria-label="Đóng"></button>
         </div>
@@ -75,8 +75,8 @@
         </div>
 
         <div class="d-flex align-items-center justify-content-end gap-2 mt-4">
-            <button type="button" class="btn btn-secondary bulk-excel-cancel" data-bulk-export-cancel>Hủy bỏ tiến trình</button>
-            <button type="button" class="btn bulk-excel-confirm" data-bulk-export-download>🚀 Kích hoạt Tải xuống File</button>
+            <button type="button" class="btn btn-secondary bulk-excel-cancel" data-bulk-export-cancel>Hủy bỏ</button>
+            <button type="button" class="btn bulk-excel-confirm" data-bulk-export-download>🚀 Xác nhận OK - Tải xuống file ngay</button>
         </div>
     </div>
 </div>
@@ -155,11 +155,11 @@
             padding: 1.5rem;
             border-radius: 8px;
             background: #fff;
-            box-shadow: 0 24px 56px rgba(15, 23, 42, .28);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         }
 
         .bulk-excel-export-modal {
-            max-width: 576px;
+            max-width: 896px;
         }
 
         .bulk-excel-title {
