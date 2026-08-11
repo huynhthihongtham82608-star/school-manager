@@ -290,7 +290,7 @@
         'selectedParentStudent' => $selectedParentStudent,
     ])
 @else
-    <div class="role-hero mb-3 {{ $user->isTeacher() ? 'teacher-portal-hero' : '' }}">
+    <div class="{{ $user->isTeacher() ? 'w-full col-span-full bg-white border border-orange-100 p-5 rounded-xl shadow-xs text-left mb-3 teacher-portal-hero' : 'role-hero mb-3' }}">
         <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
             <div>
                 <h5 class="role-hero-title">Xin chào, {{ $user->display_name }}</h5>

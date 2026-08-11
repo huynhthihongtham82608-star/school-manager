@@ -160,10 +160,10 @@ class ConductController extends Controller
                     [
                         'student_id' => $student->id,
                         'semester_id' => $semester->id,
-                        'school_year_id' => $semester->school_year_id,
-                        'class_id' => $class->id,
                     ],
                     [
+                        'school_year_id' => $semester->school_year_id,
+                        'class_id' => $class->id,
                         'conduct_level' => $conductLevel ?: Conduct::LEVEL_GOOD,
                         'comment' => $comment,
                     ]

@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', auth()->user()->isAdmin() || auth()->user()->isStaff() ? 'Quản lý bảng điểm tập trung' : 'Nhập điểm số')
 
 @section('content')
@@ -18,6 +18,12 @@
 @endphp
 
 <style>
+    .score-entry-header,
+    .score-sheet {
+        font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #374151;
+    }
+
     .score-sheet .form-control:disabled,
     .score-sheet .form-select:disabled {
         border-color: #e5e7eb;
@@ -30,13 +36,52 @@
 
     .score-sheet th,
     .score-sheet td {
-        font-size: 1rem;
+        padding: .75rem;
+        color: #374151;
+        font-size: .75rem;
         font-weight: 400;
+        text-align: left;
+        white-space: nowrap;
     }
 
     .score-sheet th {
         color: #111827;
-        font-weight: 500;
+        font-weight: 400;
+        background: #fff7ed;
+    }
+
+    @media (min-width: 768px) {
+        .score-sheet th,
+        .score-sheet td {
+            font-size: .875rem;
+        }
+    }
+
+    .score-sheet .score-student-code-col {
+        width: 128px;
+        min-width: 128px;
+    }
+
+    .score-sheet .score-student-name-col {
+        width: 260px;
+        min-width: 260px;
+    }
+
+    .score-sheet .score-student-code-cell,
+    .score-sheet .score-student-name-cell {
+        color: #374151;
+        font-size: .75rem;
+        font-weight: 400;
+        white-space: nowrap;
+        padding: .75rem;
+        text-align: left;
+    }
+
+    @media (min-width: 768px) {
+        .score-sheet .score-student-code-cell,
+        .score-sheet .score-student-name-cell {
+            font-size: .875rem;
+        }
     }
 
     .score-retest-badge {
@@ -140,33 +185,118 @@
         background: #f97316;
         content: "";
     }
+
+    .score-sheet .text-orange-400\/80 {
+        color: rgba(251, 146, 60, .8) !important;
+    }
+
+    .score-sheet .hover\:text-orange-600:hover {
+        color: #ea580c !important;
+    }
+
+    .score-entry-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        width: 100%;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border: 1px solid #ffedd5;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+        text-align: left;
+    }
+
+    .score-entry-title {
+        margin: 0;
+        color: #111827;
+        font-size: 1.15rem;
+        font-weight: 400;
+        line-height: 1.35;
+    }
+
+    .score-entry-actions,
+    .score-entry-actions .bulk-excel-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: .5rem !important;
+        flex-wrap: wrap !important;
+        justify-content: flex-end !important;
+    }
+
+    @media (min-width: 640px) {
+        .score-entry-actions,
+        .score-entry-actions .bulk-excel-actions {
+            flex-wrap: nowrap !important;
+        }
+    }
+
+    .score-entry-action-btn,
+    .score-entry-actions .bulk-excel-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        max-width: 220px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #c2410c !important;
+        background: #fff7ed !important;
+        border: 1px solid #fed7aa !important;
+        border-radius: 6px !important;
+        padding: .5rem .75rem !important;
+        font-size: .875rem !important;
+        font-weight: 400 !important;
+        line-height: 1.2 !important;
+        text-decoration: none !important;
+        transition: all .16s ease;
+        cursor: pointer;
+    }
+
+    .score-entry-action-btn:hover,
+    .score-entry-actions .bulk-excel-btn:hover {
+        color: #9a3412 !important;
+        background: #ffedd5 !important;
+    }
+
+    @media (max-width: 991.98px) {
+        .score-entry-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .score-entry-actions {
+            justify-content: flex-start !important;
+        }
+    }
 </style>
 
-<x-page-header
-    :title="$isScoreAdmin
-        ? 'Bảng điểm tập trung - ' . $class->name . ' / ' . $subject->name . ' / ' . $semester->normalizedName()
-        : 'Nhập điểm số - ' . $class->name . ' / ' . $subject->name . ' / ' . $semester->normalizedName()"
-    :subtitle="$isScoreAdmin
-        ? 'Chế độ giám sát chỉ xem. Admin tra cứu điểm số toàn trường, không nhập hoặc sửa điểm trực tiếp tại màn hình này.'
-        : 'Giáo viên bộ môn chỉ nhập điểm vào các cột điểm do Admin cấu hình và đang mở nhập.'"
->
-    @if(! $isScoreAdmin)
-        <button type="button" class="score-formula-rule-btn" data-bs-toggle="modal" data-bs-target="#scoreFormulaRuleModal">
-            👁️ Quy tắc tính điểm số
-        </button>
-    @endif
-    <x-bulk-excel-actions
-        module="scores"
-        :context="[
-            'school_year_id' => $semester->school_year_id,
-            'class_id' => $class->id,
-            'subject_id' => $subject->id,
-            'semester_id' => $semester->id,
-        ]"
-        :allow-import="! $isScoreAdmin"
-    />
-    <a href="{{ route('scores.index') }}" class="btn btn-outline-secondary">Quay lại</a>
-</x-page-header>
+<div class="score-entry-header">
+    <div class="min-w-0">
+        <h5 class="score-entry-title">
+            {{ $isScoreAdmin ? 'Bảng điểm tập trung' : 'Nhập điểm số' }} — Lớp {{ $class->name }} / Môn {{ $subject->name }} / {{ $semester->normalizedName() }}
+        </h5>
+    </div>
+    <div class="score-entry-actions flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        @if(! $isScoreAdmin)
+            <button type="button" class="score-entry-action-btn" data-bs-toggle="modal" data-bs-target="#scoreFormulaRuleModal" title="Quy tắc tính điểm">
+                Quy tắc tính điểm
+            </button>
+        @endif
+        <x-bulk-excel-actions
+            module="scores"
+            :context="[
+                'school_year_id' => $semester->school_year_id,
+                'class_id' => $class->id,
+                'subject_id' => $subject->id,
+                'semester_id' => $semester->id,
+            ]"
+            :allow-import="! $isScoreAdmin"
+        />
+    </div>
+</div>
 
 @if(! $isScoreAdmin)
     <div class="modal fade score-formula-rule-modal" id="scoreFormulaRuleModal" tabindex="-1" aria-hidden="true">
@@ -220,19 +350,19 @@
             <table class="table align-middle">
                 <thead>
                     <tr>
-                        <th>Mã HS</th>
-                        <th>Họ tên</th>
+                        <th class="score-student-code-col text-xs md:text-sm font-normal whitespace-nowrap p-3 text-left">Mã HS</th>
+                        <th class="score-student-name-col text-xs md:text-sm font-normal whitespace-nowrap p-3 text-left">Họ và tên</th>
                         @foreach($scoreColumns as $column)
                             <th style="min-width: 150px;">
-                                <div>{{ $column->name }}</div>
+                                <div>{{ $column->name }}<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></div>
                                 <div class="text-muted small mt-1">{{ $column->typeLabel() }}</div>
                             </th>
                         @endforeach
-                        <th>TB</th>
+                        <th>TB<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
                         @if($isScoreAdmin)
-                            <th class="score-annual-col">Tổng kết HK1</th>
-                            <th class="score-annual-col">Tổng kết HK2</th>
-                            <th class="score-annual-col">Điểm Cả Năm</th>
+                            <th class="score-annual-col">HK1<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
+                            <th class="score-annual-col">HK2<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
+                            <th class="score-annual-col">Cả Năm<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
                         @endif
                     </tr>
                 </thead>
@@ -242,8 +372,8 @@
                         $header = $headers[$student->id] ?? null;
                     @endphp
                     <tr>
-                        <td class="fw-semibold">{{ $student->student_code }}</td>
-                        <td>{{ $student->name }}</td>
+                        <td class="score-student-code-cell text-xs md:text-sm font-normal whitespace-nowrap p-3 text-left">{{ $student->student_code }}</td>
+                        <td class="score-student-name-cell text-xs md:text-sm font-normal whitespace-nowrap p-3 text-left">{{ $student->name }}</td>
                         @foreach($scoreColumns as $column)
                             @php
                                 $permission = $columnPermissions[$column->id] ?? ['editable' => false, 'reason' => 'Chỉ xem'];

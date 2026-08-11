@@ -165,19 +165,44 @@ class ScoreController extends Controller
     public function cascade(Request $request)
     {
         $this->authorizeScoreAdminStream();
+        $user = Auth::user();
 
         $yearId = $request->query('school_year_id') ?: $this->selectedSchoolYearId($request);
         $semesterId = $request->query('semester_id') ?: $this->selectedSemesterId($request);
         $gradeLevel = $request->query('grade_level');
         $teacherId = $request->query('teacher_id');
+        $forcedHomeroomClass = null;
+
+        if ($user->isTeacher() && ! $user->isAdmin() && ! $user->isStaff()) {
+            $forcedHomeroomClass = $this->teacherHomeroomClassForScoreMatrix($user->teacher, $yearId);
+            abort_unless($forcedHomeroomClass, 403, 'Chỉ giáo viên chủ nhiệm mới được xem ma trận điểm toàn lớp.');
+
+            $yearId = $forcedHomeroomClass->school_year_id;
+            $gradeLevel = $forcedHomeroomClass->grade_level;
+            $teacherId = null;
+            $request->merge([
+                'school_year_id' => $yearId,
+                'grade_level' => $gradeLevel,
+                'class_id' => $forcedHomeroomClass->id,
+                'teacher_id' => null,
+            ]);
+        }
+
         $class = $request->query('class_id')
             ? SchoolClass::with(['homeroomTeacher', 'students'])->find($request->query('class_id'))
             : null;
+
+        if ($forcedHomeroomClass) {
+            $class = $forcedHomeroomClass;
+        }
+
         if ($class && (string) $class->school_year_id !== (string) $yearId) {
             $yearId = $class->school_year_id;
             $gradeLevel = $gradeLevel ?: $class->grade_level;
         }
-        $classes = $this->adminLinkedClasses($yearId, $gradeLevel, $teacherId);
+        $classes = $forcedHomeroomClass
+            ? $this->adminClassOptionCollection($forcedHomeroomClass)
+            : $this->adminLinkedClasses($yearId, $gradeLevel, $teacherId);
         $subjects = $teacherId
             ? $this->adminSubjectsForTeacher((string) $teacherId, $yearId, $semesterId, $class?->id)
             : ($class
@@ -219,16 +244,32 @@ class ScoreController extends Controller
     {
         $user = Auth::user();
 
-        if (! $user?->isAdmin() && ! $user?->isStaff()) {
+        if (! $user?->isAdmin() && ! $user?->isStaff() && ! $user?->isTeacher()) {
             abort(403);
         }
     }
 
-    private function adminScoreMatrixPayload(Request $request): array
+    public function adminScoreMatrixPayload(Request $request): array
     {
+        $user = Auth::user();
         $yearId = $request->query('school_year_id') ?: $this->selectedSchoolYearId($request);
         $years = SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->get();
         $selectedYearId = $years->contains('id', $yearId) ? $yearId : ($years->first()?->id ?? $yearId);
+        $forcedHomeroomClass = null;
+
+        if ($user->isTeacher() && ! $user->isAdmin() && ! $user->isStaff()) {
+            $forcedHomeroomClass = $this->teacherHomeroomClassForScoreMatrix($user->teacher, $selectedYearId);
+            abort_unless($forcedHomeroomClass, 403, 'Chỉ giáo viên chủ nhiệm mới được xem ma trận điểm toàn lớp.');
+
+            $selectedYearId = $forcedHomeroomClass->school_year_id;
+            $request->merge([
+                'school_year_id' => $selectedYearId,
+                'grade_level' => $forcedHomeroomClass->grade_level,
+                'class_id' => $forcedHomeroomClass->id,
+                'teacher_id' => null,
+            ]);
+        }
+
         $semesters = Semester::where('school_year_id', $selectedYearId)
             ->orderBy('order')
             ->orderBy('name')
@@ -245,6 +286,12 @@ class ScoreController extends Controller
         $class = $classId
             ? SchoolClass::with(['homeroomTeacher', 'students'])->find($classId)
             : null;
+
+        if ($forcedHomeroomClass) {
+            $class = $forcedHomeroomClass;
+            $gradeLevel = $class->grade_level;
+        }
+
         if ($class && (string) $class->school_year_id !== (string) $selectedYearId) {
             $selectedYearId = $class->school_year_id;
             $semesters = Semester::where('school_year_id', $selectedYearId)
@@ -259,7 +306,13 @@ class ScoreController extends Controller
         }
 
         $teacherId = $request->query('teacher_id') ?: null;
-        $classes = $this->adminLinkedClasses($selectedYearId, $gradeLevel, $teacherId);
+        if ($forcedHomeroomClass) {
+            $teacherId = null;
+        }
+
+        $classes = $forcedHomeroomClass
+            ? $this->adminClassOptionCollection($forcedHomeroomClass)
+            : $this->adminLinkedClasses($selectedYearId, $gradeLevel, $teacherId);
         $availableSubjects = $class
             ? $this->adminSubjectsForClass($class, $selectedYearId, $selectedSemesterId)
             : ($gradeLevel ? $this->adminSubjectsForYear($selectedYearId, $gradeLevel) : collect());
@@ -331,7 +384,7 @@ class ScoreController extends Controller
                 'term_index' => $semester->termIndex(),
             ])->values(),
             'classes' => $classes,
-            'class_context' => $class ? $this->serializeAdminClassContext($class) : null,
+            'class_context' => $class ? $this->serializeAdminClassContext($class, $selectedYearId) : null,
             'subjects' => $availableSubjects->map(fn (Subject $subject) => [
                 'id' => $subject->id,
                 'name' => $subject->name,
@@ -349,6 +402,34 @@ class ScoreController extends Controller
                 'label' => 'Hiển thị ' . $rows->count() . ' trong tổng số ' . $rows->count() . ' học sinh',
             ],
         ];
+    }
+
+    private function teacherHomeroomClassForScoreMatrix(?Teacher $teacher, ?string $yearId): ?SchoolClass
+    {
+        if (! $teacher) {
+            return null;
+        }
+
+        $query = SchoolClass::with(['homeroomTeacher', 'students'])
+            ->where('homeroom_teacher_id', $teacher->id)
+            ->whereIn('status', [SchoolClass::STATUS_ACTIVE, SchoolClass::STATUS_LOCKED, SchoolClass::STATUS_DRAFT])
+            ->orderByDesc('created_at');
+
+        $class = (clone $query)
+            ->when($yearId, fn ($classQuery) => $classQuery->where('school_year_id', $yearId))
+            ->first();
+
+        return $class ?: $query->first();
+    }
+
+    private function adminClassOptionCollection(SchoolClass $class): Collection
+    {
+        return collect([[
+            'id' => $class->id,
+            'name' => $class->name,
+            'grade_level' => (string) $class->grade_level,
+            'homeroom_teacher' => $class->homeroomTeacher?->name,
+        ]]);
     }
 
     private function adminLinkedClasses(?string $yearId, $gradeLevel, ?string $teacherId = null): Collection
@@ -379,8 +460,18 @@ class ScoreController extends Controller
             ->values();
     }
 
-    private function serializeAdminClassContext(SchoolClass $class): array
+    private function serializeAdminClassContext(SchoolClass $class, ?string $yearId = null): array
     {
+        $assignments = TeachingAssignment::with('teacher')
+            ->where('class_id', $class->id)
+            ->when($yearId, fn ($q) => $q->where('school_year_id', $yearId))
+            ->where('status', TeachingAssignment::STATUS_ACTIVE)
+            ->get();
+
+        $subjectTeachers = $assignments->groupBy('subject_id')->map(function ($group) {
+            return $group->map(fn ($assignment) => $assignment->teacher?->name)->filter()->unique()->join(', ');
+        })->all();
+
         return [
             'id' => $class->id,
             'name' => $class->name,
@@ -390,6 +481,7 @@ class ScoreController extends Controller
                 'name' => $class->homeroomTeacher->name,
                 'teacher_code' => $class->homeroomTeacher->teacher_code,
             ] : null,
+            'subject_teachers' => $subjectTeachers,
             'students' => $class->students
                 ->sortBy('student_code')
                 ->map(fn (Student $student) => [
@@ -705,8 +797,8 @@ class ScoreController extends Controller
                 'assessment_type' => $subject->normalizedAssessmentType(),
                 'average' => $subject->usesPassFailAssessment()
                     ? match ($this->adminScoreCellText($header, $subject)) {
-                        'Đ' => 'Đạt',
-                        'CĐ' => 'Chưa đạt',
+                        'Đạt', 'Đ' => 'Đạt',
+                        'Chưa Đạt', 'Chưa đạt', 'CĐ' => 'Chưa đạt',
                         default => '',
                     }
                     : $this->adminScoreCellText($header, $subject),

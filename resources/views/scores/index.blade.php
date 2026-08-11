@@ -365,6 +365,8 @@
     .text-xs { font-size: 0.75rem !important; line-height: 1rem !important; }
     .text-orange-700 { color: #c2410c !important; }
     .text-orange-800 { color: #9a3412 !important; }
+    .text-orange-400\/80 { color: rgba(251, 146, 60, .8) !important; }
+    .hover\:text-orange-600:hover { color: #ea580c !important; }
     .bg-orange-50 { background-color: #fff7ed !important; }
     .bg-orange-100 { background-color: #ffedd5 !important; }
     .bg-orange-50\/20 { background-color: rgba(255, 247, 237, 0.2) !important; }
@@ -1069,12 +1071,6 @@
                         <option value="{{ $subjectOption['id'] }}">{{ $subjectOption['name'] }}</option>
                     @endforeach
                 </select>
-                <select class="form-select" data-admin-score-teacher>
-                    <option value="">Chọn Giáo viên</option>
-                    @foreach(($teachers ?? collect()) as $teacher)
-                        <option value="{{ $teacher->id }}">{{ $teacher->name }}{{ $teacher->teacher_code ? ' - ' . $teacher->teacher_code : '' }}</option>
-                    @endforeach
-                </select>
                 <select class="form-select" data-admin-score-semester>
                     @foreach(($adminMatrix['semesters'] ?? []) as $semesterOption)
                         <option value="{{ $semesterOption['id'] }}" @selected((string) ($adminMatrix['filters']['semester_id'] ?? '') === (string) $semesterOption['id'])>{{ $semesterOption['name'] }}</option>
@@ -1099,7 +1095,7 @@
 
             <div class="card">
                 <div class="table-responsive">
-                    <table class="table align-middle admin-score-grid w-full table-fixed mb-0">
+                    <table class="table align-middle admin-score-grid w-full table-fixed mb-0" data-admin-table-skip>
                         <thead data-admin-score-head></thead>
                         <tbody data-admin-score-body></tbody>
                     </table>
@@ -1126,7 +1122,7 @@
                         <button type="button" class="btn-close" data-admin-score-modal-close aria-label="Đóng"></button>
                     </div>
                     <div class="table-responsive">
-                        <table class="table align-middle admin-score-ledger-table">
+                        <table class="table align-middle admin-score-ledger-table" data-admin-table-skip>
                             <thead>
                                 <tr>
                                     <th>Môn học</th>
@@ -1162,7 +1158,6 @@
                         grade: app.querySelector('[data-admin-score-grade]'),
                         classRoom: app.querySelector('[data-admin-score-class]'),
                         subject: app.querySelector('[data-admin-score-subject]'),
-                        teacher: app.querySelector('[data-admin-score-teacher]'),
                         semester: app.querySelector('[data-admin-score-semester]'),
                         search: app.querySelector('[data-admin-score-search]'),
                         reset: app.querySelector('[data-admin-score-reset]'),
@@ -1188,13 +1183,45 @@
                     let debounceTimer = null;
                     let isResettingFilters = false;
                     let activeEvaluationType = initial.filters?.hinh_thuc_danh_gia || 'GRADE_10';
+                    let currentSortColumn = null;
+                    let currentSortDirection = 'desc';
+
+                    const handleSort = (columnKey, getValueFn) => {
+                        if (currentSortColumn === columnKey) {
+                            currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
+                        } else {
+                            currentSortColumn = columnKey;
+                            currentSortDirection = 'desc';
+                        }
+
+                        if (matrix && matrix.rows && matrix.rows.length > 0) {
+                            matrix.rows.sort((a, b) => {
+                                const rawA = getValueFn(a);
+                                const rawB = getValueFn(b);
+
+                                const numA = (rawA !== null && rawA !== undefined && rawA !== '' && rawA !== '—') ? Number(rawA) : (currentSortDirection === 'desc' ? -999 : 999);
+                                const numB = (rawB !== null && rawB !== undefined && rawB !== '' && rawB !== '—') ? Number(rawB) : (currentSortDirection === 'desc' ? -999 : 999);
+
+                                if (isNaN(numA) && isNaN(numB)) {
+                                    const strA = String(rawA || '');
+                                    const strB = String(rawB || '');
+                                    return currentSortDirection === 'desc' ? strB.localeCompare(strA, 'vi') : strA.localeCompare(strB, 'vi');
+                                }
+                                if (isNaN(numA)) return 1;
+                                if (isNaN(numB)) return -1;
+
+                                return currentSortDirection === 'desc' ? numB - numA : numA - numB;
+                            });
+
+                            renderMatrix(matrix);
+                        }
+                    };
 
                     const params = () => new URLSearchParams({
                         school_year_id: controls.year?.value || '',
                         grade_level: controls.grade?.value || '',
                         class_id: controls.classRoom?.value || '',
                         subject_id: controls.subject?.value || '',
-                        teacher_id: controls.teacher?.value || '',
                         semester_id: controls.semester?.value || '',
                         hinh_thuc_danh_gia: activeEvaluationType,
                         q: controls.search?.value || '',
@@ -1237,13 +1264,21 @@
                     const renderContext = (payload) => {
                         const classContext = payload.class_context;
                         if (!classContext) {
-                            context.textContent = 'Chọn lớp để xem ma trận điểm tất cả các môn.';
+                            context.innerHTML = 'Chọn lớp để xem ma trận điểm tất cả các môn.';
                             return;
                         }
 
-                        const teacher = classContext.class_teacher?.name || 'Chưa phân công GVCN';
+                        const homeroomTeacher = classContext.class_teacher?.name || 'Chưa phân công GVCN';
                         const total = classContext.students?.length || 0;
-                        context.textContent = `${classContext.name} · GVCN: ${teacher} · ${total} HS`;
+
+                        let subjectTeacherText = '';
+                        const selectedSubjectId = controls.subject?.value || payload.filters?.subject_id;
+                        if (selectedSubjectId && classContext.subject_teachers?.[selectedSubjectId]) {
+                            const teacherName = classContext.subject_teachers[selectedSubjectId];
+                            subjectTeacherText = ` · <span class="text-orange-700 font-medium ms-1">💡 Giáo viên phụ trách: ${teacherName}</span>`;
+                        }
+
+                        context.innerHTML = `<strong>${classContext.name}</strong> · GVCN: ${homeroomTeacher} · ${total} HS${subjectTeacherText}`;
                     };
 
                     const renderFilters = (payload) => {
@@ -1290,10 +1325,35 @@
                             }
                         }
 
+                        const createSortableTh = (label, columnKey, getValueFn, extraClass = '') => {
+                            const th = document.createElement('th');
+                            th.className = `${extraClass} cursor-pointer select-none align-middle`.trim();
+                            th.title = `Click để sắp xếp điểm ${label}`;
+
+                            const labelText = document.createTextNode(label);
+                            th.appendChild(labelText);
+
+                            const iconSpan = document.createElement('span');
+                            const isActive = currentSortColumn === columnKey;
+
+                            iconSpan.className = 'text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs';
+                            iconSpan.textContent = '↕';
+
+                            th.appendChild(iconSpan);
+
+                            const triggerSort = (e) => {
+                                e.stopPropagation();
+                                handleSort(columnKey, getValueFn);
+                            };
+
+                            th.addEventListener('click', triggerSort);
+                            return th;
+                        };
+
                         const appendTermHeaders = (row) => {
-                            row.appendChild(cell('th', 'HK1', 'admin-score-term bg-orange-50/20'));
-                            row.appendChild(cell('th', 'HK2', 'admin-score-term bg-orange-50/20'));
-                            row.appendChild(cell('th', 'Cả Năm', 'admin-score-term bg-orange-50/20'));
+                            row.appendChild(createSortableTh('HK1', 'hk1', (r) => r.summary?.hk1_gpa, 'admin-score-term bg-orange-50/20'));
+                            row.appendChild(createSortableTh('HK2', 'hk2', (r) => r.summary?.hk2_gpa, 'admin-score-term bg-orange-50/20'));
+                            row.appendChild(createSortableTh('Cả Năm', 'year', (r) => r.summary?.year_gpa, 'admin-score-term bg-orange-50/20'));
                         };
                         const appendSummaryCells = (rowEl, row) => {
                             const hk1 = document.createElement('td');
@@ -1327,14 +1387,23 @@
                                 tr.appendChild(cell('th', 'Tên Lớp'));
                                 appendTermHeaders(tr);
                                 break;
-                            case 'subject_details':
-                                ['Điểm Miệng', '15 phút (1)', '15 phút (2)', 'Giữa kỳ', 'Cuối kỳ', 'TB Môn'].forEach((label) => {
-                                    tr.appendChild(cell('th', label));
+                            case 'subject_details': {
+                                const detailKeyMap = [
+                                    { label: 'Điểm Miệng', key: 'oral' },
+                                    { label: '15 phút (1)', key: 'fifteen_1' },
+                                    { label: '15 phút (2)', key: 'fifteen_2' },
+                                    { label: 'Giữa kỳ', key: 'midterm' },
+                                    { label: 'Cuối kỳ', key: 'final' },
+                                    { label: 'TB Môn', key: 'average' },
+                                ];
+                                detailKeyMap.forEach((item) => {
+                                    tr.appendChild(createSortableTh(item.label, item.key, (r) => r.detail_cells?.[item.key]));
                                 });
                                 break;
+                            }
                             case 'class_subjects':
-                                allHeaders.forEach((header) => {
-                                    tr.appendChild(cell('th', header.name));
+                                allHeaders.forEach((header, idx) => {
+                                    tr.appendChild(createSortableTh(header.name, `subject_${idx}`, (r) => r.cells?.[idx]?.value));
                                 });
                                 appendTermHeaders(tr);
                                 break;
@@ -1448,25 +1517,14 @@
                     const refreshCascade = async () => {
                         const payload = await requestJson(urls.cascade, params());
                         const hadSubject = Boolean(controls.subject?.value);
-                        const hadTeacher = Boolean(controls.teacher?.value);
-                        const selectedSubjectForDropdown = !isResettingFilters && (hadSubject || hadTeacher)
+                        const selectedSubjectForDropdown = !isResettingFilters && hadSubject
                             ? (payload.selected_subject_id || controls.subject?.value || '')
                             : '';
-                        setOptions(controls.classRoom, payload.classes || [], 'Tất cả lớp', controls.classRoom?.value || '');
+                        setOptions(controls.classRoom, payload.classes || [], 'Tất cả lớp', payload.filters?.class_id || controls.classRoom?.value || '');
                         setOptions(controls.subject, payload.subjects || [], 'Tất cả môn học', selectedSubjectForDropdown);
-                        setOptions(
-                            controls.teacher,
-                            payload.teachers || [],
-                            'Chọn Giáo viên',
-                            !isResettingFilters && hadTeacher ? (payload.selected_teacher_id || controls.teacher?.value || '') : ''
-                        );
 
-                        if (!isResettingFilters && (hadSubject || hadTeacher) && payload.selected_subject_id && controls.subject) {
+                        if (!isResettingFilters && hadSubject && payload.selected_subject_id && controls.subject) {
                             controls.subject.value = payload.selected_subject_id;
-                        }
-
-                        if (!isResettingFilters && hadTeacher && payload.selected_teacher_id && controls.teacher) {
-                            controls.teacher.value = payload.selected_teacher_id;
                         }
                     };
 
@@ -1595,18 +1653,11 @@
                             .catch(console.error);
                     });
 
-                    controls.teacher?.addEventListener('change', () => {
-                        refreshCascade()
-                            .then(refreshMatrix)
-                            .catch(console.error);
-                    });
-
                     controls.reset?.addEventListener('click', () => {
                         if (controls.search) controls.search.value = '';
                         if (controls.grade) controls.grade.value = '';
                         if (controls.classRoom) controls.classRoom.value = '';
                         if (controls.subject) controls.subject.value = '';
-                        if (controls.teacher) controls.teacher.value = '';
                         if (controls.year) controls.year.value = initial.filters?.school_year_id || controls.year.value || '';
                         if (controls.semester) controls.semester.value = initial.filters?.semester_id || controls.semester.value || '';
 
@@ -1619,33 +1670,42 @@
                             });
                     });
 
-                    if (evalToggleEl) {
-                        evalToggleEl.addEventListener('click', (e) => {
-                            const btn = e.target.closest('[data-eval-tab]');
-                            if (!btn) return;
-                            const targetTab = String(btn.dataset.evalTab).trim().toUpperCase();
-                            if (targetTab && activeEvaluationType !== targetTab) {
-                                activeEvaluationType = targetTab;
-                                refreshMatrix().catch(console.error);
-                            }
-                        });
-                    }
+                    const switchEvalTab = async (targetTab) => {
+                        const normTab = String(targetTab).trim().toUpperCase();
+                        activeEvaluationType = normTab === 'ASSESSMENT' || normTab === 'PASS_FAIL' ? 'ASSESSMENT' : 'GRADE_10';
+
+                        if (grade10TabBtn && assessmentTabBtn) {
+                            const activeClass = 'btn text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs';
+                            const inactiveClass = 'btn text-xs font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all';
+                            const isGrade10 = activeEvaluationType === 'GRADE_10';
+                            grade10TabBtn.className = isGrade10 ? activeClass : inactiveClass;
+                            assessmentTabBtn.className = !isGrade10 ? activeClass : inactiveClass;
+                        }
+
+                        await refreshMatrix();
+                    };
 
                     if (grade10TabBtn) {
-                        grade10TabBtn.addEventListener('click', () => {
-                            if (activeEvaluationType !== 'GRADE_10') {
-                                activeEvaluationType = 'GRADE_10';
-                                refreshMatrix().catch(console.error);
-                            }
+                        grade10TabBtn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            switchEvalTab('GRADE_10').catch(console.error);
                         });
                     }
 
                     if (assessmentTabBtn) {
-                        assessmentTabBtn.addEventListener('click', () => {
-                            if (activeEvaluationType !== 'ASSESSMENT') {
-                                activeEvaluationType = 'ASSESSMENT';
-                                refreshMatrix().catch(console.error);
-                            }
+                        assessmentTabBtn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            switchEvalTab('ASSESSMENT').catch(console.error);
+                        });
+                    }
+
+                    if (evalToggleEl) {
+                        evalToggleEl.addEventListener('click', (e) => {
+                            const btn = e.target.closest('[data-eval-tab]');
+                            if (!btn) return;
+                            e.preventDefault();
+                            const targetTab = String(btn.dataset.evalTab).trim().toUpperCase();
+                            switchEvalTab(targetTab).catch(console.error);
                         });
                     }
 

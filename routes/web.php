@@ -40,6 +40,8 @@ use App\Http\Controllers\TeachingAssignmentController;
 use App\Http\Controllers\TimetableController;
 use Illuminate\Support\Facades\Route;
 
+
+
 Route::get('/', [LandingPageController::class, 'index'])->name('home');
 
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -152,7 +154,7 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::get('scores/report-card/export', [ScoreController::class, 'exportReportCard'])->name('scores.report-card.export');
     });
 
-    Route::middleware('role:admin,staff')->group(function () {
+    Route::middleware('role:admin,staff,teacher')->group(function () {
         Route::get('scores/cascade', [ScoreController::class, 'cascade'])->name('scores.cascade');
         Route::get('scores/admin-matrix', [ScoreController::class, 'adminMatrix'])->name('scores.admin-matrix');
     });
@@ -176,8 +178,17 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
     });
 
     Route::middleware('role:teacher')->group(function () {
+        Route::get('teacher', [TeacherPortalController::class, 'classes']);
+        Route::get('teacher/dashboard', [DashboardController::class, 'index']);
         Route::get('teacher/classes', [TeacherPortalController::class, 'classes'])->name('teacher.classes');
         Route::get('teacher/classes/{class}/students', [TeacherPortalController::class, 'classStudents'])->name('teacher.classes.students');
+        Route::get('teacher/homeroom', [TeacherPortalController::class, 'classes'])->name('teacher.homeroom');
+        Route::get('teacher/homeroom/scores', [TeacherPortalController::class, 'homeroomScores'])->name('teacher.homeroom.scores');
+        Route::get('teacher/scores', [ScoreController::class, 'index']);
+        Route::get('teacher/scores/entry', [ScoreController::class, 'entry']);
+        Route::get('teacher/attendance', [AttendanceController::class, 'index']);
+        Route::get('teacher/conduct', [ConductController::class, 'index']);
+        Route::get('teacher/timetable', [TimetableController::class, 'index']);
         Route::get('teacher/department', [TeacherPortalController::class, 'departmentOverview'])->name('teacher.department');
         Route::get('teacher/leave-requests', [ParentLeaveRequestController::class, 'manage'])->name('teacher.leave-requests.index');
         Route::patch('teacher/leave-requests/{leaveRequest}/approve', [ParentLeaveRequestController::class, 'approve'])->name('teacher.leave-requests.approve');
@@ -233,4 +244,12 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
     Route::get('reports/class-summary', [ReportController::class, 'classSummary'])
         ->middleware('role:admin,staff,teacher')
         ->name('reports.class-summary');
+
+    // Đăng ký cổng nhận tin nhắn của bong bóng chat lề phải
+    Route::post('/chatbot/send', 'App\Http\Controllers\Admin\ChatbotController@handleChat')->name('chatbot.send');
+
 });
+
+
+
+

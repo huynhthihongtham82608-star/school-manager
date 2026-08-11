@@ -291,10 +291,10 @@ class TimetableController extends Controller
                 ], $payload);
 
                 $action = $entry->wasRecentlyCreated ? 'timetable_entry_created' : 'timetable_entry_updated';
-                $description = ($entry->wasRecentlyCreated ? 'Tạo' : 'Sửa')
+                $description = ($entry->wasRecentlyCreated ? 'Táº¡o' : 'Sá»­a')
                     . ' ' . self::periodDisplayLabel((int) $slot['period'])
                     . ' ' . (self::DAYS[$slot['day']] ?? $slot['day'])
-                    . ' lớp ' . ($timetable->classRoom->name ?? '');
+                    . ' lá»›p ' . ($timetable->classRoom->name ?? '');
 
                 AuditLogger::log($action, TimetableEntry::class, (string) $entry->getKey(), $description);
             }
@@ -302,11 +302,11 @@ class TimetableController extends Controller
 
         if ($request->expectsJson()) {
             return response()->json([
-                'message' => 'Đã lưu thời khóa biểu.',
+                'message' => 'ÄÃ£ lÆ°u thá»i khÃ³a biá»ƒu.',
             ]);
         }
 
-        return back()->with('success', 'Đã lưu thời khóa biểu.');
+        return back()->with('success', 'ÄÃ£ lÆ°u thá»i khÃ³a biá»ƒu.');
     }
 
     public function clone(Request $request)
@@ -331,7 +331,7 @@ class TimetableController extends Controller
             ->first();
 
         if (! $sourceTimetable) {
-            return back()->withErrors(['clone' => 'Không tìm thấy thời khóa biểu nguồn để sao chép.']);
+            return back()->withErrors(['clone' => 'KhÃ´ng tÃ¬m tháº¥y thá»i khÃ³a biá»ƒu nguá»“n Ä‘á»ƒ sao chÃ©p.']);
         }
 
         $targetTimetable = Timetable::firstOrCreate([
@@ -454,7 +454,7 @@ class TimetableController extends Controller
             }
 
             foreach ($pendingSpecialEntries as [$sourceEntry, $subject, $targetTeacher]) {
-                $room = $sourceEntry->roomInfo?->isActive() ? $sourceEntry->roomInfo->name : ($sourceEntry->room ?: ($subject->isActivitySubject() ? 'Sân trường' : null));
+                $room = $sourceEntry->roomInfo?->isActive() ? $sourceEntry->roomInfo->name : ($sourceEntry->room ?: ($subject->isActivitySubject() ? 'SÃ¢n trÆ°á»ng' : null));
 
                 TimetableEntry::updateOrCreate([
                     'timetable_id' => $targetTimetable->id,
@@ -466,7 +466,7 @@ class TimetableController extends Controller
                     'teacher_id' => $targetTeacher?->id,
                     'room' => $room,
                     'room_id' => $sourceEntry->roomInfo?->isActive() ? $sourceEntry->roomInfo->id : null,
-                    'note' => $subject->isHomeroomSubject() ? 'Sinh hoạt chủ nhiệm' : 'Hoạt động tập thể',
+                    'note' => $subject->isHomeroomSubject() ? 'Sinh hoáº¡t chá»§ nhiá»‡m' : 'Hoáº¡t Ä‘á»™ng táº­p thá»ƒ',
                     'status' => $sourceEntry->status,
                     'archived_at' => null,
                 ]);
@@ -474,14 +474,14 @@ class TimetableController extends Controller
                 $count++;
             }
 
-            AuditLogger::log('timetable_cloned', Timetable::class, (string) $targetTimetable->getKey(), 'Clone thời khóa biểu HK1 sang HK2 cùng lớp: ' . $count . ' tiết');
+            AuditLogger::log('timetable_cloned', Timetable::class, (string) $targetTimetable->getKey(), 'Clone thá»i khÃ³a biá»ƒu HK1 sang HK2 cÃ¹ng lá»›p: ' . $count . ' tiáº¿t');
 
             return $count;
         });
 
         return redirect()
             ->route('timetable.manage', ['class_id' => $sourceClass->id, 'semester_id' => $targetSemester->id, 'school_year_id' => $targetSemester->school_year_id])
-            ->with('success', 'Đã clone ' . $created . ' tiết học sang học kỳ 2.');
+            ->with('success', 'ÄÃ£ clone ' . $created . ' tiáº¿t há»c sang há»c ká»³ 2.');
     }
 
     protected function teacherView()
@@ -507,6 +507,16 @@ class TimetableController extends Controller
         return view('timetables.teacher', [
             'entries' => $entries,
             'dayMap' => self::DAYS + [7 => 'CN'],
+            'teachingDays' => collect(self::DAYS)->only([1, 2, 3, 4, 5, 6])->all(),
+            'teachingPeriods' => [
+                1 => 'Tiết 1',
+                2 => 'Tiết 2',
+                3 => 'Tiết 3',
+                4 => 'Tiết 4',
+                5 => 'Tiết 5',
+            ],
+            'teachingPeriodGroups' => self::PERIOD_GROUPS,
+            'teachingSchedule' => $entries->groupBy(fn (TimetableEntry $entry) => ((int) $entry->day_of_week) . '-' . ((int) $entry->period)),
         ]);
     }
 
@@ -556,7 +566,7 @@ class TimetableController extends Controller
     {
         if ((string) $class->school_year_id !== (string) $semester->school_year_id) {
             throw ValidationException::withMessages([
-                'class_id' => 'Lớp không thuộc năm học của học kỳ đã chọn.',
+                'class_id' => 'Lá»›p khÃ´ng thuá»™c nÄƒm há»c cá»§a há»c ká»³ Ä‘Ã£ chá»n.',
             ]);
         }
 
@@ -566,13 +576,13 @@ class TimetableController extends Controller
 
         if ($semester->isLocked() || $semester->isArchived()) {
             throw ValidationException::withMessages([
-                'semester_id' => 'Không thể quản lý thời khóa biểu trong học kỳ đã khóa hoặc lưu trữ.',
+                'semester_id' => 'KhÃ´ng thá»ƒ quáº£n lÃ½ thá»i khÃ³a biá»ƒu trong há»c ká»³ Ä‘Ã£ khÃ³a hoáº·c lÆ°u trá»¯.',
             ]);
         }
 
         if (! $class->isActive() || $class->isArchived()) {
             throw ValidationException::withMessages([
-                'class_id' => 'Chỉ được quản lý thời khóa biểu cho lớp đang hoạt động.',
+                'class_id' => 'Chá»‰ Ä‘Æ°á»£c quáº£n lÃ½ thá»i khÃ³a biá»ƒu cho lá»›p Ä‘ang hoáº¡t Ä‘á»™ng.',
             ]);
         }
     }
@@ -581,13 +591,13 @@ class TimetableController extends Controller
     {
         if ($this->isHistoricalReadOnly()) {
             throw ValidationException::withMessages([
-                'timetable' => 'Đang xem dữ liệu lịch sử, không thể thay đổi thời khóa biểu.',
+                'timetable' => 'Äang xem dá»¯ liá»‡u lá»‹ch sá»­, khÃ´ng thá»ƒ thay Ä‘á»•i thá»i khÃ³a biá»ƒu.',
             ]);
         }
 
         if ($timetable->semester?->isLocked() || $timetable->semester?->isArchived()) {
             throw ValidationException::withMessages([
-                'timetable' => 'Không thể chỉnh sửa thời khóa biểu trong học kỳ đã khóa hoặc lưu trữ.',
+                'timetable' => 'KhÃ´ng thá»ƒ chá»‰nh sá»­a thá»i khÃ³a biá»ƒu trong há»c ká»³ Ä‘Ã£ khÃ³a hoáº·c lÆ°u trá»¯.',
             ]);
         }
     }
@@ -609,7 +619,7 @@ class TimetableController extends Controller
 
                 if (! array_key_exists($status, TimetableEntry::STATUSES)) {
                     throw ValidationException::withMessages([
-                        "entries.$day.$period.status" => 'Trạng thái tiết học không hợp lệ.',
+                        "entries.$day.$period.status" => 'Tráº¡ng thÃ¡i tiáº¿t há»c khÃ´ng há»£p lá»‡.',
                     ]);
                 }
 
@@ -669,7 +679,7 @@ class TimetableController extends Controller
 
         if (! $type || ! $id) {
             throw ValidationException::withMessages([
-                'entry_value' => 'Môn học trong thời khóa biểu không hợp lệ.',
+                'entry_value' => 'MÃ´n há»c trong thá»i khÃ³a biá»ƒu khÃ´ng há»£p lá»‡.',
             ]);
         }
 
@@ -687,7 +697,7 @@ class TimetableController extends Controller
 
         if ($type !== 'subject') {
             throw ValidationException::withMessages([
-                'entry_value' => 'Môn học trong thời khóa biểu không hợp lệ.',
+                'entry_value' => 'MÃ´n há»c trong thá»i khÃ³a biá»ƒu khÃ´ng há»£p lá»‡.',
             ]);
         }
 
@@ -695,13 +705,13 @@ class TimetableController extends Controller
 
         if ($subject->status !== Subject::STATUS_ACTIVE) {
             throw ValidationException::withMessages([
-                'subject_id' => 'Chỉ được xếp môn học đang hoạt động.',
+                'subject_id' => 'Chá»‰ Ä‘Æ°á»£c xáº¿p mÃ´n há»c Ä‘ang hoáº¡t Ä‘á»™ng.',
             ]);
         }
 
         if ($subject->requiresTeachingAssignment()) {
             throw ValidationException::withMessages([
-                'subject_id' => 'Môn chính khóa phải được phân công giảng dạy trước khi xếp thời khóa biểu.',
+                'subject_id' => 'MÃ´n chÃ­nh khÃ³a pháº£i Ä‘Æ°á»£c phÃ¢n cÃ´ng giáº£ng dáº¡y trÆ°á»›c khi xáº¿p thá»i khÃ³a biá»ƒu.',
             ]);
         }
 
@@ -715,22 +725,22 @@ class TimetableController extends Controller
 
             if (! $teacher) {
                 throw ValidationException::withMessages([
-                    'teacher_id' => 'Lớp chưa có giáo viên chủ nhiệm nên chưa thể xếp môn Chủ nhiệm.',
+                    'teacher_id' => 'Lá»›p chÆ°a cÃ³ giÃ¡o viÃªn chá»§ nhiá»‡m nÃªn chÆ°a thá»ƒ xáº¿p mÃ´n Chá»§ nhiá»‡m.',
                 ]);
             }
 
             if (! $teacher->isWorking()) {
                 throw ValidationException::withMessages([
-                    'teacher_id' => 'Giáo viên chủ nhiệm của lớp không còn đang công tác.',
+                    'teacher_id' => 'GiÃ¡o viÃªn chá»§ nhiá»‡m cá»§a lá»›p khÃ´ng cÃ²n Ä‘ang cÃ´ng tÃ¡c.',
                 ]);
             }
 
-            $note = 'Sinh hoạt chủ nhiệm';
+            $note = 'Sinh hoáº¡t chá»§ nhiá»‡m';
         }
 
         if ($subject->isActivitySubject()) {
-            $roomLabel = 'Sân trường';
-            $note = 'Hoạt động tập thể';
+            $roomLabel = 'SÃ¢n trÆ°á»ng';
+            $note = 'Hoáº¡t Ä‘á»™ng táº­p thá»ƒ';
         }
 
         return [
@@ -754,7 +764,7 @@ class TimetableController extends Controller
             || ! $assignment->teacher?->isWorking()
         ) {
             throw ValidationException::withMessages([
-                'assignment_id' => 'Phân công không hợp lệ hoặc không còn hoạt động.',
+                'assignment_id' => 'PhÃ¢n cÃ´ng khÃ´ng há»£p lá»‡ hoáº·c khÃ´ng cÃ²n hoáº¡t Ä‘á»™ng.',
             ]);
         }
 
@@ -762,13 +772,13 @@ class TimetableController extends Controller
 
         if (! $assignment->subject?->requiresTeachingAssignment()) {
             throw ValidationException::withMessages([
-                'assignment_id' => 'Môn Chủ nhiệm hoặc Hoạt động không cần phân công giảng dạy. Hãy chọn trực tiếp môn đó trong thời khóa biểu.',
+                'assignment_id' => 'MÃ´n Chá»§ nhiá»‡m hoáº·c Hoáº¡t Ä‘á»™ng khÃ´ng cáº§n phÃ¢n cÃ´ng giáº£ng dáº¡y. HÃ£y chá»n trá»±c tiáº¿p mÃ´n Ä‘Ã³ trong thá»i khÃ³a biá»ƒu.',
             ]);
         }
 
         if (! $assignment->subject->departments()->exists()) {
             throw ValidationException::withMessages([
-                'assignment_id' => 'Môn chính khóa phải được cấu hình Tổ chuyên môn trước khi xếp thời khóa biểu.',
+                'assignment_id' => 'MÃ´n chÃ­nh khÃ³a pháº£i Ä‘Æ°á»£c cáº¥u hÃ¬nh Tá»• chuyÃªn mÃ´n trÆ°á»›c khi xáº¿p thá»i khÃ³a biá»ƒu.',
             ]);
         }
 
@@ -787,7 +797,7 @@ class TimetableController extends Controller
 
         if (! $room->isActive()) {
             throw ValidationException::withMessages([
-                'room_id' => 'Chỉ được chọn phòng học đang hoạt động.',
+                'room_id' => 'Chá»‰ Ä‘Æ°á»£c chá»n phÃ²ng há»c Ä‘ang hoáº¡t Ä‘á»™ng.',
             ]);
         }
 
@@ -803,7 +813,7 @@ class TimetableController extends Controller
         }
 
         throw ValidationException::withMessages([
-            'assignment_id' => 'Môn học này chưa cấu hình định mức tiết/tuần cho khối ' . $class->grade_level . ', hoặc phân công chưa có giá trị điều chỉnh.',
+            'assignment_id' => 'MÃ´n há»c nÃ y chÆ°a cáº¥u hÃ¬nh Ä‘á»‹nh má»©c tiáº¿t/tuáº§n cho khá»‘i ' . $class->grade_level . ', hoáº·c phÃ¢n cÃ´ng chÆ°a cÃ³ giÃ¡ trá»‹ Ä‘iá»u chá»‰nh.',
         ]);
     }
 
@@ -826,13 +836,13 @@ class TimetableController extends Controller
                 $assignment?->loadMissing(['subject', 'classRoom']);
 
                 throw ValidationException::withMessages([
-                    'assignment_id' => 'Phân công ' . ($assignment?->subject?->name ?? 'môn học') . ' lớp ' . ($assignment?->classRoom?->name ?? '') . ' chưa có định mức tiết/tuần.',
+                    'assignment_id' => 'PhÃ¢n cÃ´ng ' . ($assignment?->subject?->name ?? 'mÃ´n há»c') . ' lá»›p ' . ($assignment?->classRoom?->name ?? '') . ' chÆ°a cÃ³ Ä‘á»‹nh má»©c tiáº¿t/tuáº§n.',
                 ]);
             }
 
             if ($count > $limit) {
                 throw ValidationException::withMessages([
-                    'assignment_id' => 'Phân công ' . ($assignment?->subject?->name ?? 'môn học') . ' lớp ' . ($assignment?->classRoom?->name ?? '') . ' chỉ được xếp tối đa ' . $limit . ' tiết/tuần. Hiện đang xếp ' . $count . '/' . $limit . ' tiết.',
+                    'assignment_id' => 'PhÃ¢n cÃ´ng ' . ($assignment?->subject?->name ?? 'mÃ´n há»c') . ' lá»›p ' . ($assignment?->classRoom?->name ?? '') . ' chá»‰ Ä‘Æ°á»£c xáº¿p tá»‘i Ä‘a ' . $limit . ' tiáº¿t/tuáº§n. Hiá»‡n Ä‘ang xáº¿p ' . $count . '/' . $limit . ' tiáº¿t.',
                 ]);
             }
         }
@@ -862,7 +872,7 @@ class TimetableController extends Controller
 
         if ($conflict) {
             throw ValidationException::withMessages([
-                'teacher_conflict' => 'Giáo viên ' . ($teacher->name ?? '') . ' đã có lịch dạy ở ' . (self::DAYS[$day] ?? $day) . ', ' . self::periodDisplayLabel($period) . '.',
+                'teacher_conflict' => 'GiÃ¡o viÃªn ' . ($teacher->name ?? '') . ' Ä‘Ã£ cÃ³ lá»‹ch dáº¡y á»Ÿ ' . (self::DAYS[$day] ?? $day) . ', ' . self::periodDisplayLabel($period) . '.',
             ]);
         }
     }
@@ -886,7 +896,7 @@ class TimetableController extends Controller
 
         if ($conflict) {
             throw ValidationException::withMessages([
-                'room_id' => 'Phòng ' . $room->name . ' đã có lịch học ở ' . (self::DAYS[$day] ?? $day) . ', ' . self::periodDisplayLabel($period) . '.',
+                'room_id' => 'PhÃ²ng ' . $room->name . ' Ä‘Ã£ cÃ³ lá»‹ch há»c á»Ÿ ' . (self::DAYS[$day] ?? $day) . ', ' . self::periodDisplayLabel($period) . '.',
             ]);
         }
     }
@@ -895,31 +905,31 @@ class TimetableController extends Controller
     {
         if ((string) $sourceSemester->school_year_id !== (string) $targetSemester->school_year_id) {
             throw ValidationException::withMessages([
-                'target_semester_id' => 'Chỉ được clone thời khóa biểu trong cùng một năm học.',
+                'target_semester_id' => 'Chá»‰ Ä‘Æ°á»£c clone thá»i khÃ³a biá»ƒu trong cÃ¹ng má»™t nÄƒm há»c.',
             ]);
         }
 
         if ((string) $class->school_year_id !== (string) $sourceSemester->school_year_id) {
             throw ValidationException::withMessages([
-                'source_class_id' => 'Lớp không thuộc năm học của học kỳ nguồn.',
+                'source_class_id' => 'Lá»›p khÃ´ng thuá»™c nÄƒm há»c cá»§a há»c ká»³ nguá»“n.',
             ]);
         }
 
         if ($this->semesterTermIndex($sourceSemester) !== 1 || $this->semesterTermIndex($targetSemester) !== 2) {
             throw ValidationException::withMessages([
-                'target_semester_id' => 'Chỉ hỗ trợ clone thời khóa biểu từ Học kỳ 1 sang Học kỳ 2 cùng lớp.',
+                'target_semester_id' => 'Chá»‰ há»— trá»£ clone thá»i khÃ³a biá»ƒu tá»« Há»c ká»³ 1 sang Há»c ká»³ 2 cÃ¹ng lá»›p.',
             ]);
         }
 
         if ($targetSemester->isLocked() || $targetSemester->isArchived()) {
             throw ValidationException::withMessages([
-                'target_semester_id' => 'Không thể clone vào học kỳ đã khóa hoặc lưu trữ.',
+                'target_semester_id' => 'KhÃ´ng thá»ƒ clone vÃ o há»c ká»³ Ä‘Ã£ khÃ³a hoáº·c lÆ°u trá»¯.',
             ]);
         }
 
         if (! $class->isActive() || $class->isArchived()) {
             throw ValidationException::withMessages([
-                'source_class_id' => 'Chỉ được clone thời khóa biểu cho lớp đang hoạt động.',
+                'source_class_id' => 'Chá»‰ Ä‘Æ°á»£c clone thá»i khÃ³a biá»ƒu cho lá»›p Ä‘ang hoáº¡t Ä‘á»™ng.',
             ]);
         }
     }
@@ -939,13 +949,13 @@ class TimetableController extends Controller
     {
         if ($reason = $this->entryBusinessDataBlockReason($entry)) {
             throw ValidationException::withMessages([
-                'delete_entry' => 'Không thể xóa tiết học vì đã phát sinh ' . $reason . '.',
+                'delete_entry' => 'KhÃ´ng thá»ƒ xÃ³a tiáº¿t há»c vÃ¬ Ä‘Ã£ phÃ¡t sinh ' . $reason . '.',
             ]);
         }
 
         $entryId = (string) $entry->getKey();
         $entry->delete();
-        AuditLogger::log('timetable_entry_deleted', TimetableEntry::class, $entryId, 'Xóa tiết học khỏi thời khóa biểu');
+        AuditLogger::log('timetable_entry_deleted', TimetableEntry::class, $entryId, 'XÃ³a tiáº¿t há»c khá»i thá»i khÃ³a biá»ƒu');
     }
 
     private function entryBusinessDataBlockReason(TimetableEntry $entry): ?string
@@ -953,11 +963,11 @@ class TimetableController extends Controller
         $entry->loadMissing('timetable');
 
         if ($this->hasAttendanceData($entry)) {
-            return 'điểm danh';
+            return 'Ä‘iá»ƒm danh';
         }
 
         if ($this->hasLearningLogData($entry)) {
-            return 'nhật ký học tập';
+            return 'nháº­t kÃ½ há»c táº­p';
         }
 
         return null;
@@ -1005,7 +1015,7 @@ class TimetableController extends Controller
     {
         if ($this->isHistoricalReadOnly()) {
             throw ValidationException::withMessages([
-                'history_readonly' => 'Đang xem dữ liệu lịch sử, không thể thay đổi thời khóa biểu.',
+                'history_readonly' => 'Äang xem dá»¯ liá»‡u lá»‹ch sá»­, khÃ´ng thá»ƒ thay Ä‘á»•i thá»i khÃ³a biá»ƒu.',
             ]);
         }
     }

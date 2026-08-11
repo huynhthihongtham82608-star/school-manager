@@ -274,7 +274,7 @@
             if ($currentUser->isHomeroom()) {
                 $addRoleGroup('Chủ nhiệm', [
                     $makeRoleItem('bi-person-vcard', 'Hồ sơ lớp chủ nhiệm', route('teacher.classes', ['scope' => 'homeroom']), 'teacher/classes*', ['query' => ['scope' => 'homeroom']]),
-                    $makeRoleItem('bi-clipboard-data', 'Theo dõi điểm toàn lớp', route('reports.index'), 'reports*'),
+                    $makeRoleItem('bi-clipboard-data', 'Theo dõi điểm toàn lớp', route('teacher.homeroom.scores'), 'teacher/homeroom/scores*'),
                     $makeRoleItem('bi-calendar-check', 'Điểm danh & Duyệt nghỉ học', route('attendance.index', ['scope' => 'homeroom']), 'attendance*', ['query' => ['scope' => 'homeroom']]),
                     $makeRoleItem('bi-clipboard-check', 'Đánh giá hạnh kiểm', route('conduct.index'), 'conduct*'),
                 ]);
@@ -442,7 +442,41 @@
         </button>
     </aside>
     @elseif($showRoleMenu)
-    <nav class="role-sidebar" aria-label="Menu chức năng">
+    <style>
+        @media (min-width: 992px) {
+            .role-sidebar {
+                transform: translateX(0) !important;
+                width: 16rem !important;
+                position: fixed !important;
+                left: 0 !important;
+                top: 0 !important;
+                height: 100% !important;
+                background-color: #ffffff !important;
+                border-right: 1px solid #ffedd5 !important;
+                z-index: 40 !important;
+                text-align: left !important;
+            }
+            .role-menu-toggle, .role-sidebar-close {
+                display: none !important;
+            }
+            .main-panel {
+                padding-left: 16rem !important;
+                width: 100% !important;
+                min-height: 100vh !important;
+                background-color: #f9fafb !important;
+                text-align: left !important;
+            }
+            .main-panel > main.content {
+                width: 100% !important;
+                min-height: 100vh !important;
+                padding: 0 1rem 1.5rem 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 1.5rem !important;
+            }
+        }
+    </style>
+    <nav class="role-sidebar w-64 fixed left-0 top-0 h-full bg-white border-r border-orange-100 z-40 text-left" aria-label="Menu chức năng">
         <div class="role-sidebar-head">
             @if($schoolLogoUrl)
                 <img src="{{ $schoolLogoUrl }}" alt="{{ $schoolTitle }}" class="brand-mark rounded-3 object-fit-cover">
@@ -497,7 +531,7 @@
     </nav>
     @endif
 
-    <div class="main-panel flex-grow-1">
+    <div class="main-panel flex-grow-1 w-full min-h-screen pl-64 pr-4 bg-gray-50 flex flex-col gap-6 text-left">
         @if($showSidebar)
         <header class="topbar admin-header-stacked">
                 <div class="admin-info-row px-4 py-3 d-flex justify-content-between align-items-center">
@@ -721,14 +755,14 @@
     <section class="floating-chatbot-panel" aria-label="Chatbot hỗ trợ">
         <div class="floating-chatbot-header">
             <div>
-                <div class="floating-chatbot-title">Chatbot hỗ trợ</div>
-                <div class="floating-chatbot-subtitle">Hỏi nhanh về thông tin trong hệ thống</div>
+                <div class="floating-chatbot-title font-medium text-white">Chatbot hỗ trợ AI</div>
+                <div class="floating-chatbot-subtitle text-xs text-orange-100 font-normal">Hỏi nhanh về thông tin trong hệ thống</div>
             </div>
             <button type="button" class="floating-chatbot-close" data-floating-chatbot-close aria-label="Đóng chatbot">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
-        <div class="floating-chatbot-messages" data-floating-chatbot-messages>
+        <div class="floating-chatbot-messages flex flex-col gap-2 p-3 overflow-y-auto max-h-[380px]" data-floating-chatbot-messages>
             @if(! \Illuminate\Support\Facades\Schema::hasTable('chatbot_messages'))
                 <div class="floating-chatbot-empty">
                     <i class="bi bi-info-circle"></i>
@@ -736,25 +770,32 @@
                 </div>
             @else
                 @forelse($floatingChatMessages as $message)
-                    <div class="chat-row chat-question">
-                        <div class="chat-bubble">{{ $message->question }}</div>
+                    <div class="chat-row chat-question flex justify-end mb-2">
+                        <div class="bg-orange-600 text-white text-sm rounded-lg p-2.5 max-w-[85%] font-normal shadow-xs text-left">{{ $message->question }}</div>
                     </div>
-                    <div class="chat-row chat-answer">
-                        <div class="chat-bubble">{{ $message->answer }}</div>
+                    <div class="chat-row chat-answer flex justify-start mb-2">
+                        <div class="bg-orange-50/50 text-gray-800 text-sm rounded-lg p-2.5 max-w-[85%] font-normal shadow-xs mb-2 text-left">{{ $message->answer }}</div>
                     </div>
                 @empty
-                    <div class="floating-chatbot-empty">
-                        <i class="bi bi-robot"></i>
-                        Nhập câu hỏi để bắt đầu trao đổi.
+                    <div class="chat-row chat-answer flex justify-start mb-2" data-chatbot-welcome>
+                        <div class="bg-orange-50/50 text-gray-800 text-sm rounded-lg p-2.5 max-w-[85%] font-normal shadow-xs mb-2 text-left">
+                            🤖 Xin chào! Tôi là Robot trợ lý học đường. Hãy đặt câu hỏi hoặc chọn các câu hỏi gợi ý bên dưới để trao đổi nhé!
+                        </div>
                     </div>
                 @endforelse
             @endif
         </div>
-        <form method="POST" action="{{ route('chatbot.ask') }}" class="floating-chatbot-form">
-            @csrf
-            <input type="hidden" name="chatbot_widget" value="1">
-            <input name="question" class="form-control" placeholder="Nhập câu hỏi..." required maxlength="1000" autocomplete="off">
-            <button class="btn btn-primary" aria-label="Gửi câu hỏi">
+
+        <!-- QUICK QUESTION SUGGESTION BUTTONS -->
+        <div class="p-2 border-t border-orange-100/60 bg-orange-50/20 flex flex-wrap gap-1.5" data-chatbot-quick-actions>
+            <button type="button" class="text-xs font-normal text-orange-700 bg-white border border-orange-200 hover:bg-orange-50 px-2 py-1 rounded-md transition-all cursor-pointer shadow-2xs" data-quick-msg="📅 Lịch kiểm tra">📅 Lịch kiểm tra</button>
+            <button type="button" class="text-xs font-normal text-orange-700 bg-white border border-orange-200 hover:bg-orange-50 px-2 py-1 rounded-md transition-all cursor-pointer shadow-2xs" data-quick-msg="⚖️ Công thức điểm">⚖️ Công thức điểm</button>
+            <button type="button" class="text-xs font-normal text-orange-700 bg-white border border-orange-200 hover:bg-orange-50 px-2 py-1 rounded-md transition-all cursor-pointer shadow-2xs" data-quick-msg="🔒 Cách đổi mật khẩu">🔒 Cách đổi mật khẩu</button>
+        </div>
+
+        <form class="floating-chatbot-form flex items-center gap-2 p-2 border-t border-gray-100 bg-white" data-floating-chatbot-form onsubmit="return false;">
+            <input name="question" class="form-control text-sm border border-orange-200 rounded-md py-1.5 px-3 w-full font-normal focus:border-orange-500 focus:ring-1 focus:ring-orange-500" placeholder="Nhập câu hỏi..." autocomplete="off" data-chatbot-input>
+            <button type="button" class="btn bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-md transition-all text-sm font-normal cursor-pointer flex items-center justify-center shrink-0" aria-label="Gửi câu hỏi" data-chatbot-send-btn>
                 <i class="bi bi-send"></i>
             </button>
         </form>
@@ -1047,6 +1088,19 @@
         const toggle = chatbot.querySelector('[data-floating-chatbot-toggle]');
         const closeButton = chatbot.querySelector('[data-floating-chatbot-close]');
         const messages = chatbot.querySelector('[data-floating-chatbot-messages]');
+        const form = chatbot.querySelector('[data-floating-chatbot-form]');
+        const input = chatbot.querySelector('[data-chatbot-input]');
+        const sendBtn = chatbot.querySelector('[data-chatbot-send-btn]');
+        const quickBtns = chatbot.querySelectorAll('[data-quick-msg]');
+
+        const scrollToBottom = () => {
+            if (messages) {
+                messages.scrollTo({
+                    top: messages.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }
+        };
 
         const setOpen = (isOpen) => {
             chatbot.classList.toggle('open', isOpen);
@@ -1054,7 +1108,7 @@
 
             if (isOpen && messages) {
                 window.requestAnimationFrame(() => {
-                    messages.scrollTop = messages.scrollHeight;
+                    scrollToBottom();
                 });
             }
         };
@@ -1063,8 +1117,112 @@
         closeButton?.addEventListener('click', () => setOpen(false));
 
         if (chatbot.classList.contains('open') && messages) {
-            messages.scrollTop = messages.scrollHeight;
+            scrollToBottom();
         }
+
+        const escapeHtml = (str) => {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        };
+
+        const sendMessageToAI = (messageText) => {
+            const trimmed = (messageText || '').trim();
+            if (!trimmed) return;
+
+            if (input) input.value = '';
+
+            // 1. Render User Question (Right aligned)
+            const userRow = document.createElement('div');
+            userRow.className = 'chat-row chat-question flex justify-end mb-2';
+            userRow.innerHTML = `<div class="bg-orange-600 text-white text-sm rounded-lg p-2.5 max-w-[85%] font-normal shadow-xs text-left">${escapeHtml(trimmed)}</div>`;
+            messages.appendChild(userRow);
+            scrollToBottom();
+
+            // 2. Render Loading State (3 blinking dots on the left)
+            const loadingRow = document.createElement('div');
+            loadingRow.className = 'chat-row chat-answer chat-loading flex justify-start mb-2';
+            loadingRow.innerHTML = `<div class="bg-orange-50/50 text-gray-800 text-sm rounded-lg p-2.5 max-w-[85%] font-normal shadow-xs mb-2 text-left flex items-center gap-1.5">
+                <span class="inline-block w-2 h-2 rounded-full bg-orange-400 animate-bounce"></span>
+                <span class="inline-block w-2 h-2 rounded-full bg-orange-400 animate-bounce [animation-delay:0.2s]"></span>
+                <span class="inline-block w-2 h-2 rounded-full bg-orange-400 animate-bounce [animation-delay:0.4s]"></span>
+            </div>`;
+            messages.appendChild(loadingRow);
+            scrollToBottom();
+
+            if (input) input.disabled = true;
+            if (sendBtn) sendBtn.disabled = true;
+
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+            // 3. Asynchronous Chat Request to Laravel Backend
+            fetch('/chatbot/send', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ message: trimmed })
+            })
+            .then(res => res.json())
+            .then(data => {
+                loadingRow.remove();
+
+                const botReply = data.reply || 'Xin lỗi, robot chưa nhận được câu trả lời phù hợp.';
+
+                // 4. Render Bot Response
+                const botRow = document.createElement('div');
+                botRow.className = 'chat-row chat-answer flex justify-start mb-2';
+                botRow.innerHTML = `<div class="bg-orange-50/50 text-gray-800 text-sm rounded-lg p-2.5 max-w-[85%] font-normal shadow-xs mb-2 text-left">${escapeHtml(botReply)}</div>`;
+                messages.appendChild(botRow);
+                scrollToBottom();
+            })
+            .catch(err => {
+                console.error('Chatbot API Error:', err);
+                loadingRow.remove();
+
+                const errRow = document.createElement('div');
+                errRow.className = 'chat-row chat-answer flex justify-start mb-2';
+                errRow.innerHTML = `<div class="bg-red-50 text-red-700 text-sm rounded-lg p-2.5 max-w-[85%] font-normal shadow-xs mb-2 text-left">Không thể kết nối với dịch vụ AI. Vui lòng thử lại.</div>`;
+                messages.appendChild(errRow);
+                scrollToBottom();
+            })
+            .finally(() => {
+                if (input) {
+                    input.disabled = false;
+                    input.focus();
+                }
+                if (sendBtn) sendBtn.disabled = false;
+            });
+        };
+
+        sendBtn?.addEventListener('click', (e) => {
+            e.preventDefault();
+            sendMessageToAI(input?.value);
+        });
+
+        input?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendMessageToAI(input?.value);
+            }
+        });
+
+        form?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            sendMessageToAI(input?.value);
+        });
+
+        quickBtns.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const msg = btn.getAttribute('data-quick-msg');
+                if (msg) {
+                    sendMessageToAI(msg);
+                }
+            });
+        });
     })();
 
     document.querySelectorAll('[data-target-role-group]').forEach((group) => {

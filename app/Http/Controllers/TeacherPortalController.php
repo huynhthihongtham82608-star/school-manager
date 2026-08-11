@@ -15,18 +15,39 @@ class TeacherPortalController extends Controller
         $teacher = $request->user()->teacher;
         abort_unless($teacher, 403);
 
+        $isHomeroomScope = $request->query('scope') === 'homeroom' || $request->routeIs('teacher.homeroom');
+
+        if ($isHomeroomScope) {
+            $homeroomClass = SchoolClass::with([
+                'schoolYear',
+                'semester',
+                'students' => fn ($q) => $q->with(['parents', 'classRoom'])->orderBy('student_code'),
+            ])
+                ->where('homeroom_teacher_id', $teacher->id)
+                ->first();
+
+            return view('teachers.homeroom-profile', compact('homeroomClass'));
+        }
+
         $assignedClassIds = $teacher->assignments()
             ->where('status', TeachingAssignment::STATUS_ACTIVE)
-            ->pluck('class_id');
+            ->pluck('class_id')
+            ->unique();
 
-        $classes = SchoolClass::with(['schoolYear', 'semester', 'students'])
+        $classes = SchoolClass::with([
+            'schoolYear',
+            'semester',
+            'students' => fn ($query) => $query->orderBy('student_code')->orderBy('name'),
+        ])
             ->whereIn('id', $assignedClassIds)
-            ->orWhere('homeroom_teacher_id', $teacher->id)
             ->orderBy('grade_level')
             ->orderBy('name')
             ->get();
 
-        return view('teachers.classes', compact('classes'));
+        return view('teachers.classes', [
+            'classes' => $classes,
+            'isHomeroomScope' => false,
+        ]);
     }
 
     public function classStudents(Request $request, SchoolClass $class)
@@ -45,6 +66,36 @@ class TeacherPortalController extends Controller
         $class->load(['schoolYear', 'semester', 'students' => fn ($query) => $query->orderBy('student_code')]);
 
         return view('teachers.class-students', compact('class'));
+    }
+
+    public function homeroomScores(Request $request)
+    {
+        $teacher = $request->user()->teacher;
+        abort_unless($teacher, 403);
+
+        $homeroomClass = SchoolClass::with(['schoolYear', 'semester', 'students' => fn ($q) => $q->where('status', 'studying')->orderBy('student_code')])
+            ->where('homeroom_teacher_id', $teacher->id)
+            ->first();
+
+        if (! $homeroomClass) {
+            return view('teachers.homeroom-scores', [
+                'homeroomClass' => null,
+                'adminMatrix' => null,
+                'adminMatrixJson' => '{}',
+            ]);
+        }
+
+        $request->merge([
+            'class_id' => $homeroomClass->id,
+            'school_year_id' => $homeroomClass->school_year_id,
+            'semester_id' => $request->query('semester_id') ?: $homeroomClass->semester_id,
+        ]);
+
+        $scoreController = new ScoreController();
+        $adminMatrix = $scoreController->adminScoreMatrixPayload($request);
+        $adminMatrixJson = json_encode($adminMatrix, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+        return view('teachers.homeroom-scores', compact('homeroomClass', 'adminMatrix', 'adminMatrixJson'));
     }
 
     public function departmentOverview(Request $request)

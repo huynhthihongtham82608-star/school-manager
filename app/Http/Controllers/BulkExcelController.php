@@ -459,24 +459,11 @@ class BulkExcelController extends Controller
         $subject = Subject::find($context['subject_id'] ?? null);
         $semester = Semester::find($context['semester_id'] ?? null);
 
-        if (! $class || ! $subject || ! $semester || $subject->isNotEvaluated()) {
-            return $this->invalidContextPreview($this->scoreHeaders($class, $subject, $semester), $rows);
-        }
-
-        $columns = $this->scoreColumns($class, $subject, $semester);
-        if ($columns->isEmpty()) {
-            return $this->invalidContextPreview($this->scoreHeaders($class, $subject, $semester), $rows);
-        }
-        $headers = array_merge([
-            ['key' => 'ma_hs', 'label' => 'Mã HS'],
-            ['key' => 'ho_ten', 'label' => 'Họ tên'],
-        ], $columns->map(fn (ScoreColumn $column) => [
-            'key' => $this->scoreColumnImportKey($column),
-            'label' => $column->name,
-        ])->values()->all());
+        $headers = $this->scoreHeaders($class, $subject, $semester);
+        $columns = ($class && $subject && $semester) ? $this->scoreColumns($class, $subject, $semester) : collect();
 
         return $this->buildPreview($headers, $rows, function (string $key, string $value) use ($class, $subject, $columns) {
-            if ($key === 'ma_hs' && ! $this->studentInClass($value, $class)) {
+            if ($key === 'ma_hs' && $class && ! $this->studentInClass($value, $class)) {
                 return 'Lỗi dữ liệu';
             }
 
@@ -484,12 +471,14 @@ class BulkExcelController extends Controller
                 return null;
             }
 
-            $column = $columns->first(fn (ScoreColumn $candidate) => $this->scoreColumnImportKey($candidate) === $key);
-            if (! $column || ! $column->isInputOpen()) {
-                return 'Lỗi dữ liệu';
+            if ($columns->isNotEmpty()) {
+                $column = $columns->first(fn (ScoreColumn $candidate) => $this->scoreColumnImportKey($candidate) === $key);
+                if ($column && ! $column->isInputOpen()) {
+                    return 'Lỗi dữ liệu';
+                }
             }
 
-            if ($subject->usesPassFailAssessment()) {
+            if ($subject && $subject->usesPassFailAssessment()) {
                 return in_array($this->normalizeText($value), ['dat', 'd', 'chua_dat', 'cd', 'khong_dat'], true) ? null : 'Lỗi dữ liệu';
             }
 
@@ -919,9 +908,34 @@ class BulkExcelController extends Controller
         $subject = Subject::find($context['subject_id'] ?? null);
         $semester = Semester::find($context['semester_id'] ?? null);
         $headers = $this->scoreHeaders($class, $subject, $semester);
-        $rows = $class
-            ? $class->students()->orderBy('student_code')->get()->map(fn (Student $student) => array_merge([$student->student_code, $student->name], array_fill(0, max(0, count($headers) - 2), '')))->all()
-            : [['HS001', 'Nguyễn Văn An']];
+
+        $rows = $class && $class->students->isNotEmpty()
+            ? $class->students()->orderBy('student_code')->get()->map(function (Student $student) use ($headers) {
+                return $this->rowForHeaders($headers, [
+                    'ma_hs' => $student->student_code,
+                    'ho_ten' => $student->name,
+                ]);
+            })->all()
+            : [
+                $this->rowForHeaders($headers, [
+                    'ma_hs' => 'HS001',
+                    'ho_ten' => 'Nguyễn Văn An',
+                    'diem_mieng' => '8.5',
+                    'diem_15p_lan_1' => '9.0',
+                    'diem_15p_lan_2' => '8.0',
+                    'diem_giua_ky' => '8.5',
+                    'diem_cuoi_ky' => '9.0',
+                ]),
+                $this->rowForHeaders($headers, [
+                    'ma_hs' => 'HS002',
+                    'ho_ten' => 'Trần Thị Bình',
+                    'diem_mieng' => '7.5',
+                    'diem_15p_lan_1' => '8.0',
+                    'diem_15p_lan_2' => '8.5',
+                    'diem_giua_ky' => '8.0',
+                    'diem_cuoi_ky' => '8.5',
+                ]),
+            ];
 
         return [$this->labels($headers), $rows, 'mau_import_diem_so.xlsx'];
     }
@@ -1723,20 +1737,30 @@ class BulkExcelController extends Controller
 
     private function scoreHeaders(?SchoolClass $class, ?Subject $subject, ?Semester $semester): array
     {
-        if (! $class || ! $subject || ! $semester || $subject->isNotEvaluated()) {
-            return [
-                ['key' => 'ma_hs', 'label' => 'Mã HS'],
-                ['key' => 'ho_ten', 'label' => 'Họ tên'],
-            ];
+        $columns = ($class && $subject && $semester)
+            ? $this->scoreColumns($class, $subject, $semester)
+            : collect();
+
+        if ($columns->isNotEmpty()) {
+            return array_merge([
+                ['key' => 'ma_hs', 'label' => 'Mã học sinh', 'aliases' => ['ma_hoc_sinh', 'student_code']],
+                ['key' => 'ho_ten', 'label' => 'Họ và tên', 'aliases' => ['ho_va_ten', 'name']],
+            ], $columns->map(fn (ScoreColumn $column) => [
+                'key' => $this->scoreColumnImportKey($column),
+                'label' => $column->name,
+                'aliases' => [SimpleExcel::normalizeHeader($column->name)],
+            ])->all());
         }
 
-        return array_merge([
-            ['key' => 'ma_hs', 'label' => 'Mã HS'],
-            ['key' => 'ho_ten', 'label' => 'Họ tên'],
-        ], $this->scoreColumns($class, $subject, $semester)->map(fn (ScoreColumn $column) => [
-            'key' => $this->scoreColumnImportKey($column),
-            'label' => $column->name,
-        ])->all());
+        return [
+            ['key' => 'ma_hs', 'label' => 'Mã học sinh', 'aliases' => ['ma_hoc_sinh', 'student_code']],
+            ['key' => 'ho_ten', 'label' => 'Họ và tên', 'aliases' => ['ho_va_ten', 'name']],
+            ['key' => 'diem_mieng', 'label' => 'Điểm kiểm tra Miệng', 'aliases' => ['oral', 'mieng', 'diem_mieng']],
+            ['key' => 'diem_15p_lan_1', 'label' => 'Điểm kiểm tra 15 phút (Lần 1)', 'aliases' => ['fifteen_1', '15p_1', 'diem_15p_lan_1']],
+            ['key' => 'diem_15p_lan_2', 'label' => 'Điểm kiểm tra 15 phút (Lần 2)', 'aliases' => ['fifteen_2', '15p_2', 'diem_15p_lan_2']],
+            ['key' => 'diem_giua_ky', 'label' => 'Điểm kiểm tra Giữa kỳ', 'aliases' => ['midterm', 'giua_ky', 'diem_giua_ky']],
+            ['key' => 'diem_cuoi_ky', 'label' => 'Điểm kiểm tra Cuối kỳ', 'aliases' => ['final', 'cuoi_ky', 'diem_cuoi_ky']],
+        ];
     }
 
     private function scoreColumnImportKey(ScoreColumn $column): string

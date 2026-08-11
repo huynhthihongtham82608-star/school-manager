@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 @section('title', 'Hạnh kiểm')
 
 @section('content')
@@ -18,6 +18,17 @@
 @endphp
 
 <style>
+    .conduct-toolbar,
+    .conduct-matrix-table,
+    .conduct-summary-bar,
+    .conduct-save-footer {
+        font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #4b5563;
+        font-size: .875rem;
+        font-weight: 400;
+        text-align: left;
+    }
+
     .conduct-toolbar {
         display: flex;
         flex-wrap: wrap;
@@ -102,8 +113,8 @@
 
     .conduct-matrix-table th,
     .conduct-matrix-table td {
-        color: #1f2937;
-        font-size: 1rem;
+        color: #4b5563;
+        font-size: .875rem;
         font-weight: 400;
         text-align: left;
         vertical-align: middle;
@@ -117,28 +128,36 @@
     }
 
     .conduct-student-code {
-        color: #111827;
-        font-weight: 700;
-    }
-
-    .conduct-student-name {
-        color: #111827;
-        font-weight: 700;
-    }
-
-    .conduct-attendance-summary {
-        color: #6b7280;
-        font-size: .92rem;
+        color: #4b5563;
+        font-size: .875rem;
         font-weight: 400;
     }
 
+    .conduct-student-name {
+        color: #374151;
+        font-size: .875rem;
+        font-weight: 400;
+    }
+
+    .conduct-attendance-summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .35rem;
+        margin-top: .35rem;
+    }
+
     .conduct-level-group {
-        display: inline-flex;
+        width: 100%;
+        display: flex;
+        align-items: center;
         flex-wrap: nowrap;
-        gap: .4rem;
+        gap: .375rem;
     }
 
     .conduct-level-option {
+        flex: 1 1 0;
+        min-width: 76px;
         position: relative;
         margin: 0;
         cursor: pointer;
@@ -155,15 +174,31 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-width: 74px;
+        width: 100%;
+        min-width: 76px;
         padding: .34rem .68rem;
-        border-radius: 999px;
+        border-radius: 8px;
         font-size: .9rem;
         font-weight: 400;
         line-height: 1.2;
         white-space: nowrap;
         border: 1px solid transparent;
         transition: all .16s ease;
+    }
+
+    .conduct-attendance-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: .375rem;
+        padding: .125rem .5rem;
+        border: 1px solid rgba(229, 231, 235, .6);
+        border-radius: 999px;
+        color: #6b7280;
+        background: #f9fafb;
+        font-size: .75rem;
+        font-weight: 400;
+        line-height: 1.25;
+        white-space: nowrap;
     }
 
     .conduct-level-badge.excellent {
@@ -190,8 +225,19 @@
         border-color: #fecaca;
     }
 
+    .conduct-level-option input + .conduct-level-badge {
+        color: #9ca3af !important;
+        background: #f3f4f6 !important;
+        border-color: #e5e7eb !important;
+        border-radius: 8px;
+        font-weight: 400;
+    }
+
     .conduct-level-option input:checked + .conduct-level-badge {
-        box-shadow: 0 0 0 2px rgba(249, 115, 22, .18);
+        color: #fff !important;
+        background: #ea580c !important;
+        border-color: #ea580c !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .12);
         font-weight: 500;
     }
 
@@ -200,6 +246,12 @@
         background: #f3f4f6;
         border-color: #e5e7eb;
         cursor: not-allowed;
+    }
+
+    .conduct-level-option input:disabled:checked + .conduct-level-badge {
+        color: #fff !important;
+        background: #ea580c !important;
+        border-color: #ea580c !important;
     }
 
     .conduct-warning-cell {
@@ -317,21 +369,21 @@
         $latestConduct = $studentConductRecords->first();
     @endphp
     <x-page-header
-        title="Hạnh kiểm"
+        title="Háº¡nh kiá»ƒm"
         :subtitle="auth()->user()->isParent()
-            ? 'Xem xếp loại hạnh kiểm và nhận xét của học sinh đang chọn.'
-            : 'Chỉ hiển thị dữ liệu hạnh kiểm của học sinh đang đăng nhập.'"
+            ? 'Xem xáº¿p loáº¡i háº¡nh kiá»ƒm vÃ  nháº­n xÃ©t cá»§a há»c sinh Ä‘ang chá»n.'
+            : 'Chá»‰ hiá»ƒn thá»‹ dá»¯ liá»‡u háº¡nh kiá»ƒm cá»§a há»c sinh Ä‘ang Ä‘Äƒng nháº­p.'"
     />
 
     <div class="card mb-3">
         <div class="card-body d-flex flex-column flex-md-row gap-3 justify-content-between">
             <div>
-                <div class="text-muted small">Học sinh</div>
+                <div class="text-muted small">Há»c sinh</div>
                 <div class="fw-bold">{{ $viewStudent?->student_code }} - {{ $viewStudent?->name }}</div>
             </div>
             <div>
-                <div class="text-muted small">Lớp</div>
-                <div class="fw-bold">{{ $viewStudent?->classRoom?->name ?? 'Chưa phân lớp' }}</div>
+                <div class="text-muted small">Lá»›p</div>
+                <div class="fw-bold">{{ $viewStudent?->classRoom?->name ?? 'ChÆ°a phÃ¢n lá»›p' }}</div>
             </div>
         </div>
     </div>
@@ -342,7 +394,7 @@
                 <div class="student-stat-card h-100">
                     <span class="student-stat-icon text-success"><i class="bi bi-award"></i></span>
                     <div>
-                        <div class="student-stat-label">Xếp loại gần nhất</div>
+                        <div class="student-stat-label">Xáº¿p loáº¡i gáº§n nháº¥t</div>
                         <div class="student-stat-value">
                             <span class="badge {{ $conductBadges[$latestConduct->conduct_level] ?? 'bg-light text-dark border' }}">
                                 {{ $conductLabels[$latestConduct->conduct_level] ?? $latestConduct->conduct_level }}
@@ -353,9 +405,9 @@
             </div>
             <div class="col-md-8">
                 <div class="card h-100">
-                    <div class="card-header">Nhận xét của giáo viên chủ nhiệm</div>
+                    <div class="card-header">Nháº­n xÃ©t cá»§a giÃ¡o viÃªn chá»§ nhiá»‡m</div>
                     <div class="card-body">
-                        <p class="mb-0">{{ $latestConduct->comment ?: 'Chưa có nhận xét chi tiết.' }}</p>
+                        <p class="mb-0">{{ $latestConduct->comment ?: 'ChÆ°a cÃ³ nháº­n xÃ©t chi tiáº¿t.' }}</p>
                     </div>
                 </div>
             </div>
@@ -363,16 +415,16 @@
     @endif
 
     <div class="card">
-        <div class="card-header">Lịch sử hạnh kiểm</div>
+        <div class="card-header">Lá»‹ch sá»­ háº¡nh kiá»ƒm</div>
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Năm học</th>
-                        <th>Học kỳ</th>
-                        <th>Lớp</th>
-                        <th>Hạnh kiểm</th>
-                        <th>Nhận xét</th>
+                        <th>NÄƒm há»c</th>
+                        <th>Há»c ká»³</th>
+                        <th>Lá»›p</th>
+                        <th>Háº¡nh kiá»ƒm</th>
+                        <th>Nháº­n xÃ©t</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -386,12 +438,12 @@
                                 {{ $conductLabels[$record->conduct_level] ?? $record->conduct_level }}
                             </span>
                         </td>
-                        <td>{{ $record->comment ?: 'Không có nhận xét' }}</td>
+                        <td>{{ $record->comment ?: 'KhÃ´ng cÃ³ nháº­n xÃ©t' }}</td>
                     </tr>
                 @empty
                     <tr>
                         <td colspan="5">
-                            <div class="empty-state"><i class="bi bi-clipboard-check"></i>Chưa có dữ liệu hạnh kiểm trong học kỳ này.</div>
+                            <div class="empty-state"><i class="bi bi-clipboard-check"></i>ChÆ°a cÃ³ dá»¯ liá»‡u háº¡nh kiá»ƒm trong há»c ká»³ nÃ y.</div>
                         </td>
                     </tr>
                 @endforelse
@@ -491,7 +543,6 @@
                         <thead>
                             <tr>
                                 <th>Học sinh</th>
-                                <th>Chuyên cần hệ thống</th>
                                 <th>Xếp loại rèn luyện</th>
                                 <th>Lời phê / Nhận xét</th>
                             </tr>
@@ -525,13 +576,11 @@
                                 <td>
                                     <div class="conduct-student-code">{{ $student->student_code }}</div>
                                     <div class="conduct-student-name">{{ $student->name }}</div>
-                                </td>
-                                <td>
-                                    <span class="conduct-attendance-summary">
-                                        Vắng có phép: {{ (int) ($attendance['excused'] ?? 0) }} |
-                                        Vắng không phép: {{ (int) ($attendance['absent'] ?? 0) }} |
-                                        Đi muộn: {{ (int) ($attendance['late'] ?? 0) }}
-                                    </span>
+                                    <div class="conduct-attendance-summary">
+                                        <span class="conduct-attendance-badge">{{ (int) ($attendance['excused'] ?? 0) }} Có phép</span>
+                                        <span class="conduct-attendance-badge">{{ (int) ($attendance['absent'] ?? 0) }} Không phép</span>
+                                        <span class="conduct-attendance-badge">{{ (int) ($attendance['late'] ?? 0) }} Đi muộn</span>
+                                    </div>
                                 </td>
                                 <td @class(['conduct-warning-cell' => $forcedWeak]) data-conduct-level-cell>
                                     @if($canEditConduct)
@@ -597,7 +646,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4">
+                                <td colspan="3">
                                     <div class="empty-state"><i class="bi bi-person-dash"></i>Lớp chưa có học sinh.</div>
                                 </td>
                             </tr>
@@ -657,6 +706,38 @@
         validateConductRanking(row.dataset.studentId);
     });
 
+    function syncConductLevelButtons(row) {
+        if (!row) {
+            return;
+        }
+
+        row.querySelectorAll('[data-conduct-level]').forEach((input) => {
+            const badge = input.closest('.conduct-level-option')?.querySelector('.conduct-level-badge');
+            if (!badge) {
+                return;
+            }
+
+            badge.classList.toggle('bg-orange-600', input.checked);
+            badge.classList.toggle('text-white', input.checked);
+            badge.classList.toggle('font-medium', input.checked);
+            badge.classList.toggle('shadow-sm', input.checked);
+            badge.classList.toggle('border-orange-600', input.checked);
+            badge.classList.toggle('bg-gray-100', !input.checked);
+            badge.classList.toggle('text-gray-400', !input.checked);
+            badge.classList.toggle('border-gray-200', !input.checked);
+        });
+    }
+
+    document.querySelectorAll('[data-conduct-row]').forEach((row) => {
+        syncConductLevelButtons(row);
+    });
+
+    document.querySelectorAll('[data-conduct-level]').forEach((input) => {
+        input.addEventListener('change', () => {
+            syncConductLevelButtons(input.closest('[data-conduct-row]'));
+        });
+    });
+
     document.querySelectorAll('[data-conduct-template]').forEach((select) => {
         select.addEventListener('change', () => {
             const input = select.closest('tr')?.querySelector('[data-conduct-comment]');
@@ -690,7 +771,7 @@
             });
 
             if (countLabel) {
-                countLabel.textContent = `Hiển thị ${visibleCount} trong tổng số ${rows.length} học sinh`;
+                countLabel.textContent = `Hiá»ƒn thá»‹ ${visibleCount} trong tá»•ng sá»‘ ${rows.length} há»c sinh`;
             }
         };
 

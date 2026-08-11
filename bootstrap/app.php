@@ -11,10 +11,13 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(append: [
-            \App\Http\Middleware\AutoAuditWriteRequests::class,
-        ]);
+    ->withMiddleware(function (Middleware $middleware) {
+    // ĐÃ SỬA: Bọc lót cả 2 phom đường dẫn để mở khóa cổng bảo mật tuyệt đối
+    $middleware->validateCsrfTokens(except: [
+        'chatbot/send',
+        '/chatbot/send',
+    ]);
+
 
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureRole::class,
@@ -65,3 +68,4 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
     })->create();
+

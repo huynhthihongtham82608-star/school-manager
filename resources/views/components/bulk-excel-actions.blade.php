@@ -1,4 +1,4 @@
-@props([
+﻿@props([
     'module',
     'context' => [],
     'allowImport' => true,
@@ -14,7 +14,7 @@
 @endphp
 
 <div
-    class="bulk-excel-actions d-inline-flex align-items-center gap-2 flex-wrap justify-content-end"
+    class="bulk-excel-actions flex items-center gap-2 flex-wrap sm:flex-nowrap justify-content-end"
     data-bulk-excel-root
     data-module="{{ $module }}"
     data-preview-url="{{ route('bulk-excel.preview', ['module' => $module]) }}"
@@ -49,34 +49,34 @@
     <div class="bulk-excel-modal bulk-excel-export-modal">
         <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
             <div>
-                <h5 class="bulk-excel-title">👁️ XEM TRƯỚC BẢN IN VÀ FILE XUẤT BÁO CÁO</h5>
-                <div class="bulk-excel-note">Mô phỏng cấu trúc các trường dữ liệu và định dạng file báo cáo sẽ tải về theo bộ lọc hiện tại.</div>
+                <h5 class="bulk-excel-title">ðŸ‘ï¸ XEM TRÆ¯á»šC Báº¢N IN VÃ€ FILE XUáº¤T BÃO CÃO</h5>
+                <div class="bulk-excel-note">MÃ´ phá»ng cáº¥u trÃºc cÃ¡c trÆ°á»ng dá»¯ liá»‡u vÃ  Ä‘á»‹nh dáº¡ng file bÃ¡o cÃ¡o sáº½ táº£i vá» theo bá»™ lá»c hiá»‡n táº¡i.</div>
             </div>
-            <button type="button" class="btn-close" data-bulk-export-cancel aria-label="Đóng"></button>
+            <button type="button" class="btn-close" data-bulk-export-cancel aria-label="ÄÃ³ng"></button>
         </div>
 
         <div class="bulk-excel-alert d-none" data-bulk-export-alert></div>
 
-        <div class="bulk-excel-section-label">Định dạng file</div>
+        <div class="bulk-excel-section-label">Äá»‹nh dáº¡ng file</div>
         <div class="bulk-export-format-group" data-bulk-export-format>
             <label class="bulk-export-radio">
                 <input type="radio" name="{{ $exportModalId }}_format" value="xlsx" checked>
-                <span>Xuất file Excel (.xlsx)</span>
+                <span>Xuáº¥t file Excel (.xlsx)</span>
             </label>
             <label class="bulk-export-radio">
                 <input type="radio" name="{{ $exportModalId }}_format" value="pdf">
-                <span>Xuất file PDF báo cáo (.pdf)</span>
+                <span>Xuáº¥t file PDF bÃ¡o cÃ¡o (.pdf)</span>
             </label>
         </div>
 
-        <div class="bulk-excel-section-label mt-3">Cột thông tin</div>
+        <div class="bulk-excel-section-label mt-3">Cá»™t thÃ´ng tin</div>
         <div class="bulk-export-checkbox-grid" data-bulk-export-fields>
-            <span class="bulk-excel-note">Đang tải danh sách trường dữ liệu...</span>
+            <span class="bulk-excel-note">Äang táº£i danh sÃ¡ch trÆ°á»ng dá»¯ liá»‡u...</span>
         </div>
 
         <div class="d-flex align-items-center justify-content-end gap-2 mt-4">
-            <button type="button" class="btn btn-secondary bulk-excel-cancel" data-bulk-export-cancel>Hủy bỏ</button>
-            <button type="button" class="btn bulk-excel-confirm" data-bulk-export-download>🚀 Xác nhận OK - Tải xuống file ngay</button>
+            <button type="button" class="btn btn-secondary bulk-excel-cancel" data-bulk-export-cancel>Há»§y bá»</button>
+            <button type="button" class="btn bulk-excel-confirm" data-bulk-export-download>ðŸš€ XÃ¡c nháº­n OK - Táº£i xuá»‘ng file ngay</button>
         </div>
     </div>
 </div>
@@ -85,10 +85,10 @@
     <div class="bulk-excel-modal">
         <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
             <div>
-                <h5 class="bulk-excel-title">📋 KIỂM TRA DỮ LIỆU FILE NHẬP HÀNG LOẠT</h5>
-                <div class="bulk-excel-note">Vui lòng rà soát lại thông tin trước khi xác nhận nạp chính thức vào Cơ sở dữ liệu.</div>
+                <h5 class="bulk-excel-title">ðŸ“‹ KIá»‚M TRA Dá»® LIá»†U FILE NHáº¬P HÃ€NG LOáº T</h5>
+                <div class="bulk-excel-note">Vui lÃ²ng rÃ  soÃ¡t láº¡i thÃ´ng tin trÆ°á»›c khi xÃ¡c nháº­n náº¡p chÃ­nh thá»©c vÃ o CÆ¡ sá»Ÿ dá»¯ liá»‡u.</div>
             </div>
-            <button type="button" class="btn-close" data-bulk-excel-cancel aria-label="Đóng"></button>
+            <button type="button" class="btn-close" data-bulk-excel-cancel aria-label="ÄÃ³ng"></button>
         </div>
         <div class="bulk-excel-alert d-none" data-bulk-excel-alert></div>
         <div class="table-responsive bulk-excel-table-wrap">
@@ -98,10 +98,10 @@
             </table>
         </div>
         <div class="d-flex align-items-center justify-content-between gap-3 mt-3">
-            <span class="bulk-excel-count" data-bulk-excel-count>Chưa có dữ liệu xem trước.</span>
+            <span class="bulk-excel-count" data-bulk-excel-count>ChÆ°a cÃ³ dá»¯ liá»‡u xem trÆ°á»›c.</span>
             <div class="d-flex align-items-center justify-content-end gap-2">
-                <button type="button" class="btn btn-secondary bulk-excel-cancel" data-bulk-excel-cancel>Hủy bỏ tiến trình</button>
-                <button type="button" class="btn bulk-excel-confirm" data-bulk-excel-confirm disabled>🔓 Xác nhận OK - Nạp vào hệ thống</button>
+                <button type="button" class="btn btn-secondary bulk-excel-cancel" data-bulk-excel-cancel>Há»§y bá» tiáº¿n trÃ¬nh</button>
+                <button type="button" class="btn bulk-excel-confirm" data-bulk-excel-confirm disabled>ðŸ”“ XÃ¡c nháº­n OK - Náº¡p vÃ o há»‡ thá»‘ng</button>
             </div>
         </div>
     </div>
@@ -109,22 +109,40 @@
 
 @once
     <style>
+        .bulk-excel-actions {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        @media (min-width: 640px) {
+            .bulk-excel-actions {
+                flex-wrap: nowrap;
+            }
+        }
+
         .bulk-excel-btn {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: .35rem;
             padding: .5rem .75rem;
             border: 1px solid #fed7aa;
             border-radius: 6px;
             color: #c2410c;
             background: #fff7ed;
-            font-size: .88rem;
+            font-size: .875rem;
             font-weight: 400;
             line-height: 1.2;
             text-decoration: none;
             cursor: pointer;
             transition: all .18s ease;
             white-space: nowrap;
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .bulk-excel-btn:hover {
@@ -409,7 +427,7 @@
                 setExportAlert(modal, '');
 
                 if (! fields.length) {
-                    wrap.innerHTML = '<span class="bulk-excel-note">Không có trường dữ liệu phù hợp để xuất.</span>';
+                    wrap.innerHTML = '<span class="bulk-excel-note">KhÃ´ng cÃ³ trÆ°á»ng dá»¯ liá»‡u phÃ¹ há»£p Ä‘á»ƒ xuáº¥t.</span>';
                     return;
                 }
 
@@ -441,7 +459,7 @@
                 modal.dataset.token = payload.token || '';
                 head.innerHTML = '';
                 body.innerHTML = '';
-                setAlert(modal, payload.error_count > 0 ? `Phát hiện ${payload.error_count} ô lỗi dữ liệu.` : '');
+                setAlert(modal, payload.error_count > 0 ? `PhÃ¡t hiá»‡n ${payload.error_count} Ã´ lá»—i dá»¯ liá»‡u.` : '');
 
                 const headerRow = document.createElement('tr');
                 (payload.headers || []).forEach((header) => {
@@ -459,7 +477,7 @@
                             td.className = 'bulk-excel-cell-error';
                         }
                         const value = document.createElement('div');
-                        value.textContent = cell.value || '—';
+                        value.textContent = cell.value || 'â€”';
                         td.appendChild(value);
                         if (cell.error) {
                             const error = document.createElement('span');
@@ -472,7 +490,7 @@
                     body.appendChild(tr);
                 });
 
-                count.textContent = `Hiển thị ${payload.rows?.length || 0} dòng đọc từ file.`;
+                count.textContent = `Hiá»ƒn thá»‹ ${payload.rows?.length || 0} dÃ²ng Ä‘á»c tá»« file.`;
                 confirm.disabled = ! payload.valid;
                 modal.classList.add('active');
                 modal.setAttribute('aria-hidden', 'false');
@@ -499,7 +517,7 @@
                     });
                     const payload = await response.json().catch(() => ({}));
                     if (! response.ok) {
-                        throw new Error(payload.message || 'Không thể đọc file Excel.');
+                        throw new Error(payload.message || 'KhÃ´ng thá»ƒ Ä‘á»c file Excel.');
                     }
                     renderPreview(root, payload);
                 } catch (error) {
@@ -535,7 +553,7 @@
                     params.forEach((value, key) => fieldsUrl.searchParams.set(key, value));
                     modal.classList.add('active');
                     modal.setAttribute('aria-hidden', 'false');
-                    modal.querySelector('[data-bulk-export-fields]').innerHTML = '<span class="bulk-excel-note">Đang tải danh sách trường dữ liệu...</span>';
+                    modal.querySelector('[data-bulk-export-fields]').innerHTML = '<span class="bulk-excel-note">Äang táº£i danh sÃ¡ch trÆ°á»ng dá»¯ liá»‡u...</span>';
 
                     try {
                         const response = await fetch(fieldsUrl.toString(), {
@@ -543,7 +561,7 @@
                         });
                         const payload = await response.json().catch(() => ({}));
                         if (! response.ok) {
-                            throw new Error(payload.message || 'Không thể tải danh sách trường xuất.');
+                            throw new Error(payload.message || 'KhÃ´ng thá»ƒ táº£i danh sÃ¡ch trÆ°á»ng xuáº¥t.');
                         }
                         renderExportFields(root, payload.fields || [], params.toString());
                     } catch (error) {
@@ -560,7 +578,7 @@
                     const format = modal.querySelector('[data-bulk-export-format] input:checked')?.value || 'xlsx';
                     const checked = [...modal.querySelectorAll('[data-bulk-export-fields] input[type="checkbox"]:checked')];
                     if (! checked.length) {
-                        setExportAlert(modal, 'Vui lòng chọn ít nhất một cột thông tin để xuất file.');
+                        setExportAlert(modal, 'Vui lÃ²ng chá»n Ã­t nháº¥t má»™t cá»™t thÃ´ng tin Ä‘á»ƒ xuáº¥t file.');
                         return;
                     }
 
@@ -599,9 +617,9 @@
                     });
                     const payload = await response.json().catch(() => ({}));
                     if (! response.ok) {
-                        throw new Error(payload.message || 'Không thể nạp dữ liệu.');
+                        throw new Error(payload.message || 'KhÃ´ng thá»ƒ náº¡p dá»¯ liá»‡u.');
                     }
-                    toast(payload.message || 'Đã nạp dữ liệu Excel.');
+                    toast(payload.message || 'ÄÃ£ náº¡p dá»¯ liá»‡u Excel.');
                     modal.classList.remove('active');
                     setTimeout(() => {
                         window.location.href = payload.redirect || window.location.href;
