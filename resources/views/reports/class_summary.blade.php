@@ -116,11 +116,11 @@
     ];
 @endphp
 
-<div class="page-heading">
-    <div>
-        <h5>{{ $reportTitle }}</h5>
-        <div class="text-muted">{{ $reportDescriptions[$activeReportType] ?? 'Dữ liệu được thống kê theo bộ lọc đã chọn.' }}</div>
-        <div class="report-context-line">
+<div class="page-heading w-full !text-left !items-start flex flex-col justify-start text-left items-start gap-1 mb-4 px-1" style="width: 100% !important; text-align: left !important; align-items: flex-start !important; justify-content: flex-start !important; margin-left: 0 !important; margin-right: auto !important;">
+    <div class="w-full !text-left !items-start flex flex-col justify-start text-left items-start gap-1 mb-4 px-1" style="width: 100% !important; text-align: left !important; align-items: flex-start !important; justify-content: flex-start !important; margin-left: 0 !important; margin-right: auto !important;">
+        <h5 class="text-xl font-semibold text-gray-900 !text-left" style="text-align: left !important;">{{ $reportTitle }}</h5>
+        <div class="text-sm font-normal text-gray-400 mt-1 !text-left" style="text-align: left !important;">{{ $reportDescriptions[$activeReportType] ?? 'Dữ liệu được thống kê theo bộ lọc đã chọn.' }}</div>
+        <div class="report-context-line w-full !text-left !items-start flex flex-wrap justify-start text-left items-start gap-1" style="width: 100% !important; text-align: left !important; align-items: flex-start !important; justify-content: flex-start !important; margin-left: 0 !important; margin-right: auto !important;">
             @if($activeReportType === 'multi_year')
                 <span>Từ năm: {{ $schoolYears->firstWhere('id', $filters['from_year_id'] ?? null)?->name ?: 'Chưa chọn' }}</span>
                 <span>Đến năm: {{ $schoolYears->firstWhere('id', $filters['to_year_id'] ?? null)?->name ?: ($selectedYear?->name ?: 'Chưa chọn') }}</span>

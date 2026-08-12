@@ -261,7 +261,7 @@
                 $makeRoleItem('bi-calendar3-week', 'Thời khóa biểu & Lịch kiểm tra', route('timetable.index'), ['timetable*', 'exam-schedules*']),
                 $makeRoleItem('bi-people', 'Danh sách lớp dạy', route('teacher.classes'), 'teacher/classes*', ['query_not' => ['scope' => 'homeroom']]),
                 $makeRoleItem('bi-table', 'Nhập điểm số', route('scores.index'), 'scores*'),
-                $makeRoleItem('bi-person-check', 'Điểm danh tiết dạy', route('attendance.index', ['scope' => 'teaching']), 'attendance*', ['query_not' => ['scope' => 'homeroom']]),
+                $makeRoleItem('bi-person-check', 'Điểm danh tiết dạy', url('/teacher/attendance'), 'teacher/attendance*', ['query_not' => ['scope' => 'homeroom']]),
                 $makeRoleItem('bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), 'documents*'),
             ];
 
@@ -443,24 +443,64 @@
     </aside>
     @elseif($showRoleMenu)
     <style>
+        .fixed.top-0.right-0.left-56.h-16.bg-white.border-b.border-orange-100 {
+            position: fixed !important;
+            top: 0 !important;
+            right: 0 !important;
+            left: 14rem !important;
+            height: 4rem !important;
+            z-index: 40 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
+            border-bottom: 1px solid #ffedd5 !important;
+            background: #fff !important;
+            box-shadow: 0 1px 1px rgba(15, 23, 42, .035) !important;
+            text-align: left !important;
+        }
+
+        .role-sidebar-head.h-16.py-4.items-center {
+            height: 4rem !important;
+            min-height: 4rem !important;
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+            align-items: center !important;
+        }
+
+        .role-content-fixed-offset {
+            width: 100% !important;
+            min-height: 100vh !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 1.5rem !important;
+            padding: 5.5rem 1rem 1.5rem 1rem !important;
+            margin-top: 0 !important;
+            background: #f9fafb !important;
+            text-align: left !important;
+        }
+
         @media (min-width: 992px) {
             .role-sidebar {
                 transform: translateX(0) !important;
-                width: 16rem !important;
+                width: 14rem !important;
                 position: fixed !important;
-                left: 0 !important;
-                top: 0 !important;
-                height: 100% !important;
+                left: .5rem !important;
+                top: .5rem !important;
+                height: calc(100% - 1rem) !important;
                 background-color: #ffffff !important;
                 border-right: 1px solid #ffedd5 !important;
+                border-radius: .75rem !important;
                 z-index: 40 !important;
                 text-align: left !important;
+                overflow: hidden !important;
             }
             .role-menu-toggle, .role-sidebar-close {
                 display: none !important;
             }
             .main-panel {
-                padding-left: 16rem !important;
+                padding-left: 15rem !important;
                 width: 100% !important;
                 min-height: 100vh !important;
                 background-color: #f9fafb !important;
@@ -468,16 +508,62 @@
             }
             .main-panel > main.content {
                 width: 100% !important;
+                max-width: 100% !important;
                 min-height: 100vh !important;
                 padding: 0 1rem 1.5rem 0 !important;
                 display: flex !important;
                 flex-direction: column !important;
                 gap: 1.5rem !important;
+                overflow-x: hidden !important;
+            }
+
+            .main-panel > main.content.role-content-fixed-offset {
+                padding: 5.5rem 1rem 1.5rem 1rem !important;
+                margin-top: 0 !important;
+                width: 100% !important;
+                min-height: 100vh !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 1.5rem !important;
+                background: #f9fafb !important;
+                text-align: left !important;
+            }
+
+            body.role-teacher,
+            body.role-homeroom,
+            body.role-teacher .main-panel,
+            body.role-homeroom .main-panel,
+            body.role-teacher main.content,
+            body.role-homeroom main.content {
+                max-width: 100vw !important;
+                overflow-x: hidden !important;
+            }
+
+            body.role-teacher .table-responsive,
+            body.role-homeroom .table-responsive,
+            body.role-teacher table,
+            body.role-homeroom table,
+            body.role-teacher .card,
+            body.role-homeroom .card {
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow-x: hidden !important;
+            }
+
+            body.role-teacher table,
+            body.role-homeroom table {
+                table-layout: fixed !important;
+            }
+        }
+
+        @media (max-width: 991.98px) {
+            .fixed.top-0.right-0.left-56.h-16.bg-white.border-b.border-orange-100 {
+                left: 0 !important;
             }
         }
     </style>
-    <nav class="role-sidebar w-64 fixed left-0 top-0 h-full bg-white border-r border-orange-100 z-40 text-left" aria-label="Menu chức năng">
-        <div class="role-sidebar-head">
+    <nav class="role-sidebar w-56 fixed left-2 top-2 h-full bg-white border-r border-orange-100 z-40 text-left" aria-label="Menu chức năng">
+        <div class="role-sidebar-head h-16 py-4 items-center">
             @if($schoolLogoUrl)
                 <img src="{{ $schoolLogoUrl }}" alt="{{ $schoolTitle }}" class="brand-mark rounded-3 object-fit-cover">
             @else
@@ -531,7 +617,7 @@
     </nav>
     @endif
 
-    <div class="main-panel flex-grow-1 w-full min-h-screen pl-64 pr-4 bg-gray-50 flex flex-col gap-6 text-left">
+    <div class="main-panel flex-grow-1 w-full min-h-screen pl-56 pr-4 bg-gray-50 flex flex-col gap-6 text-left">
         @if($showSidebar)
         <header class="topbar admin-header-stacked">
                 <div class="admin-info-row px-4 py-3 d-flex justify-content-between align-items-center">
@@ -630,7 +716,7 @@
             </div>
         </header>
         @else
-        <header class="topbar px-4 py-3 d-flex justify-content-between align-items-center">
+        <header class="{{ $showRoleMenu ? 'fixed top-0 right-0 left-56 h-16 bg-white border-b border-orange-100 flex items-center justify-between px-6 z-40 shadow-2xs text-left' : 'topbar px-4 py-3 d-flex justify-content-between align-items-center' }}">
             @if($showRoleMenu)
                 <div class="role-topbar-left">
                     <button type="button" class="btn btn-light role-menu-toggle" data-role-menu-toggle aria-label="Mở menu chức năng">
@@ -709,7 +795,7 @@
             </div>
         </header>
         @endif
-        <main class="content">
+        <main class="content {{ $showRoleMenu ? 'role-content-fixed-offset w-full min-h-screen pt-22 px-4 bg-gray-50 flex flex-col gap-6 text-left' : '' }}">
             @if($showSidebar && $historySchoolYear)
                 <div class="history-readonly-banner" role="status">
                     <div class="history-readonly-banner-icon">

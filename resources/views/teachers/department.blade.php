@@ -2,10 +2,10 @@
 @section('title', 'Tổ chuyên môn')
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>{{ $department->name }}</h5>
-        <div class="text-muted">Màn hình tổng quan dành cho tổ trưởng, chỉ hỗ trợ xem và theo dõi.</div>
+<div class="page-heading w-full !text-left !items-start flex flex-col justify-start text-left items-start gap-1 mb-4 px-1" style="width: 100% !important; text-align: left !important; align-items: flex-start !important; justify-content: flex-start !important; margin-left: 0 !important; margin-right: auto !important;">
+    <div class="w-full !text-left !items-start flex flex-col justify-start text-left items-start gap-1 mb-4 px-1" style="width: 100% !important; text-align: left !important; align-items: flex-start !important; justify-content: flex-start !important; margin-left: 0 !important; margin-right: auto !important;">
+        <h5 class="text-xl font-semibold text-gray-900 !text-left" style="text-align: left !important;">{{ $department->name }}</h5>
+        <div class="text-sm font-normal text-gray-400 mt-1 !text-left" style="text-align: left !important;">Màn hình tổng quan dành cho tổ trưởng, chỉ hỗ trợ xem và theo dõi.</div>
     </div>
 </div>
 
@@ -40,7 +40,7 @@
     <div class="card-body">
         <h6 class="card-accent-title mb-3">Tiến độ nhập điểm</h6>
         <div class="table-responsive">
-            <table class="table content-table align-middle">
+            <table class="table content-table align-middle w-full table-fixed max-w-full overflow-hidden" data-admin-table-skip>
                 <thead>
                     <tr>
                         <th>Giáo viên</th>
@@ -84,7 +84,7 @@
     <div class="card-body">
         <h6 class="card-accent-title mb-3">Lịch dạy và phân công của giáo viên trong tổ</h6>
         <div class="table-responsive">
-            <table class="table content-table align-middle">
+            <table class="table content-table align-middle w-full table-fixed max-w-full overflow-hidden" data-admin-table-skip>
                 <thead>
                     <tr>
                         <th>Giáo viên</th>

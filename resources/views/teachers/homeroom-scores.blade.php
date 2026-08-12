@@ -67,10 +67,10 @@
         padding: 1.25rem;
     }
 </style>
-<div class="page-heading flex flex-wrap items-center justify-between gap-3 mb-3">
-    <div>
-        <h5 class="text-xl font-semibold text-gray-900 mb-1">Theo dõi điểm lớp chủ nhiệm {{ $homeroomClass?->name }}</h5>
-        <div class="text-xs text-gray-500 font-normal">Bao quát ma trận điểm tất cả các môn học của học sinh lớp chủ nhiệm.</div>
+<div class="page-heading w-full !text-left !items-start flex flex-col justify-start text-left items-start gap-1 mb-4 px-1" style="width: 100% !important; text-align: left !important; align-items: flex-start !important; justify-content: flex-start !important; margin-left: 0 !important; margin-right: auto !important;">
+    <div class="w-full !text-left !items-start flex flex-col justify-start text-left items-start gap-1 mb-4 px-1" style="width: 100% !important; text-align: left !important; align-items: flex-start !important; justify-content: flex-start !important; margin-left: 0 !important; margin-right: auto !important;">
+        <h5 class="text-xl font-semibold text-gray-900 !text-left" style="text-align: left !important;">Theo dõi điểm lớp chủ nhiệm {{ $homeroomClass?->name }}</h5>
+        <div class="text-sm font-normal text-gray-400 mt-1 !text-left" style="text-align: left !important;">Bao quát ma trận điểm tất cả các môn học của học sinh lớp chủ nhiệm.</div>
     </div>
 </div>
 
@@ -135,7 +135,7 @@
 
         <div class="card border border-orange-100 rounded-xl overflow-hidden shadow-xs mb-3">
             <div class="table-responsive">
-                <table class="table align-middle admin-score-grid w-full table-fixed mb-0" data-admin-table-skip>
+                <table class="table align-middle admin-score-grid w-full table-fixed max-w-full overflow-hidden mb-0" data-admin-table-skip>
                     <thead data-admin-score-head></thead>
                     <tbody data-admin-score-body></tbody>
                 </table>
@@ -162,7 +162,7 @@
                     <button type="button" class="btn-close" data-admin-score-modal-close aria-label="Đóng"></button>
                 </div>
                 <div class="table-responsive">
-                    <table class="table align-middle admin-score-ledger-table text-sm font-normal" data-admin-table-skip>
+                    <table class="table align-middle admin-score-ledger-table w-full table-fixed max-w-full overflow-hidden text-sm font-normal" data-admin-table-skip>
                         <thead>
                             <tr class="bg-orange-50/40 text-gray-900 font-medium">
                                 <th>Môn học</th>

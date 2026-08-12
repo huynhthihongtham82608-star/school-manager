@@ -12,7 +12,7 @@
 
 <div class="card">
     <div class="table-responsive">
-        <table class="table">
+        <table class="table w-full table-fixed max-w-full overflow-hidden" data-admin-table-skip>
             <thead>
                 <tr>
                     <th>Mã học sinh</th>

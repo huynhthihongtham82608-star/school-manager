@@ -15,6 +15,23 @@
 
         return '<span class="score-retest-badge" data-tooltip="' . e($tooltip) . '">Bù</span>';
     };
+    $compactScoreColumnLabel = function ($column) {
+        $normalized = \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii((string) $column->name));
+
+        if ($column->type === \App\Models\ScoreColumn::TYPE_MIDTERM || str_contains($normalized, 'giua')) {
+            return 'Giữa Kỳ';
+        }
+
+        if ($column->type === \App\Models\ScoreColumn::TYPE_FINAL || str_contains($normalized, 'cuoi')) {
+            return 'Cuối Kỳ';
+        }
+
+        if (str_contains($normalized, '15')) {
+            return '15p';
+        }
+
+        return 'Miệng';
+    };
 @endphp
 
 <style>
@@ -37,11 +54,23 @@
     .score-sheet th,
     .score-sheet td {
         padding: .75rem;
-        color: #374151;
+        color: #4b5563;
         font-size: .75rem;
         font-weight: 400;
         text-align: left;
         white-space: nowrap;
+    }
+
+    .score-sheet .text-gray-650 {
+        color: #4b5563 !important;
+    }
+
+    .score-sheet .form-control,
+    .score-sheet .form-select,
+    .score-sheet .score-readonly-value {
+        color: #4b5563;
+        font-size: .75rem;
+        font-weight: 400;
     }
 
     .score-sheet th {
@@ -63,13 +92,13 @@
     }
 
     .score-sheet .score-student-name-col {
-        width: 260px;
-        min-width: 260px;
+        width: 320px;
+        min-width: 320px;
     }
 
     .score-sheet .score-student-code-cell,
     .score-sheet .score-student-name-cell {
-        color: #374151;
+        color: #4b5563;
         font-size: .75rem;
         font-weight: 400;
         white-space: nowrap;
@@ -79,7 +108,10 @@
 
     @media (min-width: 768px) {
         .score-sheet .score-student-code-cell,
-        .score-sheet .score-student-name-cell {
+        .score-sheet .score-student-name-cell,
+        .score-sheet .form-control,
+        .score-sheet .form-select,
+        .score-sheet .score-readonly-value {
             font-size: .875rem;
         }
     }
@@ -347,22 +379,21 @@
             </div>
         @endunless
         <div class="table-responsive">
-            <table class="table align-middle">
+            <table class="table align-middle w-full table-fixed max-w-full overflow-hidden" data-admin-table-skip>
                 <thead>
                     <tr>
-                        <th class="score-student-code-col text-xs md:text-sm font-normal whitespace-nowrap p-3 text-left">Mã HS</th>
-                        <th class="score-student-name-col text-xs md:text-sm font-normal whitespace-nowrap p-3 text-left">Họ và tên</th>
+                        <th class="score-student-code-col text-xs md:text-sm font-normal text-gray-650 whitespace-nowrap p-3 text-left">Mã HS</th>
+                        <th class="score-student-name-col text-xs md:text-sm font-normal text-gray-650 whitespace-nowrap p-3 text-left">Họ và tên</th>
                         @foreach($scoreColumns as $column)
-                            <th style="min-width: 150px;">
-                                <div>{{ $column->name }}<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></div>
-                                <div class="text-muted small mt-1">{{ $column->typeLabel() }}</div>
+                            <th class="text-xs md:text-sm font-normal text-gray-650 text-left p-3 whitespace-nowrap" style="min-width: 92px;">
+                                <div>{{ $compactScoreColumnLabel($column) }}<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></div>
                             </th>
                         @endforeach
-                        <th>TB<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
+                        <th class="text-xs md:text-sm font-normal text-gray-650 text-left p-3 whitespace-nowrap">TB<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
                         @if($isScoreAdmin)
-                            <th class="score-annual-col">HK1<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
-                            <th class="score-annual-col">HK2<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
-                            <th class="score-annual-col">Cả Năm<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
+                            <th class="score-annual-col text-xs md:text-sm font-normal text-gray-650 text-left p-3 whitespace-nowrap">HK1<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
+                            <th class="score-annual-col text-xs md:text-sm font-normal text-gray-650 text-left p-3 whitespace-nowrap">HK2<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
+                            <th class="score-annual-col text-xs md:text-sm font-normal text-gray-650 text-left p-3 whitespace-nowrap">Cả Năm<span class="text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs">↕</span></th>
                         @endif
                     </tr>
                 </thead>
@@ -372,8 +403,8 @@
                         $header = $headers[$student->id] ?? null;
                     @endphp
                     <tr>
-                        <td class="score-student-code-cell text-xs md:text-sm font-normal whitespace-nowrap p-3 text-left">{{ $student->student_code }}</td>
-                        <td class="score-student-name-cell text-xs md:text-sm font-normal whitespace-nowrap p-3 text-left">{{ $student->name }}</td>
+                        <td class="score-student-code-cell text-xs md:text-sm font-normal text-gray-650 whitespace-nowrap p-3 text-left">{{ $student->student_code }}</td>
+                        <td class="score-student-name-cell text-xs md:text-sm font-normal text-gray-650 whitespace-nowrap p-3 text-left">{{ $student->name }}</td>
                         @foreach($scoreColumns as $column)
                             @php
                                 $permission = $columnPermissions[$column->id] ?? ['editable' => false, 'reason' => 'Chỉ xem'];

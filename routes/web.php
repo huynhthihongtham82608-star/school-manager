@@ -186,7 +186,7 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::get('teacher/homeroom/scores', [TeacherPortalController::class, 'homeroomScores'])->name('teacher.homeroom.scores');
         Route::get('teacher/scores', [ScoreController::class, 'index']);
         Route::get('teacher/scores/entry', [ScoreController::class, 'entry']);
-        Route::get('teacher/attendance', [AttendanceController::class, 'index']);
+        Route::get('teacher/attendance', [AttendanceController::class, 'index'])->name('teacher.attendance.session');
         Route::get('teacher/conduct', [ConductController::class, 'index']);
         Route::get('teacher/timetable', [TimetableController::class, 'index']);
         Route::get('teacher/department', [TeacherPortalController::class, 'departmentOverview'])->name('teacher.department');
@@ -249,7 +249,6 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
     Route::post('/chatbot/send', 'App\Http\Controllers\Admin\ChatbotController@handleChat')->name('chatbot.send');
 
 });
-
 
 
 

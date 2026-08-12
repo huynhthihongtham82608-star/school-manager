@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 @section('title', 'Hạnh kiểm')
 
 @section('content')
@@ -108,7 +108,10 @@
 
     .conduct-matrix-table {
         width: 100%;
-        min-width: 980px;
+        max-width: 100%;
+        min-width: 0;
+        table-layout: fixed;
+        overflow: hidden;
     }
 
     .conduct-matrix-table th,
@@ -141,10 +144,9 @@
 
     .conduct-attendance-summary {
         display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: .35rem;
-        margin-top: .35rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .25rem;
     }
 
     .conduct-level-group {
@@ -152,12 +154,12 @@
         display: flex;
         align-items: center;
         flex-wrap: nowrap;
-        gap: .375rem;
+        gap: .25rem;
     }
 
     .conduct-level-option {
         flex: 1 1 0;
-        min-width: 76px;
+        min-width: 0;
         position: relative;
         margin: 0;
         cursor: pointer;
@@ -175,10 +177,10 @@
         align-items: center;
         justify-content: center;
         width: 100%;
-        min-width: 76px;
-        padding: .34rem .68rem;
+        min-width: 0;
+        padding: .34rem .32rem;
         border-radius: 8px;
-        font-size: .9rem;
+        font-size: clamp(.68rem, .78vw, .82rem);
         font-weight: 400;
         line-height: 1.2;
         white-space: nowrap;
@@ -270,10 +272,25 @@
 
     .conduct-comment-grid {
         display: grid;
-        grid-template-columns: minmax(220px, 1fr) minmax(180px, .65fr);
-        gap: .5rem;
-        align-items: center;
-        min-width: 460px;
+        grid-template-columns: minmax(0, 1fr);
+        gap: .4rem;
+        align-items: start;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .conduct-note-input,
+    .conduct-template-select {
+        width: 100%;
+        min-width: 0;
+        font-size: .78rem;
+        font-weight: 400;
+        text-align: left;
+    }
+
+    .conduct-note-input {
+        min-height: 38px;
+        resize: vertical;
     }
 
     .conduct-save-footer {
@@ -369,21 +386,21 @@
         $latestConduct = $studentConductRecords->first();
     @endphp
     <x-page-header
-        title="Háº¡nh kiá»ƒm"
+        title="Hạnh kiểm"
         :subtitle="auth()->user()->isParent()
-            ? 'Xem xáº¿p loáº¡i háº¡nh kiá»ƒm vÃ  nháº­n xÃ©t cá»§a há»c sinh Ä‘ang chá»n.'
-            : 'Chá»‰ hiá»ƒn thá»‹ dá»¯ liá»‡u háº¡nh kiá»ƒm cá»§a há»c sinh Ä‘ang Ä‘Äƒng nháº­p.'"
+            ? 'Xem xếp loại hạnh kiểm và nhận xét của học sinh đang chọn.'
+            : 'Chỉ hiển thị dữ liệu hạnh kiểm của học sinh đang đăng nhập.'"
     />
 
     <div class="card mb-3">
         <div class="card-body d-flex flex-column flex-md-row gap-3 justify-content-between">
             <div>
-                <div class="text-muted small">Há»c sinh</div>
+                <div class="text-muted small">Học sinh</div>
                 <div class="fw-bold">{{ $viewStudent?->student_code }} - {{ $viewStudent?->name }}</div>
             </div>
             <div>
-                <div class="text-muted small">Lá»›p</div>
-                <div class="fw-bold">{{ $viewStudent?->classRoom?->name ?? 'ChÆ°a phÃ¢n lá»›p' }}</div>
+                <div class="text-muted small">Lớp</div>
+                <div class="fw-bold">{{ $viewStudent?->classRoom?->name ?? 'Chưa phân lớp' }}</div>
             </div>
         </div>
     </div>
@@ -394,7 +411,7 @@
                 <div class="student-stat-card h-100">
                     <span class="student-stat-icon text-success"><i class="bi bi-award"></i></span>
                     <div>
-                        <div class="student-stat-label">Xáº¿p loáº¡i gáº§n nháº¥t</div>
+                        <div class="student-stat-label">Xếp loại gần nhất</div>
                         <div class="student-stat-value">
                             <span class="badge {{ $conductBadges[$latestConduct->conduct_level] ?? 'bg-light text-dark border' }}">
                                 {{ $conductLabels[$latestConduct->conduct_level] ?? $latestConduct->conduct_level }}
@@ -405,9 +422,9 @@
             </div>
             <div class="col-md-8">
                 <div class="card h-100">
-                    <div class="card-header">Nháº­n xÃ©t cá»§a giÃ¡o viÃªn chá»§ nhiá»‡m</div>
+                    <div class="card-header">Nhận xét của giáo viên chủ nhiệm</div>
                     <div class="card-body">
-                        <p class="mb-0">{{ $latestConduct->comment ?: 'ChÆ°a cÃ³ nháº­n xÃ©t chi tiáº¿t.' }}</p>
+                        <p class="mb-0">{{ $latestConduct->comment ?: 'Chưa có nhận xét chi tiết.' }}</p>
                     </div>
                 </div>
             </div>
@@ -415,16 +432,16 @@
     @endif
 
     <div class="card">
-        <div class="card-header">Lá»‹ch sá»­ háº¡nh kiá»ƒm</div>
+        <div class="card-header">Lịch sử hạnh kiểm</div>
         <div class="table-responsive">
-            <table class="table">
+            <table class="table w-full table-fixed max-w-full overflow-hidden" data-admin-table-skip>
                 <thead>
                     <tr>
-                        <th>NÄƒm há»c</th>
-                        <th>Há»c ká»³</th>
-                        <th>Lá»›p</th>
-                        <th>Háº¡nh kiá»ƒm</th>
-                        <th>Nháº­n xÃ©t</th>
+                        <th>Năm học</th>
+                        <th>Học kỳ</th>
+                        <th>Lớp</th>
+                        <th>Hạnh kiểm</th>
+                        <th>Nhận xét</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -438,12 +455,12 @@
                                 {{ $conductLabels[$record->conduct_level] ?? $record->conduct_level }}
                             </span>
                         </td>
-                        <td>{{ $record->comment ?: 'KhÃ´ng cÃ³ nháº­n xÃ©t' }}</td>
+                        <td>{{ $record->comment ?: 'Không có nhận xét' }}</td>
                     </tr>
                 @empty
                     <tr>
                         <td colspan="5">
-                            <div class="empty-state"><i class="bi bi-clipboard-check"></i>ChÆ°a cÃ³ dá»¯ liá»‡u háº¡nh kiá»ƒm trong há»c ká»³ nÃ y.</div>
+                            <div class="empty-state"><i class="bi bi-clipboard-check"></i>Chưa có dữ liệu hạnh kiểm trong học kỳ này.</div>
                         </td>
                     </tr>
                 @endforelse
@@ -539,12 +556,13 @@
             <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
             <div class="card">
                 <div class="table-responsive">
-                    <table class="table conduct-matrix-table mb-0">
+                    <table class="table conduct-matrix-table w-full table-fixed max-w-full overflow-hidden mb-0" data-admin-table-skip>
                         <thead>
                             <tr>
-                                <th>Học sinh</th>
-                                <th>Xếp loại rèn luyện</th>
-                                <th>Lời phê / Nhận xét</th>
+                                <th style="width: 22%;">Học sinh</th>
+                                <th style="width: 18%;">Chuyên cần</th>
+                                <th style="width: 38%;">Xếp loại rèn luyện</th>
+                                <th style="width: 22%;">Lời phê / Nhận xét của giáo viên</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -576,6 +594,8 @@
                                 <td>
                                     <div class="conduct-student-code">{{ $student->student_code }}</div>
                                     <div class="conduct-student-name">{{ $student->name }}</div>
+                                </td>
+                                <td>
                                     <div class="conduct-attendance-summary">
                                         <span class="conduct-attendance-badge">{{ (int) ($attendance['excused'] ?? 0) }} Có phép</span>
                                         <span class="conduct-attendance-badge">{{ (int) ($attendance['absent'] ?? 0) }} Không phép</span>
@@ -617,14 +637,13 @@
                                 <td>
                                     @if($canEditConduct)
                                         <div class="conduct-comment-grid">
-                                            <input
-                                                type="text"
+                                            <textarea
                                                 name="conduct[{{ $student->id }}][comment]"
                                                 class="form-control conduct-note-input"
-                                                value="{{ $commentValue }}"
-                                                placeholder="Nhập lời phê..."
+                                                rows="2"
+                                                placeholder="Nhập lời phê / nhận xét..."
                                                 data-conduct-comment
-                                            >
+                                            >{{ $commentValue }}</textarea>
                                             <select class="form-select conduct-template-select" data-conduct-template>
                                                 <option value="">Mẫu lời phê</option>
                                                 @foreach($conductQuickComments as $quickComment)
@@ -639,14 +658,14 @@
                                                 <span class="conduct-comment-bubble">{{ $commentValue }}</span>
                                             </span>
                                         @else
-                                            <span class="text-muted small">Chưa có lời phê</span>
+                                            <span class="text-muted small">Chưa có nhận xét</span>
                                         @endif
                                     @endif
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="3">
+                                <td colspan="4">
                                     <div class="empty-state"><i class="bi bi-person-dash"></i>Lớp chưa có học sinh.</div>
                                 </td>
                             </tr>
@@ -771,7 +790,7 @@
             });
 
             if (countLabel) {
-                countLabel.textContent = `Hiá»ƒn thá»‹ ${visibleCount} trong tá»•ng sá»‘ ${rows.length} há»c sinh`;
+                countLabel.textContent = `Hiển thị ${visibleCount} trong tổng số ${rows.length} học sinh`;
             }
         };
 

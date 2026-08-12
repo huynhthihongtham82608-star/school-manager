@@ -94,16 +94,7 @@ class ScoreController extends Controller
         }
 
         if ($user->isTeacher() && $user->teacher) {
-            $assignments = $user->teacher->assignments()
-                ->with(['classRoom', 'subject', 'schoolYear', 'semester'])
-                ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
-                ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
-                ->where('status', TeachingAssignment::STATUS_ACTIVE)
-                ->whereHas('subject', fn ($query) => $query
-                    ->whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
-                    ->where('status', Subject::STATUS_ACTIVE)
-                    ->withEvaluatedAssessment())
-                ->get();
+            $assignments = $this->teacherScoreEntryAssignments($user->teacher);
         }
 
         return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'teachers', 'assignments', 'selectedYearId', 'selectedSemesterId', 'scoreSetting', 'scoreColumnConfig', 'adminMatrix'));
@@ -1504,22 +1495,50 @@ class ScoreController extends Controller
         }
 
         if ($user->isTeacher() && $user->teacher) {
-            $assignedClassIds = $user->teacher->assignments()
-                ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
-                ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
-                ->where('status', TeachingAssignment::STATUS_ACTIVE)
-                ->pluck('class_id');
-            $homeroomClassIds = $user->teacher->homeroomClasses()
-                ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
-                ->pluck('id');
+            $assignedClassIds = $this->teacherActiveTeachingClassIds($user->teacher);
 
-            return SchoolClass::whereIn('id', $assignedClassIds->merge($homeroomClassIds)->unique()->values())
+            return SchoolClass::with(['schoolYear', 'semester'])
+                ->whereIn('id', $assignedClassIds)
                 ->orderBy('grade_level')
                 ->orderBy('name')
                 ->get();
         }
 
         return collect();
+    }
+
+    private function teacherActiveTeachingClassIds(Teacher $teacher): Collection
+    {
+        return $teacher->assignments()
+            ->where('status', TeachingAssignment::STATUS_ACTIVE)
+            ->pluck('class_id')
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
+    private function teacherScoreEntryAssignments(Teacher $teacher): Collection
+    {
+        $assignedClassIds = $this->teacherActiveTeachingClassIds($teacher);
+
+        if ($assignedClassIds->isEmpty()) {
+            return collect();
+        }
+
+        return $teacher->assignments()
+            ->with(['classRoom', 'subject', 'schoolYear', 'semester'])
+            ->where('status', TeachingAssignment::STATUS_ACTIVE)
+            ->whereIn('class_id', $assignedClassIds)
+            ->get()
+            ->sortBy(fn (TeachingAssignment $assignment) => sprintf(
+                '%02d|%s|%s|%s',
+                (int) ($assignment->classRoom?->grade_level ?? 0),
+                $assignment->classRoom?->name ?? '',
+                $assignment->subject?->name ?? '',
+                $assignment->semester?->name ?? ''
+            ))
+            ->unique('class_id')
+            ->values();
     }
 
     private function availableSubjectsFor($user, ?string $yearId, ?string $semesterId): Collection
