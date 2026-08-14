@@ -32,6 +32,7 @@ use App\Http\Controllers\ScoreController;
 use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\SystemRegulationController;
 use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\TeacherController;
 use App\Http\Controllers\TeacherDepartmentController;
@@ -119,6 +120,7 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::middleware('role:admin,staff')->group(function () {
             Route::get('system/settings', [SystemSettingController::class, 'edit'])->middleware('permission:system.settings')->name('system.settings.edit');
             Route::put('system/settings', [SystemSettingController::class, 'update'])->middleware('permission:system.settings')->name('system.settings.update');
+            Route::get('system/regulations', [SystemRegulationController::class, 'index'])->middleware('permission:system.settings')->name('system.regulations.index');
             Route::get('system/backups', [BackupController::class, 'index'])->middleware('permission:backups.manage')->name('system.backups.index');
             Route::post('system/backups', [BackupController::class, 'store'])->middleware('permission:backups.manage')->name('system.backups.store');
             Route::post('system/backups/restore/verify', [BackupController::class, 'verifyRestorePassword'])->middleware('permission:backups.manage')->name('system.backups.restore.verify');
@@ -249,6 +251,3 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
     Route::post('/chatbot/send', 'App\Http\Controllers\Admin\ChatbotController@handleChat')->name('chatbot.send');
 
 });
-
-
-

@@ -9,6 +9,13 @@ class AttendanceRecord extends Model
 {
     use UsesUuid;
 
+    public const STATUS_PRESENT = 'present';
+    public const STATUS_LATE = 'late';
+    public const STATUS_EXCUSED = 'excused';
+    public const STATUS_ABSENT = 'absent';
+    public const STATUS_PERMITTED_ABSENT = 'permitted_absent';
+    public const STATUS_UNEXCUSED_ABSENT = 'unexcused_absent';
+
     public const SESSION_DAILY = 'daily';
     public const SESSION_PERIOD = 'period';
     public const SESSION_MORNING = 'morning';
@@ -74,7 +81,13 @@ class AttendanceRecord extends Model
 
     public function statusLabel(): string
     {
-        return self::STATUSES[$this->status] ?? $this->status;
+        return match ($this->status) {
+            self::STATUS_PRESENT => 'Có mặt',
+            self::STATUS_LATE => 'Đi muộn (M)',
+            self::STATUS_EXCUSED, self::STATUS_PERMITTED_ABSENT => 'Vắng có phép (P)',
+            self::STATUS_ABSENT, self::STATUS_UNEXCUSED_ABSENT => 'Vắng không phép (K)',
+            default => self::STATUSES[$this->status] ?? $this->status,
+        };
     }
 
     public function sessionTypeLabel(): string
@@ -85,5 +98,28 @@ class AttendanceRecord extends Model
     public function displaySessionLabel(): string
     {
         return $this->session_label ?: $this->sessionTypeLabel();
+    }
+
+    public function isPeriodSession(): bool
+    {
+        return $this->session_type === self::SESSION_PERIOD
+            || str_starts_with((string) $this->session_key, 'period:');
+    }
+
+    public function isSuspiciousPeriodAbsence(): bool
+    {
+        return $this->isUnexcusedAbsent()
+            && $this->isPeriodSession()
+            && trim((string) $this->note) === '';
+    }
+
+    public function isPermittedAbsent(): bool
+    {
+        return in_array($this->status, [self::STATUS_EXCUSED, self::STATUS_PERMITTED_ABSENT], true);
+    }
+
+    public function isUnexcusedAbsent(): bool
+    {
+        return in_array($this->status, [self::STATUS_ABSENT, self::STATUS_UNEXCUSED_ABSENT], true);
     }
 }

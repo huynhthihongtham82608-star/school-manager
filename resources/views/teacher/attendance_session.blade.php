@@ -12,7 +12,9 @@
     $subtitle = ($selectedClass?->name ?? 'Chưa chọn lớp') . ' • ' . ($selectedSemester?->normalizedName() ?? $selectedSemester?->name ?? 'Chưa chọn học kỳ') . ' • ' . $dateLabel . ' • ' . $sessionLabel . $periodLabel . $subjectLabel;
     $canInteract = $selectedClass
         && $selectedSemester
-        && ! $readOnly;
+        && ! $readOnly
+        && $date
+        && \Illuminate\Support\Carbon::parse($date)->isToday();
     $canEdit = $canInteract && ! $readOnly;
     $selectedTeachingSession = (string) ($selectedTeachingSession ?? ($selectedTimetableEntry ? ((int) $selectedTimetableEntry->period <= 5 ? 'morning' : 'afternoon') : 'morning'));
     $selectedPeriod = (string) ($selectedPeriod ?? ($selectedTimetableEntry ? $selectedTimetableEntry->periodInSession() : ''));
@@ -576,14 +578,30 @@
                     @forelse($students as $student)
                         @php
                             $record = $existingRecords->get($student->id);
-                            $currentStatus = old("status.{$student->id}", $record?->status);
+                            $leaveRequest = ($approvedLeaveRequests ?? collect())->get($student->id);
+                            $isLockedByApprovedLeave = (bool) $leaveRequest || $record?->status === 'excused';
+                            $approvedLeaveNote = $leaveRequest
+                                ? 'Đã duyệt đơn xin nghỉ học của phụ huynh. Lý do: ' . $leaveRequest->reason
+                                : ($record?->note ?: 'Đã duyệt đơn xin nghỉ học của phụ huynh.');
+                            $currentStatus = $isLockedByApprovedLeave
+                                ? 'excused'
+                                : old("status.{$student->id}", $record?->status);
                         @endphp
                         <tr>
                             <td class="text-sm font-normal text-gray-500 text-left">{{ $loop->iteration }}</td>
                             <td class="text-sm font-normal text-gray-600 text-left" title="{{ $student->student_code }}">{{ $student->student_code }}</td>
                             <td class="text-sm font-normal text-gray-900 text-left" title="{{ $student->name }}">{{ $student->name }}</td>
                             <td>
-                                <div class="teacher-attendance-actions">
+                                @if($isLockedByApprovedLeave)
+                                    <input type="hidden" name="status[{{ $student->id }}]" value="excused">
+                                    <div class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 text-xs md:text-sm font-normal px-3 py-1.5 rounded-full">
+                                        🟦 Nghỉ có phép
+                                    </div>
+                                    <div class="text-xs font-normal text-gray-500 mt-1 text-left">
+                                        Đã có đơn nghỉ cả ngày được GVCN duyệt, không cho phép tích vắng thêm.
+                                    </div>
+                                @else
+                                    <div class="teacher-attendance-actions">
                                     @foreach([
                                         'present' => ['label' => '🟢 Có mặt', 'class' => 'present'],
                                         'late' => ['label' => '🟡 Muộn', 'class' => 'late'],
@@ -612,16 +630,20 @@
                                             <span>{{ $option['label'] }}</span>
                                         </label>
                                     @endforeach
-                                </div>
+                                    </div>
+                                @endif
                             </td>
                             <td>
+                                @if($isLockedByApprovedLeave)
+                                    <input type="hidden" name="note[{{ $student->id }}]" value="{{ old("note.{$student->id}", $approvedLeaveNote) }}">
+                                @endif
                                 <input
                                     type="text"
                                     name="note[{{ $student->id }}]"
-                                    value="{{ old("note.{$student->id}", $record?->note) }}"
+                                    value="{{ old("note.{$student->id}", $isLockedByApprovedLeave ? $approvedLeaveNote : $record?->note) }}"
                                     class="teacher-attendance-note text-xs md:text-sm font-normal text-gray-700 bg-gray-50 border border-gray-200/60 rounded-md px-2 py-1 focus:border-orange-500 focus:outline-none w-full text-left"
                                     placeholder="Ghi chú nếu có"
-                                    @disabled(! $canInteract)
+                                    @disabled(! $canInteract || $isLockedByApprovedLeave)
                                 >
                             </td>
                         </tr>
@@ -696,23 +718,25 @@
                                     >
                                         👁️ Xem chi tiết
                                     </button>
-                                    <a
-                                        href="{{ route('teacher.attendance.session', [
-                                            'school_year_id' => $selectedYearId,
-                                            'semester_id' => $history->semester_id,
-                                            'class_id' => $history->class_id,
-                                            'date' => $history->attendance_date,
-                                            'session_type' => $history->session_type,
-                                            'slot' => $history->slot,
-                                            'timetable_entry_id' => $history->timetable_entry_id,
-                                            'action_mode' => 'update',
-                                            'attendance_session_id' => $history->id,
-                                        ]) }}#attendance-register"
-                                        class="text-xs font-normal text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded-md hover:bg-orange-100 transition-colors cursor-pointer flex items-center gap-1"
-                                        onclick="prepareTeacherAttendanceEdit('{{ $history->id }}')"
-                                    >
-                                        ✏️ Sửa nhật ký
-                                    </a>
+                                    @if($history->can_edit ?? false)
+                                        <a
+                                            href="{{ route('teacher.attendance.session', [
+                                                'school_year_id' => $selectedYearId,
+                                                'semester_id' => $history->semester_id,
+                                                'class_id' => $history->class_id,
+                                                'date' => $history->attendance_date,
+                                                'session_type' => $history->session_type,
+                                                'slot' => $history->slot,
+                                                'timetable_entry_id' => $history->timetable_entry_id,
+                                                'action_mode' => 'update',
+                                                'attendance_session_id' => $history->id,
+                                            ]) }}#attendance-register"
+                                            class="text-xs font-normal text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded-md hover:bg-orange-100 transition-colors cursor-pointer flex items-center gap-1"
+                                            onclick="prepareTeacherAttendanceEdit('{{ $history->id }}')"
+                                        >
+                                            ✏️ Sửa nhật ký
+                                        </a>
+                                    @endif
                                 </div>
 
                                 <div class="teacher-attendance-modal fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 animate-fade-in" id="teacherAttendanceHistory{{ $history->id }}" aria-hidden="true">

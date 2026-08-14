@@ -421,15 +421,15 @@ class ReportController extends Controller
     {
         $total = $attendanceRecords->count();
         $presentLike = $attendanceRecords
-            ->whereIn('status', ['present', 'late', 'excused'])
+            ->filter(fn ($record) => in_array($record->status, ['present', 'late'], true) || $record->isPermittedAbsent())
             ->count();
 
         return [
             'total' => $total,
             'present' => $attendanceRecords->where('status', 'present')->count(),
             'late' => $attendanceRecords->where('status', 'late')->count(),
-            'excused' => $attendanceRecords->where('status', 'excused')->count(),
-            'absent' => $attendanceRecords->where('status', 'absent')->count(),
+            'excused' => $attendanceRecords->filter(fn ($record) => $record->isPermittedAbsent())->count(),
+            'absent' => $attendanceRecords->filter(fn ($record) => $record->isUnexcusedAbsent())->count(),
             'rate' => $total > 0 ? round($presentLike / $total * 100, 1) : null,
         ];
     }

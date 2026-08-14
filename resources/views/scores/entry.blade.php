@@ -325,7 +325,7 @@
                 'subject_id' => $subject->id,
                 'semester_id' => $semester->id,
             ]"
-            :allow-import="! $isScoreAdmin"
+            :allow-import="true"
         />
     </div>
 </div>
@@ -362,7 +362,7 @@
 @if($isScoreAdmin)
     <div class="score-permission-alert mb-3">
         <i class="bi bi-shield-check me-1"></i>
-        Chế độ quản trị: bảng điểm đang ở trạng thái chỉ xem để phục vụ tra cứu, giám sát và đối soát dữ liệu.
+        Chế độ quản trị: được phép chỉnh sửa điểm bất kỳ lúc nào để xử lý sai sót sau phúc khảo.
     </div>
 @endif
 
@@ -408,6 +408,9 @@
                         @foreach($scoreColumns as $column)
                             @php
                                 $permission = $columnPermissions[$column->id] ?? ['editable' => false, 'reason' => 'Chỉ xem'];
+                                $cellPermission = $scoreCellPermissions[$column->id][$student->id] ?? $permission;
+                                $isCellEditable = (bool) ($cellPermission['editable'] ?? false);
+                                $cellReason = $cellPermission['reason'] ?? ($permission['reason'] ?? 'Chỉ xem');
                                 $detail = $header?->details?->firstWhere('score_column_id', $column->id);
                                 $fieldName = "scores[{$column->id}][{$student->id}]";
                                 $fieldKey = "scores.{$column->id}.{$student->id}";
@@ -422,22 +425,14 @@
                                 };
                             @endphp
                             <td>
-                                @if($isScoreAdmin)
-                                    <span class="score-readonly-value {{ $displayValue === '' ? 'empty' : '' }}">
-                                        @if($usesPassFailAssessment)
-                                            {{ $passFailLabel !== '' ? $passFailLabel : '-' }}
-                                        @else
-                                            {{ $displayValue !== '' ? $displayValue : '-' }}
-                                        @endif
-                                        {!! $renderRetestBadge($detail) !!}
-                                    </span>
-                                @elseif($usesPassFailAssessment)
+                                @if($usesPassFailAssessment)
                                     <select
                                         name="{{ $fieldName }}"
                                         class="form-select form-select-sm {{ $errors->has($fieldKey) ? 'is-invalid' : '' }}"
                                         data-score-input
                                         data-score-type="{{ $column->type }}"
-                                        @disabled(! $permission['editable'])
+                                        title="{{ $cellReason }}"
+                                        @disabled(! $isCellEditable)
                                     >
                                         <option value="">Chọn</option>
                                         <option value="pass" @selected($displayValue === 'pass' || $displayValue === '1')>Đạt (Đ)</option>
@@ -457,12 +452,18 @@
                                         pattern="^(10(\.0)?|[0-9](\.[0-9])?)$"
                                         data-score-input
                                         data-score-type="{{ $column->type }}"
-                                        @disabled(! $permission['editable'])
+                                        title="{{ $cellReason }}"
+                                        @disabled(! $isCellEditable)
                                     >
                                     @if($errors->has($fieldKey))
                                         <div class="invalid-feedback">{{ $errors->first($fieldKey) }}</div>
                                     @endif
                                     {!! $renderRetestBadge($detail) !!}
+                                @endif
+                                @if(! $isCellEditable && $detail)
+                                    <div class="text-xs font-normal text-gray-400 mt-1 truncate" title="{{ $cellReason }}">
+                                        {{ $isScoreAdmin ? '' : 'Đã khóa sửa' }}
+                                    </div>
                                 @endif
                             </td>
                         @endforeach
@@ -505,17 +506,16 @@
         </div>
     </div>
     <div class="mt-3 text-end">
-        @if(! $isScoreAdmin && $canSubmitScores)
-            <button class="btn btn-primary">Lưu điểm</button>
+        @if($canSubmitScores)
+            <button class="btn btn-primary">{{ $isScoreAdmin ? 'Lưu điều chỉnh điểm' : 'Lưu điểm' }}</button>
         @elseif(! $isScoreAdmin)
             <span class="text-muted">Bạn đang ở chế độ chỉ xem hoặc chưa có cột điểm nào được mở.</span>
         @else
-            <span class="text-muted">Admin đang xem bảng điểm ở chế độ giám sát, không có thao tác lưu điểm.</span>
+            <span class="text-muted">Chưa có cột điểm để chỉnh sửa.</span>
         @endif
     </div>
 </form>
 
-@unless($isScoreAdmin)
 <script>
     document.querySelectorAll('[data-score-entry-form]').forEach((form) => {
         const scoreWeights = {
@@ -578,5 +578,4 @@
         });
     });
 </script>
-@endunless
 @endsection

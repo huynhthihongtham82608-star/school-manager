@@ -26,13 +26,16 @@ class AttendanceController extends Controller
         $user = $request->user();
         $selectedYearId = $this->selectedSchoolYearId($request);
         $selectedSemesterId = $this->selectedSemesterId($request);
-        $selectedClassId = $request->query('class_id');
+        $rawClassId = $request->query('class_id');
+        $selectedClassIsAll = in_array((string) $rawClassId, ['', 'all'], true);
+        $selectedClassId = $selectedClassIsAll ? null : $rawClassId;
         $date = $request->query('date', now()->format('Y-m-d'));
         $attendanceViewMode = in_array($request->query('attendance_view', 'day'), ['day', 'week', 'all'], true)
             ? $request->query('attendance_view', 'day')
             : 'day';
         $readOnly = $this->isHistoricalReadOnly();
-        $selectedSessionType = $request->query('attendance_type');
+        $rawSessionType = $request->query('attendance_type', $request->query('session_type'));
+        $selectedSessionType = in_array((string) $rawSessionType, ['', 'all'], true) ? null : $rawSessionType;
         $selectedTimetableEntryId = $request->query('timetable_entry_id');
         $selectedPeriod = $request->query('period', $request->query('slot'));
         $selectedTeachingSession = $request->query('teaching_session');
@@ -127,8 +130,20 @@ class AttendanceController extends Controller
             }
         }
 
-        if (! $selectedClassId && ! $isSubjectTeacherOnlyAttendance && $user->isHomeroom() && ! $user->isAdmin() && ! $user->isStaff() && $classes->isNotEmpty()) {
-            $selectedClassId = $classes->first()->id;
+        if (! $isSubjectTeacherOnlyAttendance && $user->isHomeroom() && ! $user->isAdmin() && ! $user->isStaff() && $classes->isNotEmpty()) {
+            $homeroomClass = $user->teacher
+                ? $classes->first(fn (SchoolClass $class) => (string) $class->homeroom_teacher_id === (string) $user->teacher->id)
+                : null;
+
+            $selectedClass = $homeroomClass ?: $classes->first();
+            $selectedClassId = $selectedClass?->id;
+            $selectedClassIsAll = false;
+
+            if ($attendanceViewMode === 'day' && ! in_array($selectedSessionType, [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON], true)) {
+                $selectedSessionType = AttendanceRecord::SESSION_MORNING;
+            } elseif ($attendanceViewMode !== 'day') {
+                $selectedSessionType = null;
+            }
         }
 
         if ($isSubjectTeacherOnlyAttendance) {
@@ -174,7 +189,7 @@ class AttendanceController extends Controller
 
             if ($selectedClass && $selectedSemester) {
                 $allowedSessionTypes = $this->allowedSessionTypes($user, $selectedClass);
-                if (! array_key_exists((string) $selectedSessionType, $allowedSessionTypes)) {
+                if ($selectedSessionType && ! array_key_exists((string) $selectedSessionType, $allowedSessionTypes)) {
                     $selectedSessionType = array_key_first($allowedSessionTypes) ?: AttendanceRecord::SESSION_DAILY;
                 }
 
@@ -225,7 +240,7 @@ class AttendanceController extends Controller
                         ->orderBy('student_code')
                         ->get();
 
-                    if (Schema::hasTable('attendance_records') && ($selectedSessionType !== AttendanceRecord::SESSION_PERIOD || $selectedTimetableEntryId)) {
+                    if ($selectedSessionType && Schema::hasTable('attendance_records') && ($selectedSessionType !== AttendanceRecord::SESSION_PERIOD || $selectedTimetableEntryId)) {
                         $sessionKey = $this->sessionKey($selectedSessionType, $selectedTimetableEntryId);
                         $existingRecords = AttendanceRecord::where('class_id', $selectedClass->id)
                             ->where('semester_id', $selectedSemester->id)
@@ -240,8 +255,8 @@ class AttendanceController extends Controller
                     $approvedLeaveStudentIds = $approvedLeaveRequests->pluck('student_id')->unique()->values();
                 }
             }
-        } else {
-            $selectedSessionType = $selectedSessionType ?: AttendanceRecord::SESSION_MORNING;
+        } elseif ($isSubjectTeacherOnlyAttendance) {
+            $selectedSessionType = $selectedSessionType ?: AttendanceRecord::SESSION_PERIOD;
         }
 
         $isSubjectTeacherPeriodScope = $user->isTeacher()
@@ -310,10 +325,23 @@ class AttendanceController extends Controller
                         $recordsQuery->whereRaw('1 = 0');
                     }
                 } else {
-                    $recordsQuery->where(function ($query) {
-                        $query->whereIn('session_type', [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON])
-                            ->orWhereIn('session_key', [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON]);
-                    });
+                    if (in_array($selectedSessionType, [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON], true)) {
+                        $recordsQuery->where(function ($query) use ($selectedSessionType) {
+                            $query->where('session_type', $selectedSessionType)
+                                ->orWhere('session_key', $selectedSessionType);
+                        });
+                    } elseif ($attendanceViewMode === 'all') {
+                        $recordsQuery->where(function ($query) {
+                            $query->whereIn('session_type', [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON, AttendanceRecord::SESSION_PERIOD])
+                                ->orWhereIn('session_key', [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON])
+                                ->orWhere('session_key', 'like', 'period:%');
+                        });
+                    } else {
+                        $recordsQuery->where(function ($query) {
+                            $query->whereIn('session_type', [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON])
+                                ->orWhereIn('session_key', [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON]);
+                        });
+                    }
                 }
             }
         }
@@ -323,8 +351,8 @@ class AttendanceController extends Controller
             'total' => $attendanceRecords->count(),
             'present' => $attendanceRecords->where('status', 'present')->count(),
             'late' => $attendanceRecords->where('status', 'late')->count(),
-            'excused' => $attendanceRecords->where('status', 'excused')->count(),
-            'absent' => $attendanceRecords->where('status', 'absent')->count(),
+            'excused' => $attendanceRecords->filter(fn (AttendanceRecord $record) => $record->isPermittedAbsent())->count(),
+            'absent' => $attendanceRecords->filter(fn (AttendanceRecord $record) => $record->isUnexcusedAbsent())->count(),
         ];
         $homeroomAttendanceStats = $this->homeroomAttendanceStats($selectedClass, $selectedSemesterId, $date);
         $adminAttendanceMatrix = ($attendanceViewMode === 'day' && ($user->isAdmin() || $user->isStaff()))
@@ -332,7 +360,7 @@ class AttendanceController extends Controller
             : collect();
         $attendanceDetailRows = $this->attendanceDetailRows($attendanceRecords);
         $weeklyMatrix = $attendanceViewMode === 'week'
-            ? $this->weeklyMatrix($request->user(), $selectedClass, $selectedSemesterId, $date)
+            ? $this->weeklyMatrix($request->user(), $selectedClass, $selectedSemesterId, $date, $classes)
             : ['enabled' => false, 'days' => collect(), 'rows' => collect()];
         $pendingLeaveRequests = $this->pendingLeaveRequestsFor($request->user(), $selectedClass);
 
@@ -386,7 +414,10 @@ class AttendanceController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless($request->user()->isTeacher() && ! $request->user()->isAdmin() && ! $request->user()->isStaff(), 403);
+        abort_unless(
+            $request->user()->isTeacher() || $request->user()->isAdmin() || $request->user()->isStaff(),
+            403
+        );
 
         if (! Schema::hasTable('attendance_records')) {
             return back()->with('error', 'Chưa có bảng attendance_records. Vui lòng chạy migration trước.');
@@ -402,7 +433,7 @@ class AttendanceController extends Controller
             'action_mode' => ['nullable', 'in:create,update'],
             'attendance_session_id' => ['nullable', 'string', 'max:64'],
             'status' => ['required', 'array'],
-            'status.*' => ['required', 'in:present,late,excused,absent'],
+            'status.*' => ['required', 'in:present,late,excused,absent,permitted_absent,unexcused_absent'],
             'note' => ['nullable', 'array'],
             'note.*' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -439,8 +470,8 @@ class AttendanceController extends Controller
                 $status = $data['status'][$student->id] ?? null;
                 $note = $data['note'][$student->id] ?? null;
 
-                if ($data['attendance_type'] !== AttendanceRecord::SESSION_PERIOD && $approvedLeaveStudentIds->contains($student->id)) {
-                    $status = 'excused';
+                if ($approvedLeaveStudentIds->contains($student->id)) {
+                    $status = AttendanceRecord::STATUS_PERMITTED_ABSENT;
                     $leaveReason = optional($approvedLeaveRequests->firstWhere('student_id', $student->id))->reason;
                     $note = 'Đã duyệt đơn xin nghỉ học của phụ huynh.' . ($leaveReason ? ' Lý do: ' . $leaveReason : '');
                 }
@@ -493,13 +524,15 @@ class AttendanceController extends Controller
 
     private function authorizeAttendanceMutation($user, SchoolClass $class, Semester $semester, string $attendanceDate, string $sessionType, ?string $timetableEntryId): void
     {
+        if ($user->isAdmin() || $user->isStaff()) {
+            return;
+        }
+
         if ($sessionType === AttendanceRecord::SESSION_PERIOD) {
             $this->authorizePeriodAttendanceView($user, $class, $semester, $attendanceDate, $timetableEntryId);
 
-            return;
-
-            if (! $this->attendanceEditWindowOpen($attendanceDate)) {
-                abort(403, 'Đã quá 24 giờ kể từ ngày điểm danh. Sổ điểm danh đã chuyển sang chế độ chỉ xem.');
+            if (! Carbon::parse($attendanceDate)->isToday()) {
+                abort(403, 'Giáo viên bộ môn chỉ được sửa nhật ký điểm danh theo tiết trong ngày hiện tại.');
             }
 
             return;
@@ -513,9 +546,49 @@ class AttendanceController extends Controller
             abort(403, 'Giáo viên bộ môn chỉ được xem điểm danh theo tiết, không được lưu sổ tổng hợp lớp.');
         }
 
+        $sessionRecords = $this->attendanceSessionRecords($class, $semester, $attendanceDate, $sessionType, $timetableEntryId);
+
+        if ($sessionRecords->isNotEmpty()) {
+            if (! $this->attendanceRecordsEditWindowOpen($sessionRecords)) {
+                abort(403, 'Đã quá 24 giờ kể từ lúc tạo bản ghi điểm danh. Sổ điểm danh đã chuyển sang chế độ chỉ xem.');
+            }
+
+            return;
+        }
+
         if (! $this->attendanceEditWindowOpen($attendanceDate)) {
             abort(403, 'Đã quá 24 giờ kể từ ngày điểm danh. Sổ điểm danh đã chuyển sang chế độ chỉ xem.');
         }
+    }
+
+    private function attendanceSessionRecords(SchoolClass $class, Semester $semester, string $attendanceDate, string $sessionType, ?string $timetableEntryId)
+    {
+        if (! Schema::hasTable('attendance_records')) {
+            return collect();
+        }
+
+        return AttendanceRecord::where('class_id', $class->id)
+            ->where('semester_id', $semester->id)
+            ->whereDate('attendance_date', $attendanceDate)
+            ->where('session_key', $this->sessionKey($sessionType, $timetableEntryId))
+            ->get();
+    }
+
+    private function attendanceRecordsEditWindowOpen($records): bool
+    {
+        $createdAt = collect($records)
+            ->pluck('created_at')
+            ->filter()
+            ->sortBy(fn ($value) => $value instanceof Carbon ? $value->timestamp : Carbon::parse($value)->timestamp)
+            ->first();
+
+        if (! $createdAt) {
+            return false;
+        }
+
+        $createdAt = $createdAt instanceof Carbon ? $createdAt : Carbon::parse($createdAt);
+
+        return now()->lte($createdAt->copy()->addHours(24));
     }
 
     private function attendanceEditDeadline(string $attendanceDate): Carbon
@@ -661,6 +734,7 @@ class AttendanceController extends Controller
                     'class_name' => $first->classRoom?->name ?? $entry?->timetable?->classRoom?->name ?? '-',
                     'semester_id' => $semesterId,
                     'attendance_date' => $first->attendance_date?->toDateString(),
+                    'can_edit' => $first->attendance_date ? $first->attendance_date->isToday() : false,
                     'session_type' => $sessionKey,
                     'session_label' => $sessionKey === 'morning' ? 'Buổi Sáng' : 'Buổi Chiều',
                     'slot' => $entry ? (string) $entry->periodInSession() : (string) ($first->session_order ?: ''),
@@ -668,10 +742,10 @@ class AttendanceController extends Controller
                     'subject_name' => $entry?->subject?->name ?? 'Môn học',
                     'present' => $records->where('status', 'present')->count(),
                     'late' => $records->where('status', 'late')->count(),
-                    'absent' => $records->where('status', 'absent')->count(),
+                    'absent' => $records->filter(fn (AttendanceRecord $record) => $record->isUnexcusedAbsent())->count(),
                     'total' => $records->count(),
                     'detail_records' => $records
-                        ->filter(fn (AttendanceRecord $record) => in_array($record->status, ['late', 'absent'], true))
+                        ->filter(fn (AttendanceRecord $record) => $record->status === 'late' || $record->isUnexcusedAbsent())
                         ->sortBy(fn (AttendanceRecord $record) => $record->student?->student_code ?? $record->student?->name ?? '')
                         ->values(),
                 ];
@@ -700,8 +774,7 @@ class AttendanceController extends Controller
         $stats['present'] = $records->where('status', 'present')->count();
         $stats['late'] = $records->where('status', 'late')->count();
         $stats['period_absent'] = $records
-            ->filter(fn (AttendanceRecord $record) => $record->status === 'absent'
-                && ($record->session_type === AttendanceRecord::SESSION_PERIOD || str_starts_with((string) $record->session_key, 'period:')))
+            ->filter(fn (AttendanceRecord $record) => $record->isUnexcusedAbsent() && $record->isPeriodSession())
             ->count();
 
         return $stats;
@@ -719,6 +792,8 @@ class AttendanceController extends Controller
             return $classes->map(fn (SchoolClass $class) => (object) [
                 'class' => $class,
                 'daily_absent' => 0,
+                'daily_permitted_absent' => 0,
+                'daily_unexcused_absent' => 0,
                 'period_absent' => 0,
                 'period_absent_details' => collect(),
             ]);
@@ -734,16 +809,22 @@ class AttendanceController extends Controller
         return $classes->map(function (SchoolClass $class) use ($records) {
             $classRecords = collect($records->get($class->id, collect()));
             $periodAbsentDetails = $classRecords
-                ->filter(fn (AttendanceRecord $record) => $record->status === 'absent'
-                    && ($record->session_type === AttendanceRecord::SESSION_PERIOD || str_starts_with((string) $record->session_key, 'period:')))
+                ->filter(fn (AttendanceRecord $record) => $record->isUnexcusedAbsent() && $record->isPeriodSession())
                 ->values();
+            $dailyPermittedAbsent = $classRecords
+                ->filter(fn (AttendanceRecord $record) => $record->isPermittedAbsent()
+                    && in_array($record->session_type, [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON], true))
+                ->count();
+            $dailyUnexcusedAbsent = $classRecords
+                ->filter(fn (AttendanceRecord $record) => $record->isUnexcusedAbsent()
+                    && in_array($record->session_type, [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON], true))
+                ->count();
 
             return (object) [
                 'class' => $class,
-                'daily_absent' => $classRecords
-                    ->filter(fn (AttendanceRecord $record) => in_array($record->status, ['absent', 'excused'], true)
-                        && in_array($record->session_type, [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON], true))
-                    ->count(),
+                'daily_absent' => $dailyPermittedAbsent + $dailyUnexcusedAbsent,
+                'daily_permitted_absent' => $dailyPermittedAbsent,
+                'daily_unexcused_absent' => $dailyUnexcusedAbsent,
                 'period_absent' => $periodAbsentDetails->count(),
                 'period_absent_details' => $periodAbsentDetails,
             ];
@@ -763,14 +844,22 @@ class AttendanceController extends Controller
             ->values();
     }
 
-    private function weeklyMatrix($user, ?SchoolClass $class, ?string $semesterId, ?string $date): array
+    private function weeklyMatrix($user, ?SchoolClass $class, ?string $semesterId, ?string $date, $classes = null): array
     {
-        if (! $class || ! $semesterId || ! $date || ! Schema::hasTable('attendance_records')) {
+        if (! $semesterId || ! $date || ! Schema::hasTable('attendance_records')) {
+            return ['enabled' => false, 'days' => collect(), 'rows' => collect()];
+        }
+
+        $classScope = $class ? collect([$class]) : collect($classes)->filter()->values();
+
+        if ($classScope->isEmpty()) {
             return ['enabled' => false, 'days' => collect(), 'rows' => collect()];
         }
 
         $canViewMatrix = $user->isAdmin()
-            || ($user->isHomeroom() && $user->teacher && (string) $class->homeroom_teacher_id === (string) $user->teacher->id);
+            || $user->isStaff()
+            || ($class && $user->isHomeroom() && $user->teacher && (string) $class->homeroom_teacher_id === (string) $user->teacher->id)
+            || (! $class && $user->isHomeroom() && $user->teacher);
 
         if (! $canViewMatrix) {
             return ['enabled' => false, 'days' => collect(), 'rows' => collect()];
@@ -778,12 +867,16 @@ class AttendanceController extends Controller
 
         $start = Carbon::parse($date)->startOfWeek(Carbon::MONDAY);
         $days = collect(range(0, 5))->map(fn ($offset) => $start->copy()->addDays($offset));
-        $students = $class->students()
+        $classIds = $classScope->pluck('id')->filter()->values();
+        $students = Student::with('classRoom')
+            ->whereIn('class_id', $classIds)
             ->where('status', Student::STATUS_STUDYING)
+            ->orderBy('class_id')
             ->orderBy('student_code')
             ->get();
 
-        $records = AttendanceRecord::where('class_id', $class->id)
+        $records = AttendanceRecord::with('timetableEntry')
+            ->whereIn('class_id', $classIds)
             ->where('semester_id', $semesterId)
             ->whereBetween('attendance_date', [$days->first()->toDateString(), $days->last()->toDateString()])
             ->get()
@@ -796,22 +889,25 @@ class AttendanceController extends Controller
 
             $cells = $days->mapWithKeys(function (Carbon $day) use ($studentRecords, &$totalAbsentPeriods, &$totalLate) {
                 $items = collect($studentRecords->get($day->toDateString(), collect()));
-                $excused = $items->where('status', 'excused')->count();
-                $absent = $items->where('status', 'absent')->count();
+                $excused = $items->filter(fn (AttendanceRecord $record) => $record->isPermittedAbsent())->count();
+                $absent = $items->filter(fn (AttendanceRecord $record) => $record->isUnexcusedAbsent())->count();
                 $late = $items->where('status', 'late')->count();
                 $morningAbsent = $items
-                    ->filter(fn (AttendanceRecord $record) => in_array($record->status, ['absent', 'excused'], true)
+                    ->filter(fn (AttendanceRecord $record) => ($record->isPermittedAbsent() || $record->isUnexcusedAbsent())
                         && ($record->session_type === AttendanceRecord::SESSION_MORNING || $record->session_key === AttendanceRecord::SESSION_MORNING))
                     ->isNotEmpty();
                 $afternoonAbsent = $items
-                    ->filter(fn (AttendanceRecord $record) => in_array($record->status, ['absent', 'excused'], true)
+                    ->filter(fn (AttendanceRecord $record) => ($record->isPermittedAbsent() || $record->isUnexcusedAbsent())
                         && ($record->session_type === AttendanceRecord::SESSION_AFTERNOON || $record->session_key === AttendanceRecord::SESSION_AFTERNOON))
                     ->isNotEmpty();
                 $subjectAbsentItems = $items
-                    ->filter(fn (AttendanceRecord $record) => $record->status === 'absent'
-                        && ($record->session_type === AttendanceRecord::SESSION_PERIOD || str_starts_with((string) $record->session_key, 'period:')))
+                    ->filter(fn (AttendanceRecord $record) => $record->isUnexcusedAbsent()
+                        && $record->isPeriodSession())
                     ->values();
                 $subjectAbsent = $subjectAbsentItems->count();
+                $suspiciousSubjectAbsent = $subjectAbsentItems
+                    ->filter(fn (AttendanceRecord $record) => $record->isSuspiciousPeriodAbsence())
+                    ->count();
                 $markers = collect();
 
                 if ($morningAbsent) {
@@ -837,6 +933,7 @@ class AttendanceController extends Controller
                     'late' => $late,
                     'present' => $items->where('status', 'present')->count(),
                     'subject_absent' => $subjectAbsent,
+                    'suspicious_period_absence' => $suspiciousSubjectAbsent,
                     'markers' => $markers->values(),
                     'total' => $items->count(),
                 ]];
@@ -998,8 +1095,8 @@ class AttendanceController extends Controller
     {
         $mainRecords = $records
             ->filter(fn (AttendanceRecord $record) => $periodMode
-                ? ($record->session_type === AttendanceRecord::SESSION_PERIOD || str_starts_with((string) $record->session_key, 'period:'))
-                : $this->normalizedMainSessionType($record) !== null)
+                ? $record->isPeriodSession()
+                : $this->normalizedMainSessionType($record) !== null || $record->isPeriodSession())
             ->values();
 
         $rosters = $mainRecords->isEmpty()
@@ -1017,11 +1114,14 @@ class AttendanceController extends Controller
                 $record->class_id,
                 $record->semester_id ?: 'none',
                 optional($record->attendance_date)->toDateString(),
-                $periodMode ? ($record->session_key ?: 'period:' . $record->timetable_entry_id) : $this->normalizedMainSessionType($record),
+                ($periodMode || $record->isPeriodSession())
+                    ? ($record->session_key ?: 'period:' . $record->timetable_entry_id)
+                    : $this->normalizedMainSessionType($record),
             ]))
-            ->map(function ($items, $key) use ($rosters, $rosterCounts, $periodMode) {
+            ->map(function ($items, $key) use ($rosters, $rosterCounts, $periodMode, $request) {
                 $first = $items->first();
-                $sessionType = $periodMode
+                $isPeriodSession = $periodMode || $first->isPeriodSession();
+                $sessionType = $isPeriodSession
                     ? AttendanceRecord::SESSION_PERIOD
                     : ($this->normalizedMainSessionType($first) ?: AttendanceRecord::SESSION_MORNING);
                 $uniqueRecords = $items
@@ -1029,11 +1129,13 @@ class AttendanceController extends Controller
                     ->unique('student_id')
                     ->values();
                 $counts = $uniqueRecords->countBy('status');
+                $permittedAbsentCount = $uniqueRecords->filter(fn (AttendanceRecord $record) => $record->isPermittedAbsent())->count();
+                $unexcusedAbsentCount = $uniqueRecords->filter(fn (AttendanceRecord $record) => $record->isUnexcusedAbsent())->count();
                 $rosterTotal = (int) ($rosterCounts->get($first->class_id) ?: $uniqueRecords->count());
                 $recordedTotal = $uniqueRecords->count();
                 $recordsByStudent = $uniqueRecords->keyBy('student_id');
                 $displayRecords = collect($rosters->get($first->class_id, collect()))
-                    ->map(function (Student $student) use ($recordsByStudent, $first, $sessionType, $periodMode) {
+                    ->map(function (Student $student) use ($recordsByStudent, $first, $sessionType, $isPeriodSession) {
                         $record = $recordsByStudent->get($student->id);
                         if ($record) {
                             return $record;
@@ -1045,9 +1147,9 @@ class AttendanceController extends Controller
                             'semester_id' => $first->semester_id,
                             'attendance_date' => $first->attendance_date?->toDateString(),
                             'session_type' => $sessionType,
-                            'session_key' => $periodMode ? ($first->session_key ?: 'period:' . $first->timetable_entry_id) : $sessionType,
-                            'session_label' => $periodMode ? ($first->session_label ?: $first->displaySessionLabel()) : (AttendanceRecord::SESSION_TYPES[$sessionType] ?? ''),
-                            'session_order' => $periodMode ? (int) ($first->session_order ?: 0) : ($sessionType === AttendanceRecord::SESSION_AFTERNOON ? 2 : 1),
+                            'session_key' => $isPeriodSession ? ($first->session_key ?: 'period:' . $first->timetable_entry_id) : $sessionType,
+                            'session_label' => $isPeriodSession ? ($first->session_label ?: $first->displaySessionLabel()) : (AttendanceRecord::SESSION_TYPES[$sessionType] ?? ''),
+                            'session_order' => $isPeriodSession ? (int) ($first->session_order ?: 0) : ($sessionType === AttendanceRecord::SESSION_AFTERNOON ? 2 : 1),
                             'status' => 'present',
                         ]);
                         $record->setRelation('student', $student);
@@ -1063,9 +1165,9 @@ class AttendanceController extends Controller
                     'school_year_id' => $first->semester?->school_year_id ?? $first->classRoom?->school_year_id,
                     'date' => $first->attendance_date,
                     'session_type' => $sessionType,
-                    'session_label' => $periodMode ? ($first->session_label ?: $first->displaySessionLabel()) : (AttendanceRecord::SESSION_TYPES[$sessionType] ?? $first->displaySessionLabel()),
-                    'session_order' => $periodMode ? (int) ($first->session_order ?: 0) : ($sessionType === AttendanceRecord::SESSION_AFTERNOON ? 2 : 1),
-                    'timetable_entry_id' => $periodMode ? $first->timetable_entry_id : null,
+                    'session_label' => $isPeriodSession ? ($first->session_label ?: $first->displaySessionLabel()) : (AttendanceRecord::SESSION_TYPES[$sessionType] ?? $first->displaySessionLabel()),
+                    'session_order' => $isPeriodSession ? (int) ($first->session_order ?: 0) : ($sessionType === AttendanceRecord::SESSION_AFTERNOON ? 2 : 1),
+                    'timetable_entry_id' => $isPeriodSession ? $first->timetable_entry_id : null,
                     'class_name' => $first->classRoom->name ?? 'Không rõ',
                     'semester_name' => $first->semester->name ?? 'Không rõ',
                     'school_year_name' => $first->semester?->schoolYear?->name ?? $first->classRoom?->schoolYear?->name ?? 'Không rõ',
@@ -1073,9 +1175,10 @@ class AttendanceController extends Controller
                     'recorded_total' => $recordedTotal,
                     'present' => $counts->get('present', 0),
                     'late' => $counts->get('late', 0),
-                    'excused' => $counts->get('excused', 0),
-                    'absent' => $counts->get('absent', 0),
+                    'excused' => $permittedAbsentCount,
+                    'absent' => $unexcusedAbsentCount,
                     'is_completed' => $rosterTotal > 0 && $recordedTotal >= $rosterTotal,
+                    'can_edit' => $this->canEditAttendanceSessionForUser($request->user(), $first, $uniqueRecords),
                     'records' => $displayRecords->isNotEmpty() ? $displayRecords : $uniqueRecords
                         ->sortBy(fn ($record) => $record->student->student_code ?? $record->student->name ?? '')
                         ->values(),
@@ -1114,6 +1217,29 @@ class AttendanceController extends Controller
         }
 
         return null;
+    }
+
+    private function canEditAttendanceSessionForUser($user, AttendanceRecord $record, $sessionRecords = null): bool
+    {
+        if ($user->isAdmin() || $user->isStaff()) {
+            return true;
+        }
+
+        if (! ($user->isTeacher() && $user->teacher)) {
+            return false;
+        }
+
+        if ($record->isPeriodSession()) {
+            return $record->attendance_date?->isToday() === true
+                && $record->timetableEntry
+                && (string) $record->timetableEntry->teacher_id === (string) $user->teacher->id;
+        }
+
+        if (! ($user->isHomeroom() && (string) $record->classRoom?->homeroom_teacher_id === (string) $user->teacher->id)) {
+            return false;
+        }
+
+        return $this->attendanceRecordsEditWindowOpen($sessionRecords ?: collect([$record]));
     }
 
     private function sessionKey(string $sessionType, ?string $timetableEntryId = null): string

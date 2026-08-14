@@ -15,6 +15,7 @@ use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\TeachingAssignment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -1332,9 +1333,12 @@ class ScoreController extends Controller
         $subjectAnnualAverages = $this->subjectAnnualAveragesForClass($students->pluck('id'), $subject, $semester);
 
         $columnPermissions = $this->scoreColumnPermissions($class, $subject, $semester, $scoreColumns);
-        $canSubmitScores = collect($columnPermissions)->contains(fn ($meta) => $meta['editable']);
+        $scoreCellPermissions = $this->scoreCellPermissions($students, $headers, $scoreColumns, $columnPermissions);
+        $canSubmitScores = collect($scoreCellPermissions)
+            ->flatMap(fn (array $cells) => $cells)
+            ->contains(fn (array $meta) => $meta['editable']);
 
-        return view('scores.entry', compact('class', 'subject', 'semester', 'students', 'headers', 'scoreColumns', 'columnPermissions', 'canSubmitScores', 'subjectAnnualAverages', 'scoreSetting'));
+        return view('scores.entry', compact('class', 'subject', 'semester', 'students', 'headers', 'scoreColumns', 'columnPermissions', 'scoreCellPermissions', 'canSubmitScores', 'subjectAnnualAverages', 'scoreSetting'));
     }
 
     public function store(Request $request)
@@ -1358,6 +1362,7 @@ class ScoreController extends Controller
         $columnPermissions = $this->scoreColumnPermissions($class, $subject, $semester, $scoreColumns);
         $editableColumns = $scoreColumns->filter(fn (ScoreColumn $column) => $columnPermissions[$column->id]['editable'] ?? false);
         $usesPassFailAssessment = $subject->usesPassFailAssessment();
+        $isScoreAdmin = Auth::user()->isAdmin() || Auth::user()->isStaff();
 
         if ($editableColumns->isEmpty()) {
             abort(403, 'Hiện không có cột điểm nào đang mở để nhập hoặc chỉnh sửa.');
@@ -1367,11 +1372,24 @@ class ScoreController extends Controller
             ->where('status', Student::STATUS_STUDYING)
             ->get()
             ->keyBy('id');
+        $existingHeaders = ScoreHeader::where('subject_id', $subject->id)
+            ->where('semester_id', $semester->id)
+            ->whereIn('student_id', $students->keys())
+            ->with('details')
+            ->get()
+            ->keyBy('student_id');
         $normalizedScores = [];
         $errors = [];
 
         foreach ($editableColumns as $column) {
             foreach ($students as $student) {
+                $header = $existingHeaders->get($student->id);
+                $detail = $header?->details?->firstWhere('score_column_id', $column->id);
+                $columnEditable = (bool) ($columnPermissions[$column->id]['editable'] ?? false);
+                if (! $this->canEditScoreDetail($detail, $columnEditable, $isScoreAdmin)) {
+                    continue;
+                }
+
                 $field = "scores.{$column->id}.{$student->id}";
                 $value = trim((string) $request->input($field, ''));
 
@@ -1412,6 +1430,14 @@ class ScoreController extends Controller
 
         DB::transaction(function () use ($students, $editableColumns, $semester, $subject, $normalizedScores, $scoreSetting) {
             foreach ($students as $student) {
+                $hasEditablePayload = $editableColumns->contains(
+                    fn (ScoreColumn $column) => array_key_exists($student->id, $normalizedScores[$column->id] ?? [])
+                );
+
+                if (! $hasEditablePayload) {
+                    continue;
+                }
+
                 $header = ScoreHeader::firstOrCreate([
                     'student_id' => $student->id,
                     'subject_id' => $subject->id,
@@ -1420,6 +1446,10 @@ class ScoreController extends Controller
                 ]);
 
                 foreach ($editableColumns as $column) {
+                    if (! array_key_exists($student->id, $normalizedScores[$column->id] ?? [])) {
+                        continue;
+                    }
+
                     $value = $normalizedScores[$column->id][$student->id] ?? null;
 
                     $detail = $header->details()
@@ -1593,6 +1623,10 @@ class ScoreController extends Controller
 
     protected function authorizeScoreEdit(SchoolClass $class, string $subjectId, Semester $semester): void
     {
+        if (Auth::user()->isAdmin() || Auth::user()->isStaff()) {
+            return;
+        }
+
         if (! $this->isAssignedSubjectTeacher($class, $subjectId, $semester)) {
             abort(403, 'Chỉ giáo viên bộ môn được phân công mới được nhập hoặc chỉnh sửa điểm.');
         }
@@ -1633,14 +1667,16 @@ class ScoreController extends Controller
 
     private function scoreColumnPermissions(SchoolClass $class, Subject $subject, Semester $semester, Collection $scoreColumns): array
     {
+        $isScoreAdmin = Auth::user()->isAdmin() || Auth::user()->isStaff();
         $canTeacherEdit = Auth::user()->isTeacher()
             && $this->isAssignedSubjectTeacher($class, $subject->id, $semester)
             && $semester->isActive()
             && ! $this->isHistoricalReadOnly();
 
-        return $scoreColumns->mapWithKeys(function (ScoreColumn $column) use ($canTeacherEdit) {
-            $editable = $canTeacherEdit && $column->isInputOpen();
+        return $scoreColumns->mapWithKeys(function (ScoreColumn $column) use ($canTeacherEdit, $isScoreAdmin) {
+            $editable = $isScoreAdmin || ($canTeacherEdit && $column->isInputOpen());
             $reason = match (true) {
+                $isScoreAdmin => 'Admin được phép chỉnh sửa điểm bất kỳ lúc nào.',
                 ! $canTeacherEdit => 'Chỉ giáo viên bộ môn được phân công mới được nhập điểm.',
                 $column->isInputOpen() => 'Đang mở nhập điểm.',
                 default => $column->inputStatusLabel(),
@@ -1651,6 +1687,54 @@ class ScoreController extends Controller
                 'reason' => $reason,
             ]];
         })->all();
+    }
+
+    private function scoreCellPermissions(Collection $students, Collection $headers, Collection $scoreColumns, array $columnPermissions): array
+    {
+        $isScoreAdmin = Auth::user()->isAdmin() || Auth::user()->isStaff();
+
+        return $scoreColumns->mapWithKeys(function (ScoreColumn $column) use ($students, $headers, $columnPermissions, $isScoreAdmin) {
+            $columnEditable = (bool) ($columnPermissions[$column->id]['editable'] ?? false);
+            $cells = $students->mapWithKeys(function (Student $student) use ($headers, $column, $columnEditable, $isScoreAdmin) {
+                $detail = ($headers->get($student->id))?->details?->firstWhere('score_column_id', $column->id);
+                $editable = $this->canEditScoreDetail($detail, $columnEditable, $isScoreAdmin);
+                $reason = match (true) {
+                    $isScoreAdmin => 'Admin được phép sửa điểm bất kỳ lúc nào.',
+                    ! $columnEditable => 'Cột điểm đang khóa hoặc bạn không có quyền nhập điểm.',
+                    ! $detail => 'Được nhập điểm mới.',
+                    $editable => 'Điểm còn trong thời hạn 7 ngày kể từ lúc tạo.',
+                    default => 'Điểm đã quá 7 ngày kể từ lúc tạo, giáo viên bộ môn không được sửa.',
+                };
+
+                return [$student->id => [
+                    'editable' => $editable,
+                    'reason' => $reason,
+                ]];
+            })->all();
+
+            return [$column->id => $cells];
+        })->all();
+    }
+
+    private function canEditScoreDetail(?ScoreDetail $detail, bool $columnEditable, bool $isScoreAdmin = false): bool
+    {
+        if ($isScoreAdmin) {
+            return true;
+        }
+
+        if (! $columnEditable) {
+            return false;
+        }
+
+        if (! $detail) {
+            return true;
+        }
+
+        if (! $detail->created_at) {
+            return false;
+        }
+
+        return now()->lte(Carbon::parse($detail->created_at)->copy()->addDays(7));
     }
 
     protected function ensureScorableSubject(Subject $subject): void

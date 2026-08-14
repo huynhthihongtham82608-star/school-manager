@@ -144,7 +144,33 @@
             ? route('school-years.detail', $historySchoolYear)
             : route('school-years.index');
 
-        $academicConfigItems = [
+        $strictAcademicTeachingItems = [
+            $adminItem('bi-building', 'Lớp học', route('classes.index'), ['classes.*', 'classes*'], 'classes.manage'),
+            $adminItem('bi-diagram-3', 'Phân công giảng dạy', route('assignments.index'), ['assignments.*', 'assignments*'], 'assignments.manage'),
+            $adminItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.manage'), ['timetable.manage', 'timetable/manage*'], 'timetable.manage'),
+            $adminItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), ['exam-schedules.*', 'exam-schedules*'], 'exams.manage'),
+        ];
+
+        $strictAcademicResultItems = [
+            $adminItem('bi-person-check', 'Điểm danh', route('attendance.index'), ['attendance.*', 'attendance*'], 'attendance.view'),
+        ];
+
+        if ($currentUser->hasAnyPermission(['scores.view', 'scores.manage'])) {
+            $strictAcademicResultItems[] = $adminItem('bi-table', 'Điểm số', route('scores.index'), ['scores.index', 'scores.entry', 'scores.store', 'scores/report-card*', 'scores/cascade*', 'scores/admin-matrix*'], 'scores.view');
+        }
+
+        if ($currentUser->hasAnyPermission(['conduct.view', 'conduct.manage'])) {
+            $strictAcademicResultItems[] = $adminItem('bi-star', 'Hạnh kiểm', route('conduct.index'), ['conduct.*', 'conduct*'], 'conduct.view');
+        }
+
+        $strictContentItems = [
+            $adminItem('bi-globe2', '🌐 Thông tin & Diện mạo trường', route('system.settings.edit'), ['system.settings.*', 'system/settings*'], 'system.settings'),
+            $adminItem('bi-megaphone', 'Thông báo', route('announcements.index'), ['announcements.*', 'announcements*'], 'content.manage'),
+            $adminItem('bi-calendar-event', 'Sự kiện', route('events.index'), ['events.*', 'events*'], 'content.manage'),
+            $adminItem('bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), ['documents.*', 'documents*'], 'documents.manage'),
+        ];
+
+        $strictSystemCatalogItems = [
             $adminItem('bi-calendar-event', 'Năm học', $schoolYearMenuUrl, ['school-years.*', 'school-years*'], 'academic.manage'),
             $adminItem('bi-calendar2-week', 'Học kỳ', route('semesters.index'), ['semesters.*', 'semesters*'], 'academic.manage'),
             $adminItem('bi-book', 'Môn học', route('subjects.index'), ['subjects.*', 'subjects*'], 'subjects.manage'),
@@ -152,92 +178,73 @@
             $adminItem('bi-door-open', 'Phòng học', route('rooms.index'), ['rooms.*', 'rooms*'], 'rooms.manage'),
         ];
 
-        $academicTeachingItems = [
-            $adminItem('bi-building', 'Lớp học', route('classes.index'), ['classes.*', 'classes*'], 'classes.manage'),
-            $adminItem('bi-diagram-3', 'Phân công giảng dạy', route('assignments.index'), ['assignments.*', 'assignments*'], 'assignments.manage'),
-            $adminItem('bi-calendar3-week', 'Thời khóa biểu', route('timetable.manage'), ['timetable.manage', 'timetable/manage*'], 'timetable.manage'),
-            $adminItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), ['exam-schedules.*', 'exam-schedules*'], 'exams.manage'),
+        $strictSystemRegulationItems = [
+            $adminItem('bi-sliders', 'Cấu hình đầu điểm', route('score-columns.index'), ['score-columns.*', 'score-columns*'], 'scores.manage'),
+            $adminItem('bi-bar-chart-steps', 'Mốc xếp loại học lực', route('system.regulations.index'), ['system.regulations.*', 'system/regulations*'], 'system.settings'),
+            $adminItem('bi-person-lines-fill', 'Định mức nề nếp', route('system.regulations.index'), ['system.regulations.*', 'system/regulations*'], 'system.settings'),
         ];
 
-        $academicResultItems = [
-            $adminItem('bi-person-check', 'Điểm danh', route('attendance.index'), ['attendance.*', 'attendance*'], 'attendance.view'),
+        $strictSystemOperationItems = [
+            $adminItem('bi-database-down', 'Sao lưu & Khôi phục', route('system.backups.index'), ['system.backups.*', 'system/backups*'], 'backups.manage'),
+            $adminItem('bi-shield-check', 'Nhật ký hoạt động', route('audit-logs.index'), ['audit-logs.*', 'audit-logs*'], 'audit_logs.view'),
+            $adminItem('bi-shield-lock', 'Vai trò & Quyền', route('rbac-roles.index'), ['rbac-roles.*', 'rbac-roles*'], 'manage_roles'),
         ];
-
-        if ($currentUser->hasAnyPermission(['scores.view', 'scores.manage'])) {
-            $academicResultItems[] = $adminItem('bi-table', 'Điểm số', route('scores.index'), ['scores.*', 'scores*', 'grade-windows.*', 'grade-windows*'], 'scores.view');
-        }
-
-        if ($currentUser->hasPermission('scores.manage')) {
-            $academicResultItems[] = $adminItem('bi-sliders', 'Cấu hình đầu điểm', route('score-columns.index'), ['score-columns.*', 'score-columns*'], 'scores.manage');
-        }
-
-        if ($currentUser->hasAnyPermission(['conduct.view', 'conduct.manage'])) {
-            $academicResultItems[] = $adminItem('bi-star', 'Hạnh kiểm', route('conduct.index'), ['conduct.*', 'conduct*'], 'conduct.view');
-        }
-
-        $academicSubgroups = [
-            [
-                'key' => 'academic-config',
-                'icon' => 'bi-sliders',
-                'title' => 'Cấu hình hệ thống',
-                'items' => $academicConfigItems,
-            ],
-            [
-                'key' => 'academic-teaching',
-                'icon' => 'bi-easel2',
-                'title' => 'Tổ chức giảng dạy',
-                'items' => $academicTeachingItems,
-            ],
-            [
-                'key' => 'academic-results',
-                'icon' => 'bi-clipboard-data',
-                'title' => 'Quản lý kết quả',
-                'items' => $academicResultItems,
-            ],
-        ];
-
-        $academicItems = array_merge($academicConfigItems, $academicTeachingItems, $academicResultItems);
 
         $addAdminGroup('overview', 'bi-speedometer2', 'Tổng quan', [
             $adminItem('bi-house-door', 'Bảng điều khiển', route('dashboard'), ['dashboard'], 'dashboard.view'),
         ]);
-
-        $addAdminGroup('academic', 'bi-building', 'Quản lý học vụ', $academicItems, $academicSubgroups);
-
-        $addAdminGroup('users', 'bi-people', 'Quản lý người dùng', [
+        $addAdminGroup('academic', 'bi-building', 'Học vụ', array_merge($strictAcademicTeachingItems, $strictAcademicResultItems), [
+            [
+                'key' => 'strict-academic-teaching',
+                'icon' => 'bi-easel2',
+                'title' => 'Tổ chức giảng dạy',
+                'items' => $strictAcademicTeachingItems,
+            ],
+            [
+                'key' => 'strict-academic-results',
+                'icon' => 'bi-clipboard-data',
+                'title' => 'Quản lý kết quả',
+                'items' => $strictAcademicResultItems,
+            ],
+        ]);
+        $addAdminGroup('users', 'bi-people', 'Người dùng', [
             $adminItem('bi-person', 'Học sinh', route('students.index'), ['students.*', 'students*'], 'students.manage'),
             $adminItem('bi-person-badge', 'Giáo viên', route('teachers.index'), ['teachers.*', 'teachers*'], 'teachers.manage'),
             $adminItem('bi-people', 'Phụ huynh', route('parents.index'), ['parents.*', 'parents*'], 'parents.manage'),
         ]);
 
-        $addAdminGroup('content', 'bi-megaphone', 'Nội dung hệ thống', [
-            $adminItem('bi-window-stack', 'Trang chủ', route('admin.home-page.index'), ['admin.home-page.*', 'admin/home-page*'], 'content.manage'),
-            $adminItem('bi-megaphone', 'Thông báo', route('announcements.index'), ['announcements.*', 'announcements*'], 'content.manage'),
-            $adminItem('bi-calendar-event', 'Sự kiện', route('events.index'), ['events.*', 'events*'], 'content.manage'),
-            $adminItem('bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), ['documents.*', 'documents*'], 'documents.manage'),
-        ]);
-
+        $strictReportItems = [];
+        if ($currentUser->hasPermission('reports.view')) {
+            $strictReportItems[] = $adminItem('bi-bar-chart', 'Báo cáo', route('reports.index'), ['reports.*', 'reports*'], 'reports.view');
+        }
+        $addAdminGroup('reports', 'bi-graph-up', 'Báo cáo', $strictReportItems);
+        $addAdminGroup('content', 'bi-megaphone', 'Quản lý nội dung', $strictContentItems);
         $addAdminGroup('communication', 'bi-chat-dots', 'Giao tiếp', [
             $adminItem('bi-inbox', 'Hộp thư đến', route('messages.inbox'), ['messages.inbox'], 'messages.manage'),
             $adminItem('bi-send', 'Đã gửi', route('messages.sent'), ['messages.sent'], 'messages.manage'),
             $adminItem('bi-pencil-square', 'Soạn tin', route('messages.create'), ['messages.create'], 'messages.manage'),
             $adminItem('bi-trash3', 'Thùng rác', route('messages.trash'), ['messages.trash'], 'messages.manage'),
         ]);
-
-        $addAdminGroup('system', 'bi-gear', 'Hệ thống', [
-            $adminItem('bi-sliders', 'Cài đặt hệ thống', route('system.settings.edit'), ['system.settings.*', 'system/settings*'], 'system.settings'),
-            $adminItem('bi-database-down', 'Sao lưu & Khôi phục dữ liệu', route('system.backups.index'), ['system.backups.*', 'system/backups*'], 'backups.manage'),
-            $adminItem('bi-shield-check', 'Nhật ký hoạt động', route('audit-logs.index'), ['audit-logs.*', 'audit-logs*'], 'audit_logs.view'),
-            $adminItem('bi-shield-lock', 'Vai trò & quyền', route('rbac-roles.index'), ['rbac-roles.*', 'rbac-roles*'], 'manage_roles'),
+        $addAdminGroup('system', 'bi-gear', 'Hệ thống', array_merge($strictSystemCatalogItems, $strictSystemRegulationItems, $strictSystemOperationItems), [
+            [
+                'key' => 'strict-system-catalog',
+                'icon' => 'bi-folder2-open',
+                'title' => '⚙️ Tham số danh mục',
+                'items' => $strictSystemCatalogItems,
+            ],
+            [
+                'key' => 'strict-system-regulations',
+                'icon' => 'bi-shield-exclamation',
+                'title' => '⚖️ Quy định học vụ',
+                'items' => $strictSystemRegulationItems,
+            ],
+            [
+                'key' => 'strict-system-operation',
+                'icon' => 'bi-gear-wide-connected',
+                'title' => '🛠️ Vận hành hệ thống',
+                'items' => $strictSystemOperationItems,
+            ],
         ]);
-
-        $reportItems = [];
-        if ($currentUser->hasPermission('reports.view')) {
-            $reportItems[] = $adminItem('bi-bar-chart', 'Báo cáo', route('reports.index'), ['reports.*', 'reports*'], 'reports.view');
-        }
-        if ($reportItems) {
-        $addAdminGroup('reports', 'bi-graph-up', 'Báo cáo', $reportItems);
-        }
 
         foreach ($adminMenuGroups as $group) {
             foreach ($group['items'] as $item) {
@@ -387,7 +394,7 @@
     <aside class="admin-sidebar">
         <nav class="admin-menu admin-submenu" aria-label="Chức năng con quản trị">
             @if($activeAdminGroup)
-                @if($activeAdminGroup['key'] === 'academic' && ! empty($activeAdminGroup['subgroups']))
+                @if(! empty($activeAdminGroup['subgroups']))
                     @foreach($activeAdminGroup['subgroups'] as $subgroup)
                         @php
                             $adminSubgroupTitle = match ($subgroup['key']) {
@@ -695,7 +702,7 @@
                 <nav class="admin-top-nav" aria-label="Phân hệ quản trị">
                     @foreach($adminMenuGroups as $group)
                         @php
-                            $groupUrl = $group['key'] === 'academic' ? route('academic.index') : $group['url'];
+                            $groupUrl = $group['url'];
                             $groupLabel = match ($group['key']) {
                                 'overview' => 'Tổng quan',
                                 'academic' => 'Học vụ',
@@ -706,6 +713,7 @@
                                 'reports' => 'Báo cáo',
                                 default => $group['title'],
                             };
+                            $groupLabel = $group['title'];
                         @endphp
                         <a href="{{ $groupUrl }}" class="admin-top-nav-link {{ $activeAdminGroup && $activeAdminGroup['key'] === $group['key'] ? 'active' : '' }}">
                             <i class="bi {{ $group['icon'] }}"></i>

@@ -202,6 +202,11 @@ class BulkExcelController extends Controller
         $classId = $context['class_id'] ?? null;
         $subjectId = $context['subject_id'] ?? null;
         $semesterId = $context['semester_id'] ?? null;
+        if ($user?->isAdmin() || $user?->isStaff()) {
+            abort_unless($classId && $subjectId && $semesterId, 403);
+            return;
+        }
+
         abort_unless($user?->isTeacher() && $classId && $subjectId && $semesterId, 403);
 
         $assigned = TeachingAssignment::query()
@@ -508,7 +513,7 @@ class BulkExcelController extends Controller
     {
         $class = SchoolClass::find($context['class_id'] ?? null);
         $headers = $this->attendanceHeaders();
-        $allowed = ['co_mat', 'present', 'v', 'di_muon', 'late', 'm', 'vang_mat', 'vang_khong_phep', 'absent', 'x', 'nghi_co_phep', 'excused', 'p'];
+        $allowed = ['co_mat', 'present', 'v', 'di_muon', 'late', 'm', 'vang_mat', 'vang_khong_phep', 'absent', 'unexcused_absent', 'k', 'x', 'nghi_co_phep', 'excused', 'permitted_absent', 'p'];
 
         return $this->buildPreview($headers, $rows, function (string $key, string $value) use ($class, $allowed) {
             if ($key === 'ma_hs' && (! $class || ! $this->studentInClass($value, $class))) {
@@ -649,6 +654,7 @@ class BulkExcelController extends Controller
         $subject = Subject::findOrFail($context['subject_id']);
         $semester = Semester::findOrFail($context['semester_id']);
         $columns = $this->scoreColumns($class, $subject, $semester);
+        $isScoreAdmin = auth()->user()?->isAdmin() || auth()->user()?->isStaff();
         $affected = 0;
 
         foreach ($rows as $row) {
@@ -670,7 +676,11 @@ class BulkExcelController extends Controller
             foreach ($columns as $column) {
                 $key = $this->scoreColumnImportKey($column);
                 $value = trim((string) ($row[$key] ?? ''));
-                if ($value === '' || ! $column->isInputOpen()) {
+                if ($value === '') {
+                    continue;
+                }
+
+                if (! $isScoreAdmin && ! $column->isInputOpen()) {
                     continue;
                 }
 
@@ -678,15 +688,38 @@ class BulkExcelController extends Controller
                     ? (in_array($this->normalizeText($value), ['dat', 'd'], true) ? 1 : 0)
                     : (float) $value;
 
-                ScoreDetail::updateOrCreate(
-                    ['score_header_id' => $header->id, 'score_column_id' => $column->id],
-                    [
-                        'type' => $column->type,
-                        'name' => $column->name,
-                        'value' => $numericValue,
-                        'weight_group' => $column->weight_group,
-                    ]
-                );
+                $detail = ScoreDetail::where('score_header_id', $header->id)
+                    ->where('score_column_id', $column->id)
+                    ->first();
+
+                if (! $isScoreAdmin && $detail?->created_at && now()->gt(Carbon::parse($detail->created_at)->copy()->addDays(7))) {
+                    throw ValidationException::withMessages([
+                        'file' => 'Một số điểm đã quá 7 ngày kể từ lúc tạo, giáo viên bộ môn không được sửa bằng Excel.',
+                    ]);
+                }
+
+                $payload = [
+                    'type' => $column->type,
+                    'name' => $column->name,
+                    'value' => $numericValue,
+                    'weight_group' => $column->weight_group,
+                ];
+
+                if ($detail) {
+                    if ($detail->value !== null && round((float) $detail->value, 1) !== round((float) $numericValue, 1)) {
+                        $payload['is_retest'] = true;
+                        $payload['original_value'] = $detail->original_value ?? $detail->value;
+                        $payload['retest_updated_at'] = now();
+                    }
+
+                    $detail->update($payload);
+                } else {
+                    ScoreDetail::create([
+                        'score_header_id' => $header->id,
+                        'score_column_id' => $column->id,
+                        ...$payload,
+                    ]);
+                }
                 $affected++;
             }
 
@@ -1352,7 +1385,13 @@ class BulkExcelController extends Controller
             ->get()
             ->each(function ($row) use ($summary) {
                 $current = $summary->get($row->student_id, ['present' => 0, 'late' => 0, 'excused' => 0, 'absent' => 0]);
-                $current[$row->status] = (int) $row->total;
+                if (in_array($row->status, [AttendanceRecord::STATUS_EXCUSED, AttendanceRecord::STATUS_PERMITTED_ABSENT], true)) {
+                    $current['excused'] += (int) $row->total;
+                } elseif (in_array($row->status, [AttendanceRecord::STATUS_ABSENT, AttendanceRecord::STATUS_UNEXCUSED_ABSENT], true)) {
+                    $current['absent'] += (int) $row->total;
+                } else {
+                    $current[$row->status] = (int) $row->total;
+                }
                 $summary->put($row->student_id, $current);
             });
 
@@ -1842,8 +1881,8 @@ class BulkExcelController extends Controller
     {
         return match ($this->normalizeText($value)) {
             'di_muon', 'late', 'm' => 'late',
-            'vang_mat', 'vang_khong_phep', 'absent', 'x' => 'absent',
-            'nghi_co_phep', 'excused', 'p' => 'excused',
+            'vang_mat', 'vang_khong_phep', 'absent', 'unexcused_absent', 'k', 'x' => AttendanceRecord::STATUS_UNEXCUSED_ABSENT,
+            'nghi_co_phep', 'excused', 'permitted_absent', 'p' => AttendanceRecord::STATUS_PERMITTED_ABSENT,
             default => 'present',
         };
     }

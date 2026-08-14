@@ -270,6 +270,27 @@
         white-space: normal;
     }
 
+    .conduct-suggestion-badge {
+        display: inline-flex;
+        align-items: center;
+        max-width: 100%;
+        padding: .24rem .55rem;
+        border: 1px solid #fed7aa;
+        border-radius: 999px;
+        color: #9a3412;
+        background: rgba(255, 247, 237, .65);
+        font-size: .75rem;
+        font-weight: 400;
+        line-height: 1.25;
+        white-space: normal;
+    }
+
+    .conduct-suggestion-muted {
+        color: #9ca3af;
+        font-size: .75rem;
+        font-weight: 400;
+    }
+
     .conduct-comment-grid {
         display: grid;
         grid-template-columns: minmax(0, 1fr);
@@ -472,10 +493,9 @@
     @php
         $currentUser = auth()->user();
         $isAdminConductView = $currentUser->isAdmin() || $currentUser->isStaff();
-        $rowLevels = $students->mapWithKeys(function ($student) use ($records, $attendanceSummaries) {
+        $rowLevels = $students->mapWithKeys(function ($student) use ($records) {
             $record = $records[$student->id] ?? null;
-            $attendance = $attendanceSummaries[$student->id] ?? ['force_weak' => false];
-            return [$student->id => ($attendance['force_weak'] ?? false) ? \App\Models\Conduct::LEVEL_NOT_PASS : ($record?->conduct_level ?? \App\Models\Conduct::LEVEL_GOOD)];
+            return [$student->id => $record?->conduct_level ?? \App\Models\Conduct::LEVEL_GOOD];
         });
         $conductCounts = collect(array_keys($conductLabels))->mapWithKeys(fn ($level) => [$level => $rowLevels->filter(fn ($value) => $value === $level)->count()]);
     @endphp
@@ -559,10 +579,11 @@
                     <table class="table conduct-matrix-table w-full table-fixed max-w-full overflow-hidden mb-0" data-admin-table-skip>
                         <thead>
                             <tr>
-                                <th style="width: 22%;">Học sinh</th>
-                                <th style="width: 18%;">Chuyên cần</th>
-                                <th style="width: 38%;">Xếp loại rèn luyện</th>
-                                <th style="width: 22%;">Lời phê / Nhận xét của giáo viên</th>
+                                <th style="width: 20%;">Học sinh</th>
+                                <th style="width: 16%;">Chuyên cần</th>
+                                <th style="width: 32%;">Xếp loại rèn luyện</th>
+                                <th style="width: 14%;">Gợi ý hệ thống</th>
+                                <th style="width: 18%;">Lời phê / Nhận xét của giáo viên</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -578,7 +599,8 @@
                                     'force_weak' => false,
                                 ];
                                 $forcedWeak = (bool) ($attendance['force_weak'] ?? false);
-                                $selectedLevel = old("conduct.{$student->id}.conduct_level", $forcedWeak ? \App\Models\Conduct::LEVEL_NOT_PASS : ($record?->conduct_level ?? \App\Models\Conduct::LEVEL_GOOD));
+                                $systemSuggestion = $conductSuggestions[$student->id] ?? ['text' => null, 'average' => null];
+                                $selectedLevel = old("conduct.{$student->id}.conduct_level", $record?->conduct_level ?? \App\Models\Conduct::LEVEL_GOOD);
                                 $commentValue = old("conduct.{$student->id}.comment", $record?->comment);
                                 $searchText = \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii(trim($student->student_code . ' ' . $student->name)));
                             @endphp
@@ -604,9 +626,6 @@
                                 </td>
                                 <td @class(['conduct-warning-cell' => $forcedWeak]) data-conduct-level-cell>
                                     @if($canEditConduct)
-                                        @if($forcedWeak)
-                                            <input type="hidden" name="conduct[{{ $student->id }}][conduct_level]" value="{{ \App\Models\Conduct::LEVEL_NOT_PASS }}">
-                                        @endif
                                         <div class="conduct-level-group">
                                             @foreach($conductLabels as $level => $label)
                                                 <label class="conduct-level-option">
@@ -615,7 +634,6 @@
                                                         name="conduct[{{ $student->id }}][conduct_level]"
                                                         value="{{ $level }}"
                                                         @checked($selectedLevel === $level)
-                                                        @disabled($forcedWeak)
                                                         data-conduct-level
                                                     >
                                                     <span class="{{ $conductBadgeClasses[$level] ?? 'conduct-level-badge' }}">{{ $label }}</span>
@@ -632,6 +650,15 @@
                                         @if($forcedWeak)
                                             <span class="conduct-warning-text">⚠️ Cảnh báo: Học sinh vắng quá số buổi quy định</span>
                                         @endif
+                                    @endif
+                                </td>
+                                <td class="text-left">
+                                    @if($systemSuggestion['text'] ?? null)
+                                        <span class="conduct-suggestion-badge" title="Điểm TB: {{ $systemSuggestion['average'] !== null ? number_format((float) $systemSuggestion['average'], 2) : '-' }}">
+                                            {{ $systemSuggestion['text'] }}
+                                        </span>
+                                    @else
+                                        <span class="conduct-suggestion-muted">Chưa có gợi ý</span>
                                     @endif
                                 </td>
                                 <td>
@@ -665,7 +692,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4">
+                                <td colspan="5">
                                     <div class="empty-state"><i class="bi bi-person-dash"></i>Lớp chưa có học sinh.</div>
                                 </td>
                             </tr>
@@ -710,13 +737,6 @@
 
         levelCell?.classList.toggle('conduct-warning-cell', mustLock);
         warning?.classList.toggle('d-none', !mustLock);
-
-        if (mustLock) {
-            row.querySelectorAll('[data-conduct-level]').forEach((input) => {
-                input.disabled = true;
-                input.checked = input.value === @json(\App\Models\Conduct::LEVEL_NOT_PASS);
-            });
-        }
 
         return mustLock;
     }
