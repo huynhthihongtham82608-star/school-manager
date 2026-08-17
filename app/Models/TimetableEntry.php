@@ -60,6 +60,12 @@ class TimetableEntry extends Model
         return $this->belongsTo(Teacher::class);
     }
 
+    public function approvedSubstitutes()
+    {
+        return $this->hasMany(SubstituteTeaching::class, 'timetable_entry_id')
+            ->where('status', SubstituteTeaching::STATUS_APPROVED);
+    }
+
     public function roomInfo()
     {
         return $this->belongsTo(Room::class, 'room_id');
@@ -78,6 +84,10 @@ class TimetableEntry extends Model
     public function displayTeacherName(): string
     {
         $subject = $this->assignment?->subject ?? $this->subject;
+
+        if ($this->teacher?->name && (string) $this->teacher_id !== (string) $this->assignment?->teacher_id) {
+            return $this->teacher->name;
+        }
 
         if ($this->assignment?->teacher?->name) {
             return $this->assignment->teacher->name;
@@ -99,6 +109,20 @@ class TimetableEntry extends Model
         }
 
         return '';
+    }
+
+    public function hasApprovedSubstitute(): bool
+    {
+        if ($this->relationLoaded('approvedSubstitutes')) {
+            return $this->approvedSubstitutes->isNotEmpty();
+        }
+
+        return $this->approvedSubstitutes()->exists();
+    }
+
+    public function displaySubstituteMarker(): string
+    {
+        return $this->hasApprovedSubstitute() ? '(Dạy thay)' : '';
     }
 
     public function displayRoomLabel(): ?string

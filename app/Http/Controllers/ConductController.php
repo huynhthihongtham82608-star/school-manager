@@ -7,7 +7,9 @@ use App\Models\AttendanceRecord;
 use App\Models\SchoolClass;
 use App\Models\ScoreHeader;
 use App\Models\Semester;
+use App\Models\Setting;
 use App\Models\Student;
+use App\Services\AcademicEvaluationService;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -90,9 +92,10 @@ class ConductController extends Controller
         $records = collect();
         $attendanceSummaries = collect();
         $conductSuggestions = collect();
+        $evaluationRules = $this->evaluationRules();
         $absencePolicy = [
-            'semester_unexcused_limit' => self::SEMESTER_UNEXCUSED_ABSENCE_LIMIT,
-            'school_year_unexcused_limit' => self::SCHOOL_YEAR_UNEXCUSED_ABSENCE_LIMIT,
+            'semester_unexcused_limit' => (int) $evaluationRules['conduct_unexcused_absence_limit'],
+            'school_year_unexcused_limit' => max(self::SCHOOL_YEAR_UNEXCUSED_ABSENCE_LIMIT, (int) $evaluationRules['conduct_unexcused_absence_limit'] * 2),
         ];
         $canEditConduct = false;
 
@@ -113,8 +116,8 @@ class ConductController extends Controller
                 ->where('semester_id', $selectedSemester->id)
                 ->get()
                 ->keyBy('student_id');
-            $attendanceSummaries = $this->conductAttendanceSummaries($students, $selectedSemester, $selectedClass);
-            $conductSuggestions = $this->conductSystemSuggestions($students, $attendanceSummaries, $selectedSemester);
+            $attendanceSummaries = $this->conductAttendanceSummaries($students, $selectedSemester, $selectedClass, $evaluationRules);
+            $conductSuggestions = $this->conductSystemSuggestions($students, $attendanceSummaries, $selectedSemester, $evaluationRules);
         }
 
         return view('conduct.index', compact('classes', 'semesters', 'selectedClass', 'selectedSemester', 'students', 'records', 'selectedYearId', 'canEditConduct', 'attendanceSummaries', 'conductSuggestions', 'absencePolicy'));
@@ -143,7 +146,7 @@ class ConductController extends Controller
         }
 
         $students = Student::where('class_id', $class->id)->orderBy('student_code')->get();
-        $attendanceSummaries = $this->conductAttendanceSummaries($students, $semester, $class);
+        $attendanceSummaries = $this->conductAttendanceSummaries($students, $semester, $class, $this->evaluationRules());
 
         DB::transaction(function () use ($students, $request, $class, $semester, $attendanceSummaries) {
             foreach ($students as $student) {
@@ -213,7 +216,7 @@ class ConductController extends Controller
             && (string) $user->teacher->id === (string) $class->homeroom_teacher_id;
     }
 
-    private function conductAttendanceSummaries($students, Semester $semester, SchoolClass $class)
+    private function conductAttendanceSummaries($students, Semester $semester, SchoolClass $class, array $evaluationRules)
     {
         $studentIds = $students->pluck('id')->values();
         $summary = $students->mapWithKeys(fn ($student) => [$student->id => $this->emptyAttendanceSummary()]);
@@ -222,20 +225,30 @@ class ConductController extends Controller
             return $summary;
         }
 
-        $semesterCounts = AttendanceRecord::query()
+        $hasSessionType = Schema::hasColumn('attendance_records', 'session_type');
+        $semesterCountsQuery = AttendanceRecord::query()
             ->whereIn('student_id', $studentIds)
             ->where('class_id', $class->id)
             ->where('semester_id', $semester->id)
             ->select('student_id', 'status', DB::raw('COUNT(*) as total'))
-            ->groupBy('student_id', 'status')
-            ->get();
+            ->groupBy('student_id', 'status');
+
+        if ($hasSessionType) {
+            $semesterCountsQuery->addSelect('session_type')->groupBy('session_type');
+        }
+
+        $semesterCounts = $semesterCountsQuery->get();
 
         foreach ($semesterCounts as $row) {
             $studentSummary = $summary->get($row->student_id, $this->emptyAttendanceSummary());
             if (in_array($row->status, [AttendanceRecord::STATUS_EXCUSED, AttendanceRecord::STATUS_PERMITTED_ABSENT], true)) {
                 $studentSummary['excused'] += (int) $row->total;
             } elseif (in_array($row->status, [AttendanceRecord::STATUS_ABSENT, AttendanceRecord::STATUS_UNEXCUSED_ABSENT], true)) {
-                $studentSummary['absent'] += (int) $row->total;
+                if ($hasSessionType && ($row->session_type ?? null) === AttendanceRecord::SESSION_PERIOD) {
+                    $studentSummary['period_absent'] += (int) $row->total;
+                } else {
+                    $studentSummary['absent'] += (int) $row->total;
+                }
             } else {
                 $studentSummary[$row->status] = (int) $row->total;
             }
@@ -244,25 +257,34 @@ class ConductController extends Controller
         }
 
         $schoolYearSemesterIds = Semester::where('school_year_id', $semester->school_year_id)->pluck('id');
-        $yearAbsentCounts = AttendanceRecord::query()
+        $yearAbsentCountsQuery = AttendanceRecord::query()
             ->whereIn('student_id', $studentIds)
             ->whereIn('semester_id', $schoolYearSemesterIds)
-            ->whereIn('status', [AttendanceRecord::STATUS_ABSENT, AttendanceRecord::STATUS_UNEXCUSED_ABSENT])
+            ->whereIn('status', [AttendanceRecord::STATUS_ABSENT, AttendanceRecord::STATUS_UNEXCUSED_ABSENT]);
+
+        if ($hasSessionType) {
+            $yearAbsentCountsQuery->where('session_type', '!=', AttendanceRecord::SESSION_PERIOD);
+        }
+
+        $yearAbsentCounts = $yearAbsentCountsQuery
             ->select('student_id', DB::raw('COUNT(*) as total'))
             ->groupBy('student_id')
             ->get()
             ->pluck('total', 'student_id');
 
-        return $summary->map(function (array $studentSummary, string $studentId) use ($yearAbsentCounts) {
+        return $summary->map(function (array $studentSummary, string $studentId) use ($yearAbsentCounts, $evaluationRules) {
             $studentSummary['school_year_unexcused_absent'] = (int) ($yearAbsentCounts[$studentId] ?? 0);
-            $studentSummary['force_weak'] = $studentSummary['semester_unexcused_absent'] > self::SEMESTER_UNEXCUSED_ABSENCE_LIMIT
-                || $studentSummary['school_year_unexcused_absent'] > self::SCHOOL_YEAR_UNEXCUSED_ABSENCE_LIMIT;
+            $semesterLimit = collect(app(AcademicEvaluationService::class)->conductLevels())
+                ->max(fn (array $level) => (int) $level['max_unexcused_absence']) ?: (int) $evaluationRules['conduct_unexcused_absence_limit'];
+            $yearLimit = max(self::SCHOOL_YEAR_UNEXCUSED_ABSENCE_LIMIT, $semesterLimit * 2);
+            $studentSummary['force_weak'] = $studentSummary['semester_unexcused_absent'] > $semesterLimit
+                || $studentSummary['school_year_unexcused_absent'] > $yearLimit;
 
             return $studentSummary;
         });
     }
 
-    private function conductSystemSuggestions($students, $attendanceSummaries, Semester $semester)
+    private function conductSystemSuggestions($students, $attendanceSummaries, Semester $semester, array $evaluationRules)
     {
         if ($students->isEmpty() || ! Schema::hasTable('score_headers')) {
             return collect();
@@ -276,18 +298,22 @@ class ConductController extends Controller
             ->groupBy('student_id')
             ->map(fn ($scores) => round((float) $scores->avg('average'), 2));
 
-        return $students->mapWithKeys(function (Student $student) use ($attendanceSummaries, $scoreAverages) {
+        return $students->mapWithKeys(function (Student $student) use ($attendanceSummaries, $scoreAverages, $evaluationRules) {
             $attendance = $attendanceSummaries->get($student->id, $this->emptyAttendanceSummary());
             $unexcusedAbsence = (int) ($attendance['semester_unexcused_absent'] ?? 0);
+            $periodAbsence = (int) ($attendance['period_absent'] ?? 0);
             $late = (int) ($attendance['late'] ?? 0);
             $excused = (int) ($attendance['excused'] ?? 0);
             $average = $scoreAverages->get($student->id);
+            $topAcademicLevel = app(AcademicEvaluationService::class)->levels()['level_1'];
+            $excellentMin = (float) $topAcademicLevel['gpa_min'];
+            $conductSuggestion = app(AcademicEvaluationService::class)->suggestConductLabel($unexcusedAbsence, $periodAbsence, $late);
 
             $suggestion = null;
-            if ($unexcusedAbsence > 5) {
-                $suggestion = 'Gợi ý: Đạt/Chưa đạt';
-            } elseif ($unexcusedAbsence === 0 && $late === 0 && $excused === 0 && $average !== null && $average > 8.0) {
-                $suggestion = 'Gợi ý: Tốt';
+            if ($unexcusedAbsence > 0 || $late > 0) {
+                $suggestion = 'Gợi ý: ' . $conductSuggestion;
+            } elseif ($unexcusedAbsence === 0 && $late === 0 && $excused === 0 && $average !== null && $average >= $excellentMin) {
+                $suggestion = 'Gợi ý: ' . $topAcademicLevel['label'];
             }
 
             return [$student->id => [
@@ -304,9 +330,17 @@ class ConductController extends Controller
             'late' => 0,
             'excused' => 0,
             'absent' => 0,
+            'period_absent' => 0,
             'semester_unexcused_absent' => 0,
             'school_year_unexcused_absent' => 0,
             'force_weak' => false,
         ];
+    }
+
+    private function evaluationRules(): array
+    {
+        return Setting::valuesFor(array_merge(AcademicEvaluationService::defaults(), [
+            'conduct_unexcused_absence_limit' => self::SEMESTER_UNEXCUSED_ABSENCE_LIMIT,
+        ]));
     }
 }

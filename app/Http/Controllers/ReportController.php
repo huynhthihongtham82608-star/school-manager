@@ -14,6 +14,7 @@ use App\Models\SystemSetting;
 use App\Models\Teacher;
 use App\Models\TeacherDepartment;
 use App\Models\TeachingAssignment;
+use App\Services\AcademicEvaluationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -327,14 +328,15 @@ class ReportController extends Controller
         $attendanceByStudent = $attendanceRecords->groupBy('student_id');
 
         return $students->map(function (Student $student) use ($scoresByStudent, $conductsByStudent, $attendanceByStudent, $subjectsById) {
-            $avg = $this->calculateAverage($scoresByStudent->get($student->id, collect()), $subjectsById);
+            $studentScores = $scoresByStudent->get($student->id, collect());
+            $avg = $this->calculateAverage($studentScores, $subjectsById);
             $attendance = $this->attendanceDistribution($attendanceByStudent->get($student->id, collect()));
             $conduct = $conductsByStudent->get($student->id, collect())->last();
 
             return [
                 'student' => $student,
                 'average' => $avg,
-                'study_rank' => $this->rankStudy($avg),
+                'study_rank' => $this->rankStudy($avg, $studentScores),
                 'conduct' => $conduct?->conduct_level,
                 'attendance_rate' => $attendance['rate'],
             ];
@@ -359,36 +361,27 @@ class ReportController extends Controller
         return $weight > 0 ? round($sum / $weight, 2) : null;
     }
 
-    private function rankStudy(?float $avg): string
+    private function rankStudy(?float $avg, ?Collection $scoreHeaders = null): string
     {
-        if ($avg === null) {
+        $scoreHeaders ??= collect();
+
+        if ($avg === null || $scoreHeaders->isEmpty()) {
             return 'no_data';
         }
 
-        if ($avg >= 8) {
-            return 'excellent';
-        }
-
-        if ($avg >= 6.5) {
-            return 'good';
-        }
-
-        if ($avg >= 5) {
-            return 'average';
-        }
-
-        return 'needs_support';
+        return app(AcademicEvaluationService::class)->classifyFromScoreHeaders($avg, $scoreHeaders)['legacyKey'];
     }
 
     private function studyDistribution(Collection $studentRows): array
     {
-        $labels = [
-            'excellent' => 'Giỏi',
-            'good' => 'Khá',
-            'average' => 'Trung bình',
-            'needs_support' => 'Cần hỗ trợ',
-            'no_data' => 'Chưa có dữ liệu',
-        ];
+        $evaluationService = app(AcademicEvaluationService::class);
+        $labels = collect($evaluationService->levels())
+            ->mapWithKeys(fn (array $level) => [$level['legacy_key'] => $level['label']])
+            ->merge([
+                'needs_support' => 'Chưa Đạt',
+                'no_data' => 'Chưa có dữ liệu',
+            ])
+            ->all();
 
         return collect($labels)->map(fn ($label, $key) => [
             'key' => $key,
@@ -654,13 +647,7 @@ class ReportController extends Controller
 
     public function studyLabel(?string $rank): string
     {
-        return [
-            'excellent' => 'Giỏi',
-            'good' => 'Khá',
-            'average' => 'Trung bình',
-            'needs_support' => 'Cần hỗ trợ',
-            'no_data' => 'Chưa có dữ liệu',
-        ][$rank] ?? 'Chưa có dữ liệu';
+        return app(AcademicEvaluationService::class)->labelFor($rank);
     }
 
     public function conductLabel(?string $level): string
@@ -735,14 +722,17 @@ class ReportController extends Controller
         }
 
         $rowsWithAverage = $studentRows->whereNotNull('average');
-        $passedCount = $studentRows->filter(fn ($row) => in_array($row['study_rank'], ['excellent', 'good', 'average'], true))->count();
+        $evaluationService = app(AcademicEvaluationService::class);
+        $passingStudyKeys = $evaluationService->passingRankKeys();
+        $topStudyKeys = $evaluationService->topRankKeys(2);
+        $passedCount = $studentRows->filter(fn ($row) => in_array($row['study_rank'], $passingStudyKeys, true))->count();
 
         return [
             'teacher' => $teacher,
             'summary' => $teacherSummary->firstWhere('label', $teacher->name),
             'student_count' => $studentRows->count(),
             'average' => $rowsWithAverage->isNotEmpty() ? round($rowsWithAverage->avg('average'), 2) : null,
-            'excellent_good_rate' => $studentRows->isNotEmpty() ? round($studentRows->whereIn('study_rank', ['excellent', 'good'])->count() / $studentRows->count() * 100, 1) : null,
+            'excellent_good_rate' => $studentRows->isNotEmpty() ? round($studentRows->whereIn('study_rank', $topStudyKeys)->count() / $studentRows->count() * 100, 1) : null,
             'passed_rate' => $studentRows->isNotEmpty() ? round($passedCount / $studentRows->count() * 100, 1) : null,
         ];
     }
@@ -897,7 +887,7 @@ class ReportController extends Controller
     private function schoolYearDashboard(Collection $students, Collection $studentRows, Collection $classes, Collection $teachers, Collection $subjects, array $studyDistribution, array $conductDistribution, array $attendanceDistribution, array $graduation, Collection $gradeSummary): array
     {
         $rowsWithAverage = $studentRows->whereNotNull('average');
-        $goodRate = $this->rate($studentRows->whereIn('study_rank', ['excellent', 'good'])->count(), $students->count());
+        $goodRate = $this->rate($studentRows->whereIn('study_rank', app(AcademicEvaluationService::class)->topRankKeys(2))->count(), $students->count());
         $promotion = $this->promotionStats($students);
 
         $cards = [
@@ -939,7 +929,7 @@ class ReportController extends Controller
     private function semesterDashboard(Collection $students, Collection $studentRows, Collection $classes, array $studyDistribution, array $conductDistribution, array $attendanceDistribution, Collection $classSummary): array
     {
         $rowsWithAverage = $studentRows->whereNotNull('average');
-        $goodRate = $this->rate($studentRows->whereIn('study_rank', ['excellent', 'good'])->count(), $students->count());
+        $goodRate = $this->rate($studentRows->whereIn('study_rank', app(AcademicEvaluationService::class)->topRankKeys(2))->count(), $students->count());
         $conductGoodRate = $this->rate(collect($conductDistribution)->whereIn('key', ['excellent', 'good'])->sum('value'), $students->count());
 
         return [
@@ -1141,7 +1131,7 @@ class ReportController extends Controller
             $classStudentRows = $studentRows->filter(fn ($row) => (string) $row['student']->class_id === (string) $class?->id);
             $rowsWithAverage = $classStudentRows->whereNotNull('average');
 
-            $excellentGoodRate = $this->rate($classStudentRows->whereIn('study_rank', ['excellent', 'good'])->count(), $classStudentRows->count());
+            $excellentGoodRate = $this->rate($classStudentRows->whereIn('study_rank', app(AcademicEvaluationService::class)->topRankKeys(2))->count(), $classStudentRows->count());
 
             return [
                 $class?->name ?: 'Chưa rõ lớp',
@@ -1261,7 +1251,7 @@ class ReportController extends Controller
                 $this->metric('Lớp', $student->classRoom?->name ?: 'Chưa có lớp', 'bi-building'),
                 $this->metric('Giáo viên chủ nhiệm', $student->classRoom?->homeroomTeacher?->name ?: 'Chưa phân công', 'bi-person-badge'),
                 $this->metric('Điểm trung bình', $studentReport['average'] ?? 'Chưa có dữ liệu', 'bi-star'),
-                $this->metric('Học lực', $this->rankStudy($studentReport['average'] ?? null) === 'no_data' ? 'Chưa có dữ liệu' : $this->studyLabel($this->rankStudy($studentReport['average'] ?? null)), 'bi-graph-up'),
+                $this->metric('Học lực', $this->rankStudy($studentReport['average'] ?? null, $headers) === 'no_data' ? 'Chưa có dữ liệu' : $this->studyLabel($this->rankStudy($studentReport['average'] ?? null, $headers)), 'bi-graph-up'),
                 $this->metric('Hạnh kiểm', $this->conductLabel($studentReport['conduct']), 'bi-clipboard-check'),
                 $this->metric('Chuyên cần', $studentReport['attendance_rate'] === null ? 'Chưa có dữ liệu' : $studentReport['attendance_rate'] . '%', 'bi-calendar-check'),
             ],

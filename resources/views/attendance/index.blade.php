@@ -889,91 +889,61 @@
         </div>
     </div>
 
-    @if(auth()->user()->isParent())
-        <div class="card attendance-parent-leave-card mb-3">
-            <div class="card-header">
-                <div class="fw-semibold">Đơn xin nghỉ học</div>
-                <div class="text-muted small">Gửi trực tiếp đến giáo viên chủ nhiệm của học sinh đang chọn.</div>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="{{ route('parent.leave-requests.store') }}" class="row g-3 align-items-end">
-                    @csrf
-                    <input type="hidden" name="return_to" value="attendance">
-                    <div class="col-md-3">
-                        <label class="form-label">Học sinh</label>
-                        <select name="student_id" class="form-select" required>
-                            @foreach(($parentLeaveChildren ?? collect()) as $child)
-                                <option value="{{ $child->id }}" @selected(($selectedParentStudent?->id ?? null) === $child->id)>
-                                    {{ $child->student_code }} - {{ $child->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Ngày nghỉ</label>
-                        <input type="date" name="leave_date" class="form-control" value="{{ now()->toDateString() }}" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Lý do</label>
-                        <input type="text" name="reason" class="form-control" maxlength="2000" placeholder="Nhập lý do xin nghỉ học" required>
-                    </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-primary w-100">
-                            <i class="bi bi-send me-1"></i>
-                            Gửi đơn
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    @endif
+    @php
+        $attendanceExceptionRows = collect($attendanceDetailRows ?? collect())
+            ->reject(fn ($record) => $record->status === \App\Models\AttendanceRecord::STATUS_PRESENT)
+            ->values();
+    @endphp
 
-    @if(auth()->user()->isParent())
-    <div class="card mb-3">
-        <div class="card-header d-flex flex-column flex-md-row justify-content-between gap-2">
-            <div>
-                <div class="fw-semibold">Chi tiết chuyên cần</div>
-                <div class="text-muted small">Theo dõi từng ngày, từng tiết học và lý do được ghi nhận.</div>
-            </div>
+    <div class="w-full bg-white border border-orange-100 p-6 rounded-xl shadow-2xs text-left mb-3 font-sans">
+        <div class="w-full text-left mb-4">
+            <h2 class="text-base font-semibold text-gray-900 mb-1 text-left">Biến động chuyên cần</h2>
+            <p class="text-sm font-normal text-orange-700/70 mb-0 text-left">Chỉ hiển thị các ngày đi muộn hoặc vắng mặt, các dòng có mặt đã được ẩn khỏi bảng.</p>
         </div>
         <div class="table-responsive">
-            <table class="table align-middle w-full table-fixed max-w-full overflow-hidden" data-admin-table-skip>
+            <table class="table align-middle w-full table-fixed max-w-full overflow-hidden mb-0 text-left font-sans" data-admin-table-skip>
                 <thead>
                     <tr>
-                        <th>Ngày</th>
-                        <th>Học sinh</th>
-                        <th>Lớp</th>
-                        <th>Phiên điểm danh</th>
-                        <th>Trạng thái</th>
-                        <th>Lý do/Ghi chú</th>
+                        <th class="bg-orange-50/40 text-orange-850 border-b border-orange-100/60 font-sans font-medium p-3 text-left" style="width: 12%;">Ngày</th>
+                        <th class="bg-orange-50/40 text-orange-850 border-b border-orange-100/60 font-sans font-medium p-3 text-left" style="width: 22%;">Học sinh</th>
+                        <th class="bg-orange-50/40 text-orange-850 border-b border-orange-100/60 font-sans font-medium p-3 text-left" style="width: 12%;">Lớp</th>
+                        <th class="bg-orange-50/40 text-orange-850 border-b border-orange-100/60 font-sans font-medium p-3 text-left" style="width: 20%;">Phiên</th>
+                        <th class="bg-orange-50/40 text-orange-850 border-b border-orange-100/60 font-sans font-medium p-3 text-left" style="width: 16%;">Trạng thái</th>
+                        <th class="bg-orange-50/40 text-orange-850 border-b border-orange-100/60 font-sans font-medium p-3 text-left" style="width: 18%;">Lý do / Ghi chú</th>
                     </tr>
                 </thead>
                 <tbody>
-                @forelse($attendanceDetailRows as $record)
-                    <tr>
-                        <td class="fw-semibold">{{ $record->attendance_date?->format('d/m/Y') }}</td>
-                        <td>
-                            <div class="fw-semibold">{{ $record->student?->name ?? '-' }}</div>
-                            <div class="text-muted small">{{ $record->student?->student_code ?? '-' }}</div>
-                        </td>
-                        <td>{{ $record->classRoom?->name ?? '-' }}</td>
-                        <td>
-                            <div>{{ $record->sessionTypeLabel() }}</div>
-                            <div class="text-muted small">{{ $record->displaySessionLabel() }}</div>
-                        </td>
-                        <td>
-                            <span class="badge {{ $statusBadge[$record->status] ?? 'bg-secondary' }}">
-                                {{ $record->statusLabel() }}
-                            </span>
-                        </td>
-                        <td>{{ $record->note ?: 'Không có' }}</td>
-                    </tr>
+                @forelse($attendanceExceptionRows as $record)
+                    @if($record->status !== \App\Models\AttendanceRecord::STATUS_PRESENT)
+                        <tr class="odd:bg-white even:bg-orange-50/10 hover:bg-orange-50/30 transition-colors">
+                            <td class="p-3 text-sm font-normal text-gray-700 text-left">{{ $record->attendance_date?->format('d/m/Y') }}</td>
+                            <td class="p-3 text-sm font-normal text-gray-700 text-left">
+                                <div class="font-normal text-gray-900">{{ $record->student?->name ?? '-' }}</div>
+                                <div class="text-xs font-normal text-gray-400">{{ $record->student?->student_code ?? '-' }}</div>
+                            </td>
+                            <td class="p-3 text-sm font-normal text-gray-700 text-left">{{ $record->classRoom?->name ?? '-' }}</td>
+                            <td class="p-3 text-sm font-normal text-gray-700 text-left">
+                                <div>{{ $record->sessionTypeLabel() }}</div>
+                                <div class="text-xs font-normal text-gray-400">{{ $record->displaySessionLabel() }}</div>
+                            </td>
+                            <td class="p-3 text-sm font-normal text-gray-700 text-left">
+                                @if($record->status === \App\Models\AttendanceRecord::STATUS_LATE)
+                                    <span class="bg-amber-50 text-amber-700 border border-amber-200 text-xs font-normal px-2.5 py-0.5 rounded-full inline-block whitespace-nowrap">🟡 Muộn</span>
+                                @elseif($record->isPermittedAbsent())
+                                    <span class="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-normal px-2.5 py-0.5 rounded-full inline-block whitespace-nowrap">🔵 Vắng có phép</span>
+                                @else
+                                    <span class="bg-red-50 text-red-700 border border-red-200 text-xs font-normal px-2.5 py-0.5 rounded-full inline-block whitespace-nowrap">❌ Vắng mặt</span>
+                                @endif
+                            </td>
+                            <td class="p-3 text-sm font-normal text-gray-600 text-left">{{ $record->note ?: 'Không có' }}</td>
+                        </tr>
+                    @endif
                 @empty
                     <tr>
                         <td colspan="6">
                             <div class="empty-state">
                                 <i class="bi bi-calendar-check"></i>
-                                Chưa có dữ liệu chuyên cần.
+                                Không có biến động chuyên cần trong phạm vi đang xem.
                             </div>
                         </td>
                     </tr>
@@ -982,7 +952,6 @@
             </table>
         </div>
     </div>
-    @endif
 @endif
 
 @if($canViewAttendanceRoster)

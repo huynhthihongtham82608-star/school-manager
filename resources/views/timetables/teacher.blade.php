@@ -145,6 +145,8 @@
                                                         $roomName = $entry->roomInfo?->name ?? $entry->room ?? '-';
                                                         $title = $subjectName . ' • ' . $className;
                                                         $roomLabel = 'Phòng: ' . $roomName;
+                                                        $marker = $entry->displaySubstituteMarker();
+                                                        $title .= $marker ? ' ' . $marker : '';
                                                     @endphp
                                                     <div class="teacher-timetable-slot bg-orange-50/40 border border-orange-100/60 rounded-lg p-2 flex flex-col gap-1">
                                                         <span class="teacher-timetable-slot-title w-full font-normal text-xs md:text-sm text-gray-700 block text-left" title="{{ $title }}">{{ $title }}</span>

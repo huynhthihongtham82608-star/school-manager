@@ -110,7 +110,7 @@ class TimetableController extends Controller
                 if ($timetable) {
                     $entries = TimetableEntry::where('timetable_id', $timetable->id)
                         ->where('status', '!=', TimetableEntry::STATUS_ARCHIVED)
-                        ->with(['assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo'])
+                        ->with(['assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo', 'approvedSubstitutes'])
                         ->get()
                         ->keyBy(fn ($entry) => $entry->day_of_week . '-' . $entry->period);
                 }
@@ -491,7 +491,7 @@ class TimetableController extends Controller
             abort(403);
         }
 
-        $entries = TimetableEntry::with(['timetable.classRoom.homeroomTeacher', 'assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo'])
+        $entries = TimetableEntry::with(['timetable.classRoom.homeroomTeacher', 'assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo', 'approvedSubstitutes'])
             ->where(function ($query) use ($teacherId) {
                 $query->where('teacher_id', $teacherId)
                     ->orWhere(function ($homeroomQuery) use ($teacherId) {

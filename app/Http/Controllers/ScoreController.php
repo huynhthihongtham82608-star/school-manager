@@ -954,7 +954,15 @@ class ScoreController extends Controller
         $selectedYearId = $years->contains('id', $yearId)
             ? $yearId
             : ($years->first()?->id ?? $student->school_year_id);
+        $scoreSemesterIds = ScoreHeader::where('student_id', $student->id)
+            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
+            ->pluck('semester_id')
+            ->filter()
+            ->unique()
+            ->values();
         $semesters = Semester::where('school_year_id', $selectedYearId)
+            ->when($scoreSemesterIds->isNotEmpty(), fn ($query) => $query->whereIn('id', $scoreSemesterIds))
+            ->when($scoreSemesterIds->isEmpty(), fn ($query) => $query->whereRaw('1 = 0'))
             ->orderBy('order')
             ->orderBy('name')
             ->get();
@@ -1062,15 +1070,9 @@ class ScoreController extends Controller
                 ->unique()
         )->get();
 
-        $years = $years->merge($scoreYears);
-
-        if ($student->schoolYear) {
-            $years->push($student->schoolYear);
-        }
-
-        if ($student->classRoom?->schoolYear) {
-            $years->push($student->classRoom->schoolYear);
-        }
+        $years = $scoreYears->isNotEmpty()
+            ? $scoreYears
+            : $years->merge(collect([$student->schoolYear, $student->classRoom?->schoolYear])->filter());
 
         return $years
             ->unique('id')

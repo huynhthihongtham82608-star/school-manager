@@ -33,6 +33,14 @@
     $charts = collect($reportDashboard['charts'] ?? [])->values();
     $cards = collect($reportDashboard['cards'] ?? [])->values();
     $profile = collect($reportDashboard['profile'] ?? [])->values();
+    $academicLevels = app(\App\Services\AcademicEvaluationService::class)->levels();
+    $studyLabels = collect($academicLevels)
+        ->mapWithKeys(fn (array $level) => [$level['legacy_key'] => $level['label']])
+        ->merge([
+            'needs_support' => 'Chưa Đạt',
+            'no_data' => 'Chưa có dữ liệu',
+        ])
+        ->all();
     $table = $reportDashboard['table'] ?? ['title' => 'Bảng thống kê', 'headers' => [], 'rows' => []];
     $tableHeaders = collect($table['headers'] ?? [])->values();
     $tableRows = collect($table['rows'] ?? [])->values();

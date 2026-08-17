@@ -81,6 +81,9 @@
                                     <div class="fw-semibold">{{ $entry->displaySubjectName() }}</div>
                                     <div class="text-muted small">
                                         {{ $entry->displayTeacherName() }}
+                                        @if($entry->displaySubstituteMarker())
+                                            <span class="text-orange-500 font-normal">{{ $entry->displaySubstituteMarker() }}</span>
+                                        @endif
                                         @if($entry->displayRoomLabel()) · {{ $entry->displayRoomLabel() }} @endif
                                     </div>
                                     @if($entry->status !== \App\Models\TimetableEntry::STATUS_ACTIVE)

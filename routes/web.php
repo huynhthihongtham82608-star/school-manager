@@ -15,6 +15,7 @@ use App\Http\Controllers\ConductController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExamScheduleController;
 use App\Http\Controllers\GradeWindowController;
+use App\Http\Controllers\KhenThuongController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\LearningDocumentController;
 use App\Http\Controllers\MessageController;
@@ -39,6 +40,8 @@ use App\Http\Controllers\TeacherDepartmentController;
 use App\Http\Controllers\TeacherPortalController;
 use App\Http\Controllers\TeachingAssignmentController;
 use App\Http\Controllers\TimetableController;
+use App\Http\Controllers\TuitionFeeController;
+use App\Http\Controllers\SubstituteTeachingController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -121,6 +124,13 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
             Route::get('system/settings', [SystemSettingController::class, 'edit'])->middleware('permission:system.settings')->name('system.settings.edit');
             Route::put('system/settings', [SystemSettingController::class, 'update'])->middleware('permission:system.settings')->name('system.settings.update');
             Route::get('system/regulations', [SystemRegulationController::class, 'index'])->middleware('permission:system.settings')->name('system.regulations.index');
+            Route::put('system/regulations', [SystemRegulationController::class, 'update'])->middleware('permission:system.settings')->name('system.regulations.update');
+            Route::get('system/academic-levels', [SystemRegulationController::class, 'academicLevels'])->middleware('permission:system.settings')->name('system.academic-levels.index');
+            Route::put('system/academic-levels', [SystemRegulationController::class, 'updateAcademicLevels'])->middleware('permission:system.settings')->name('system.academic-levels.update');
+            Route::get('system/conduct-levels', [SystemRegulationController::class, 'conductLevels'])->middleware('permission:system.settings')->name('system.conduct-levels.index');
+            Route::put('system/conduct-levels', [SystemRegulationController::class, 'updateConductLevels'])->middleware('permission:system.settings')->name('system.conduct-levels.update');
+            Route::get('system/tuition-levels', [SystemRegulationController::class, 'tuitionLevels'])->middleware('permission:system.settings')->name('system.tuition-levels.index');
+            Route::put('system/tuition-levels', [SystemRegulationController::class, 'updateTuitionLevels'])->middleware('permission:system.settings')->name('system.tuition-levels.update');
             Route::get('system/backups', [BackupController::class, 'index'])->middleware('permission:backups.manage')->name('system.backups.index');
             Route::post('system/backups', [BackupController::class, 'store'])->middleware('permission:backups.manage')->name('system.backups.store');
             Route::post('system/backups/restore/verify', [BackupController::class, 'verifyRestorePassword'])->middleware('permission:backups.manage')->name('system.backups.restore.verify');
@@ -128,6 +138,15 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
             Route::get('system/backups/{filename}', [BackupController::class, 'download'])->middleware('permission:backups.manage')->name('system.backups.download');
             Route::delete('system/backups/{filename}', [BackupController::class, 'destroy'])->middleware('permission:backups.manage')->name('system.backups.destroy');
             Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('permission:audit_logs.view')->name('audit-logs.index');
+            Route::resource('tuition-fees', TuitionFeeController::class)
+                ->only(['index', 'update'])
+                ->middleware('permission:system.settings');
+            Route::post('substitute-teachings/recommendations', [SubstituteTeachingController::class, 'recommendations'])
+                ->middleware('permission:system.settings')
+                ->name('substitute-teachings.recommendations');
+            Route::resource('substitute-teachings', SubstituteTeachingController::class)
+                ->except(['show', 'create', 'edit'])
+                ->middleware('permission:system.settings');
 
             Route::patch('admin-users/{admin_user}/toggle', [AdminUserController::class, 'toggle'])
                 ->middleware('permission:manage_admin_accounts')
@@ -186,6 +205,7 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::get('teacher/classes/{class}/students', [TeacherPortalController::class, 'classStudents'])->name('teacher.classes.students');
         Route::get('teacher/homeroom', [TeacherPortalController::class, 'classes'])->name('teacher.homeroom');
         Route::get('teacher/homeroom/scores', [TeacherPortalController::class, 'homeroomScores'])->name('teacher.homeroom.scores');
+        Route::get('teacher/homeroom/tuition-fees', [TuitionFeeController::class, 'homeroomPortal'])->name('teacher.tuition-fees.homeroom');
         Route::get('teacher/scores', [ScoreController::class, 'index']);
         Route::get('teacher/scores/entry', [ScoreController::class, 'entry']);
         Route::get('teacher/attendance', [AttendanceController::class, 'index'])->name('teacher.attendance.session');
@@ -204,6 +224,13 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
     Route::middleware('role:admin,staff,homeroom')->group(function () {
         Route::post('conduct', [ConductController::class, 'store'])->name('conduct.store');
     });
+
+    Route::post('rewards/scan', [KhenThuongController::class, 'scan'])
+        ->middleware('role:admin,staff,teacher')
+        ->name('rewards.scan');
+    Route::resource('rewards', KhenThuongController::class)
+        ->except(['show', 'create', 'edit'])
+        ->middleware('role:admin,staff,teacher');
 
     Route::middleware('role:teacher')->group(function () {
         Route::post('attendance', [AttendanceController::class, 'store'])->name('attendance.store');
@@ -228,6 +255,7 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
     Route::get('messages/{message}', [MessageController::class, 'show'])->name('messages.show');
 
     Route::middleware('role:parent')->group(function () {
+        Route::get('parent/tuition-fees', [TuitionFeeController::class, 'parentPortal'])->name('parent.tuition-fees.index');
         Route::get('parent/leave-requests', [ParentLeaveRequestController::class, 'index'])->name('parent.leave-requests.index');
         Route::post('parent/leave-requests', [ParentLeaveRequestController::class, 'store'])->name('parent.leave-requests.store');
     });

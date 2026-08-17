@@ -95,11 +95,14 @@
     }
 
     .student-report-toolbar {
+        width: 100%;
         margin-bottom: .9rem;
         padding: .9rem;
         border: 1px solid #fed7aa;
-        border-radius: 8px;
+        border-radius: 12px;
         background: #fff;
+        box-shadow: 0 1px 0 rgba(15, 23, 42, .03);
+        text-align: left;
     }
 
     .student-report-toolbar form {
@@ -107,6 +110,7 @@
         flex-wrap: wrap;
         align-items: end;
         gap: .75rem;
+        text-align: left;
     }
 
     .student-report-toolbar label {
@@ -118,8 +122,11 @@
     .student-report-toolbar .form-select {
         min-width: 180px;
         border-radius: 8px;
-        font-size: 1rem;
+        font-size: .875rem;
         font-weight: 400;
+        color: #374151;
+        background: #f9fafb;
+        border-color: #e5e7eb;
     }
 
     .student-report-toolbar .form-select:focus {
@@ -127,18 +134,56 @@
         box-shadow: 0 0 0 .2rem rgba(255, 237, 213, .9);
     }
 
+    .student-report-card {
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+        border: 1px solid #fed7aa;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 1px 0 rgba(15, 23, 42, .03);
+        text-align: left;
+    }
+
+    .student-report-table {
+        width: 100%;
+        max-width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        margin: 0;
+        color: #374151;
+        font-size: .875rem;
+        font-weight: 400;
+        text-align: left;
+        font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
     .student-report-table th,
     .student-report-table td {
-        color: #1f2937;
-        font-size: 1rem;
+        padding: .8rem .75rem;
+        border-bottom: 1px solid #f3f4f6;
+        color: #374151;
+        font-size: .875rem;
         font-weight: 400;
         text-align: left;
         vertical-align: middle;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .student-report-table th {
         color: #111827;
         font-weight: 500;
+        background: rgba(255, 247, 237, .72);
+        border-bottom: 1px solid rgba(254, 215, 170, .7);
+    }
+
+    .student-report-table tbody tr:nth-child(even) td {
+        background: rgba(255, 247, 237, .18);
+    }
+
+    .student-report-table tbody tr:hover td {
+        background: rgba(255, 247, 237, .45);
     }
 
     .student-report-gpa-row td {
@@ -146,6 +191,29 @@
         background: #fff7ed;
         font-size: 1rem;
         font-weight: 700;
+    }
+
+    .student-report-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: .25rem;
+        padding: .42rem .7rem;
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        background: #fff7ed;
+        color: #c2410c;
+        font-size: .78rem;
+        font-weight: 400;
+        cursor: pointer;
+        transition: all .18s ease;
+        white-space: nowrap;
+    }
+
+    .student-report-toggle:hover,
+    .student-report-toggle.active {
+        background: #ea580c;
+        border-color: #ea580c;
+        color: #fff;
     }
 
     .student-report-term-col {
@@ -584,47 +652,32 @@
 </style>
 @if(auth()->user()->isStudent() || auth()->user()->isParent())
     @php
-        $detailLabels = $detailLabels ?? [];
-        $formatScoreList = function ($score, array $types, array $keywords = []) use ($detailLabels) {
-            if (! $score) {
-                return '<span class="text-muted">&nbsp;</span>';
+        $studentReportColumnHeaders = collect($studentReportColumnHeaders ?? []);
+        $studentReportColumnsBySubject = collect($studentReportColumnsBySubject ?? []);
+        $studentReportAnnualSummary = $studentReportAnnualSummary ?? ['hk1_gpa' => null, 'hk2_gpa' => null, 'year_gpa' => null];
+        $formatTermValue = fn ($value) => $value !== null ? number_format((float) $value, 1, '.', '') : null;
+        $formatReportScoreValue = function ($score, $subject, $column) {
+            if (! $score || ! $column) {
+                return '<span class="text-muted">-</span>';
             }
 
-            $items = $score->details->filter(function ($detail) use ($types, $keywords, $detailLabels) {
-                $normalizedType = match ($detail->type) {
-                    'oral', 'quiz', 'test', 'regular' => 'regular',
-                    'final', 'final_test' => 'final',
-                    default => $detail->type,
-                };
-
-                if (! in_array($normalizedType, $types, true)) {
-                    return false;
-                }
-
-                if ($keywords === []) {
-                    return true;
-                }
-
-                $label = mb_strtolower((string) ($detail->scoreColumn?->name ?: ($detail->name ?: ($detailLabels[$detail->type] ?? $detail->type))));
-
-                return collect($keywords)->contains(fn ($keyword) => str_contains($label, mb_strtolower($keyword)));
-            });
-
-            if ($items->isEmpty()) {
-                return '<span class="text-muted">Chưa có</span>';
+            $detail = $score->details?->firstWhere('score_column_id', $column->id);
+            if (! $detail || $detail->value === null) {
+                return '<span class="text-muted">-</span>';
             }
 
-            return $items
-                ->sortBy(fn ($detail) => $detail->scoreColumn?->sort_order ?? 999)
-                ->map(function ($detail) use ($detailLabels, $score) {
-                    $label = $detail->scoreColumn?->name ?: ($detail->name ?: ($detailLabels[$detail->type] ?? $detail->type));
-                    $value = $score->subject?->usesPassFailAssessment()
-                        ? ((float) $detail->value >= 0.5 ? 'Đ' : 'CĐ')
-                        : rtrim(rtrim(number_format((float) $detail->value, 2, '.', ''), '0'), '.');
+            $value = $subject->usesPassFailAssessment()
+                ? ((float) $detail->value >= 0.5 ? 'Đạt' : 'Chưa đạt')
+                : rtrim(rtrim(number_format((float) $detail->value, 1, '.', ''), '0'), '.');
+            $badge = '';
 
-                    return '<span class="score-chip"><span>' . e($label) . '</span><strong>' . e($value) . '</strong></span>';
-                })
-                ->implode('');
+            if ($detail->is_retest && $detail->original_value !== null) {
+                $originalValue = rtrim(rtrim(number_format((float) $detail->original_value, 1, '.', ''), '0'), '.');
+                $tooltip = 'Điểm gốc: ' . $originalValue . '. Cập nhật ngày: ' . ($detail->retest_updated_at?->format('d/m/Y') ?? '-');
+                $badge = '<span class="score-retest-badge" data-tooltip="' . e($tooltip) . '">Bù</span>';
+            }
+
+            return '<span class="score-chip"><strong>' . e($value) . '</strong>' . $badge . '</span>';
         };
     @endphp
 
@@ -653,19 +706,19 @@
         </div>
     </div>
 
-    <div class="card mb-3">
-        <div class="card-body d-flex flex-column flex-md-row gap-3 justify-content-between">
+    <div class="w-full bg-white border border-orange-100 p-5 rounded-xl shadow-2xs text-left mb-3 font-sans">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-left">
             <div>
-                <div class="text-muted small">Học sinh</div>
-                <div class="fw-bold">{{ $student?->student_code }} - {{ $student?->name }}</div>
+                <div class="text-xs font-normal text-gray-400">Học sinh</div>
+                <div class="text-sm font-medium text-gray-900 truncate">{{ $student?->student_code }} - {{ $student?->name }}</div>
             </div>
             <div>
-                <div class="text-muted small">Lớp</div>
-                <div class="fw-bold">{{ $student?->classRoom?->name ?? 'Chưa phân lớp' }}</div>
+                <div class="text-xs font-normal text-gray-400">Lớp</div>
+                <div class="text-sm font-medium text-gray-900 truncate">{{ $student?->classRoom?->name ?? 'Chưa phân lớp' }}</div>
             </div>
             <div>
-                <div class="text-muted small">Học kỳ</div>
-                <div class="fw-bold">{{ $semesters->firstWhere('id', $selectedSemesterId)?->normalizedName() ?? 'Học kỳ hiện hành' }}</div>
+                <div class="text-xs font-normal text-gray-400">Học kỳ</div>
+                <div class="text-sm font-medium text-gray-900 truncate">{{ $semesters->firstWhere('id', $selectedSemesterId)?->normalizedName() ?? 'Học kỳ hiện hành' }}</div>
             </div>
         </div>
     </div>
@@ -689,60 +742,35 @@
                 </select>
             </div>
         </form>
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-3" data-report-column-filter-bar>
+            <button type="button" class="student-report-toggle active" data-report-column-filter="all">Tất cả</button>
+            <button type="button" class="student-report-toggle" data-report-column-filter="oral">Miệng</button>
+            <button type="button" class="student-report-toggle" data-report-column-filter="fifteen">15 phút</button>
+            <button type="button" class="student-report-toggle" data-report-column-filter="midterm">Giữa kỳ</button>
+            <button type="button" class="student-report-toggle" data-report-column-filter="final">Cuối kỳ</button>
+            <button type="button" class="student-report-toggle" data-report-column-filter="average">TB môn</button>
+        </div>
     </div>
 
-    <div class="card" data-student-report-card>
-        <div class="card-header d-flex align-items-center justify-content-between gap-3 bg-white">
-            <span class="fw-medium text-gray-900">Phiếu điểm tổng hợp học kỳ</span>
-            <a
-                href="{{ route('scores.report-card.export', ['school_year_id' => $selectedYearId, 'semester_id' => $selectedSemesterId]) }}"
-                class="student-report-export-btn"
-                data-report-export
-            >
+    <div class="student-report-card" data-student-report-card>
+        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap bg-white border-bottom border-orange-100 px-4 py-3 text-left">
+            <span class="text-sm font-medium text-gray-900">Phiếu điểm tổng hợp học kỳ</span>
+            <a href="{{ route('scores.report-card.export', ['school_year_id' => $selectedYearId, 'semester_id' => $selectedSemesterId]) }}" class="student-report-export-btn" data-report-export>
                 📥 Xuất phiếu điểm học kỳ
             </a>
         </div>
-        <div class="table-responsive">
-            @php
-                $studentReportColumnHeaders = collect($studentReportColumnHeaders ?? []);
-                $studentReportColumnsBySubject = collect($studentReportColumnsBySubject ?? []);
-                $studentReportAnnualSummary = $studentReportAnnualSummary ?? ['hk1_gpa' => null, 'hk2_gpa' => null, 'year_gpa' => null];
-                $formatTermValue = fn ($value) => $value !== null ? number_format((float) $value, 1, '.', '') : null;
-                $formatReportScoreValue = function ($score, $subject, $column) {
-                    if (! $score || ! $column) {
-                        return '<span class="text-muted">-</span>';
-                    }
-
-                    $detail = $score->details?->firstWhere('score_column_id', $column->id);
-                    if (! $detail || $detail->value === null) {
-                        return '<span class="text-muted">-</span>';
-                    }
-
-                    $value = $subject->usesPassFailAssessment()
-                        ? ((float) $detail->value >= 0.5 ? 'Đ' : 'CĐ')
-                        : rtrim(rtrim(number_format((float) $detail->value, 1, '.', ''), '0'), '.');
-                    $badge = '';
-
-                    if ($detail->is_retest && $detail->original_value !== null) {
-                        $originalValue = rtrim(rtrim(number_format((float) $detail->original_value, 1, '.', ''), '0'), '.');
-                        $tooltip = 'Điểm gốc: ' . $originalValue . '. Cập nhật ngày: ' . ($detail->retest_updated_at?->format('d/m/Y') ?? '-');
-                        $badge = '<span class="score-retest-badge" data-tooltip="' . e($tooltip) . '">Bù</span>';
-                    }
-
-                    return '<span class="score-chip"><strong>' . e($value) . '</strong>' . $badge . '</span>';
-                };
-            @endphp
-            <table class="table align-middle student-report-table">
+        <div class="w-full max-w-full overflow-hidden">
+            <table class="student-report-table">
                 <thead data-report-head>
                     <tr>
                         <th>Môn học</th>
                         @foreach($studentReportColumnHeaders as $header)
-                            <th class="text-nowrap">{{ $header['label'] }}</th>
+                            <th class="text-nowrap" data-score-family="{{ $header['family'] }}">{{ $header['label'] }}</th>
                         @endforeach
-                        <th>Điểm trung bình môn</th>
-                        <th class="student-report-term-col">Tổng kết HK1</th>
-                        <th class="student-report-term-col">Tổng kết HK2</th>
-                        <th class="student-report-term-col">Điểm Cả Năm</th>
+                        <th data-score-family="average">Điểm trung bình môn</th>
+                        <th class="student-report-term-col" data-score-family="term">Tổng kết HK1</th>
+                        <th class="student-report-term-col" data-score-family="term">Tổng kết HK2</th>
+                        <th class="student-report-term-col" data-score-family="term">Điểm Cả Năm</th>
                     </tr>
                 </thead>
                 <tbody data-report-body>
@@ -759,41 +787,23 @@
                                 $familyColumns = collect($columnsByFamily->get($header['family'], []))->values();
                                 $column = $familyColumns->get(((int) $header['index']) - 1);
                             @endphp
-                            <td>{!! $formatReportScoreValue($score, $subject, $column) !!}</td>
+                            <td data-score-family="{{ $header['family'] }}">{!! $formatReportScoreValue($score, $subject, $column) !!}</td>
                         @endforeach
-                        <td>
+                        <td data-score-family="average">
                             @if($subject->usesPassFailAssessment())
                                 <span class="text-muted">Không tính TB</span>
                             @elseif($score?->average !== null)
                                 <span class="badge bg-info">{{ rtrim(rtrim(number_format($score->average, 1), '0'), '.') }}</span>
                             @else
-                                <span class="text-muted">&nbsp;</span>
+                                <span class="text-muted">-</span>
                             @endif
                         </td>
                         @php
                             $termAverages = $row['annual'] ?? ['hk1' => null, 'hk2' => null, 'year' => null];
                         @endphp
-                        <td class="student-report-term-col">
-                            @if($termAverages['hk1'] !== null)
-                                <span class="student-report-term-value">{{ $formatTermValue($termAverages['hk1']) }}</span>
-                            @else
-                                <span class="student-report-term-muted">-</span>
-                            @endif
-                        </td>
-                        <td class="student-report-term-col">
-                            @if($termAverages['hk2'] !== null)
-                                <span class="student-report-term-value">{{ $formatTermValue($termAverages['hk2']) }}</span>
-                            @else
-                                <span class="student-report-term-muted">-</span>
-                            @endif
-                        </td>
-                        <td class="student-report-term-col">
-                            @if($termAverages['year'] !== null)
-                                <span class="student-report-term-value">{{ $formatTermValue($termAverages['year']) }}</span>
-                            @else
-                                <span class="student-report-term-muted">-</span>
-                            @endif
-                        </td>
+                        <td class="student-report-term-col" data-score-family="term">@if($termAverages['hk1'] !== null)<span class="student-report-term-value">{{ $formatTermValue($termAverages['hk1']) }}</span>@else<span class="student-report-term-muted">-</span>@endif</td>
+                        <td class="student-report-term-col" data-score-family="term">@if($termAverages['hk2'] !== null)<span class="student-report-term-value">{{ $formatTermValue($termAverages['hk2']) }}</span>@else<span class="student-report-term-muted">-</span>@endif</td>
+                        <td class="student-report-term-col" data-score-family="term">@if($termAverages['year'] !== null)<span class="student-report-term-value">{{ $formatTermValue($termAverages['year']) }}</span>@else<span class="student-report-term-muted">-</span>@endif</td>
                     </tr>
                 @empty
                     <tr>
@@ -809,16 +819,10 @@
                 </tbody>
             </table>
         </div>
-        <div
-            class="student-report-summary"
-            data-report-annual-summary
-            data-hk1="{{ $studentReportAnnualSummary['hk1_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk1_gpa'], 1, '.', '') : '-' }}"
-            data-hk2="{{ $studentReportAnnualSummary['hk2_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk2_gpa'], 1, '.', '') : '-' }}"
-            data-year="{{ $studentReportAnnualSummary['year_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['year_gpa'], 1, '.', '') : '-' }}"
-        >
-            <div class="student-report-summary-item">🟢 Điểm TB học kỳ 1: <strong data-report-summary-hk1>{{ $studentReportAnnualSummary['hk1_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk1_gpa'], 1, '.', '') : '-' }}</strong></div>
-            <div class="student-report-summary-item">🔵 Điểm TB học kỳ 2: <strong data-report-summary-hk2>{{ $studentReportAnnualSummary['hk2_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk2_gpa'], 1, '.', '') : '-' }}</strong></div>
-            <div class="student-report-summary-item master">🔥 ĐIỂM TRUNG BÌNH CẢ NĂM: <strong data-report-summary-year>{{ $studentReportAnnualSummary['year_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['year_gpa'], 1, '.', '') : '-' }}</strong></div>
+        <div class="student-report-summary" data-report-annual-summary data-hk1="{{ $studentReportAnnualSummary['hk1_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk1_gpa'], 1, '.', '') : '-' }}" data-hk2="{{ $studentReportAnnualSummary['hk2_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk2_gpa'], 1, '.', '') : '-' }}" data-year="{{ $studentReportAnnualSummary['year_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['year_gpa'], 1, '.', '') : '-' }}">
+            <div class="student-report-summary-item">📊 Điểm TB học kỳ 1: <strong data-report-summary-hk1>{{ $studentReportAnnualSummary['hk1_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk1_gpa'], 1, '.', '') : '-' }}</strong></div>
+            <div class="student-report-summary-item">📊 Điểm TB học kỳ 2: <strong data-report-summary-hk2>{{ $studentReportAnnualSummary['hk2_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['hk2_gpa'], 1, '.', '') : '-' }}</strong></div>
+            <div class="student-report-summary-item master">📌 Điểm trung bình cả năm: <strong data-report-summary-year>{{ $studentReportAnnualSummary['year_gpa'] !== null ? number_format((float) $studentReportAnnualSummary['year_gpa'], 1, '.', '') : '-' }}</strong></div>
         </div>
     </div>
 
@@ -833,166 +837,54 @@
             const summaryHk1 = document.querySelector('[data-report-summary-hk1]');
             const summaryHk2 = document.querySelector('[data-report-summary-hk2]');
             const summaryYear = document.querySelector('[data-report-summary-year]');
-
-            if (! form || ! tableHead || ! tableBody || ! yearSelect || ! semesterSelect) {
-                return;
-            }
-
-            const createCell = (tag, text, className = '') => {
-                const cell = document.createElement(tag);
-                cell.textContent = text;
-                if (className) {
-                    cell.className = className;
-                }
-                return cell;
+            const filterButtons = document.querySelectorAll('[data-report-column-filter]');
+            let activeColumnFilter = 'all';
+            if (! form || ! tableHead || ! tableBody || ! yearSelect || ! semesterSelect) { return; }
+            const createCell = (tag, text, className = '') => { const cell = document.createElement(tag); cell.textContent = text; if (className) cell.className = className; return cell; };
+            const setFamily = (cell, family) => { if (family) cell.dataset.scoreFamily = family; return cell; };
+            const applyScoreColumnFilter = (filter) => {
+                activeColumnFilter = filter;
+                document.querySelectorAll('[data-score-family]').forEach((cell) => { const family = cell.dataset.scoreFamily; cell.hidden = !(filter === 'all' || family === filter); });
+                const gpaRow = document.querySelector('[data-report-gpa-row]');
+                if (gpaRow) gpaRow.hidden = filter !== 'all';
+                filterButtons.forEach((button) => button.classList.toggle('active', button.dataset.reportColumnFilter === filter));
             };
-
-            const renderSemesters = (semesters, selectedSemesterId) => {
-                semesterSelect.innerHTML = '';
-                semesters.forEach((semester) => {
-                    const option = document.createElement('option');
-                    option.value = semester.id;
-                    option.textContent = semester.name;
-                    option.selected = String(semester.id) === String(selectedSemesterId);
-                    semesterSelect.appendChild(option);
-                });
-            };
-
-            const createTermCell = (value) => {
-                const td = document.createElement('td');
-                td.className = 'student-report-term-col';
-                const span = document.createElement('span');
-                span.className = value ? 'student-report-term-value' : 'student-report-term-muted';
-                span.textContent = value || '-';
-                td.appendChild(span);
-
-                return td;
-            };
-
-            const renderAnnualSummary = (summary = {}) => {
-                if (summaryHk1) {
-                    summaryHk1.textContent = summary.hk1_gpa || '-';
-                }
-
-                if (summaryHk2) {
-                    summaryHk2.textContent = summary.hk2_gpa || '-';
-                }
-
-                if (summaryYear) {
-                    summaryYear.textContent = summary.year_gpa || '-';
-                }
-            };
-
+            const renderSemesters = (semesters, selectedSemesterId) => { semesterSelect.innerHTML = ''; semesters.forEach((semester) => { const option = document.createElement('option'); option.value = semester.id; option.textContent = semester.name; option.selected = String(semester.id) === String(selectedSemesterId); semesterSelect.appendChild(option); }); };
+            const createTermCell = (value) => { const td = document.createElement('td'); td.className = 'student-report-term-col'; td.dataset.scoreFamily = 'term'; const span = document.createElement('span'); span.className = value ? 'student-report-term-value' : 'student-report-term-muted'; span.textContent = value || '-'; td.appendChild(span); return td; };
+            const renderAnnualSummary = (summary = {}) => { if (summaryHk1) summaryHk1.textContent = summary.hk1_gpa || '-'; if (summaryHk2) summaryHk2.textContent = summary.hk2_gpa || '-'; if (summaryYear) summaryYear.textContent = summary.year_gpa || '-'; };
             const renderReport = (payload) => {
+                const headers = payload.headers || [];
                 renderSemesters(payload.semesters || [], payload.selected_semester_id);
-                if (exportButton) {
-                    const exportUrl = new URL(exportButton.href, window.location.origin);
-                    exportUrl.searchParams.set('school_year_id', payload.selected_year_id || yearSelect.value);
-                    exportUrl.searchParams.set('semester_id', payload.selected_semester_id || semesterSelect.value);
-                    exportButton.href = exportUrl.toString();
-                }
-
+                if (exportButton) { const exportUrl = new URL(exportButton.href, window.location.origin); exportUrl.searchParams.set('school_year_id', payload.selected_year_id || yearSelect.value); exportUrl.searchParams.set('semester_id', payload.selected_semester_id || semesterSelect.value); exportButton.href = exportUrl.toString(); }
                 const headerRow = document.createElement('tr');
                 headerRow.appendChild(createCell('th', 'Môn học'));
-                (payload.headers || []).forEach((header) => {
-                    headerRow.appendChild(createCell('th', header.label, 'text-nowrap'));
-                });
-                headerRow.appendChild(createCell('th', 'Điểm trung bình môn'));
-                headerRow.appendChild(createCell('th', 'Tổng kết HK1', 'student-report-term-col'));
-                headerRow.appendChild(createCell('th', 'Tổng kết HK2', 'student-report-term-col'));
-                headerRow.appendChild(createCell('th', 'Điểm Cả Năm', 'student-report-term-col'));
-                tableHead.innerHTML = '';
-                tableHead.appendChild(headerRow);
-
-                tableBody.innerHTML = '';
-                const colspan = (payload.headers || []).length + 5;
+                headers.forEach((header) => headerRow.appendChild(setFamily(createCell('th', header.label, 'text-nowrap'), header.family)));
+                headerRow.appendChild(setFamily(createCell('th', 'Điểm trung bình môn'), 'average'));
+                headerRow.appendChild(setFamily(createCell('th', 'Tổng kết HK1', 'student-report-term-col'), 'term'));
+                headerRow.appendChild(setFamily(createCell('th', 'Tổng kết HK2', 'student-report-term-col'), 'term'));
+                headerRow.appendChild(setFamily(createCell('th', 'Điểm Cả Năm', 'student-report-term-col'), 'term'));
+                tableHead.innerHTML = ''; tableHead.appendChild(headerRow); tableBody.innerHTML = '';
+                const colspan = headers.length + 5;
                 renderAnnualSummary(payload.annual_summary || {});
-
                 if (! payload.rows || payload.rows.length === 0) {
-                    const emptyRow = document.createElement('tr');
-                    const emptyCell = createCell('td', 'Chưa có dữ liệu điểm trong học kỳ này.', 'text-muted');
-                    emptyCell.colSpan = colspan;
-                    emptyRow.appendChild(emptyCell);
-                    tableBody.appendChild(emptyRow);
+                    const emptyRow = document.createElement('tr'); const emptyCell = createCell('td', 'Chưa có dữ liệu điểm trong học kỳ này.', 'text-muted'); emptyCell.colSpan = colspan; emptyRow.appendChild(emptyCell); tableBody.appendChild(emptyRow);
                 } else {
                     payload.rows.forEach((row) => {
-                        const tr = document.createElement('tr');
-                        tr.appendChild(createCell('td', row.subject_name || '-', 'fw-semibold'));
-
-                        (row.values || []).forEach((value) => {
-                            const td = document.createElement('td');
-                            const span = document.createElement('span');
-                            span.className = value.muted ? 'text-muted' : 'score-chip';
-                            span.textContent = value.text || '-';
-
-                            if (value.is_retest && value.retest_tooltip) {
-                                const badge = document.createElement('span');
-                                badge.className = 'score-retest-badge';
-                                badge.dataset.tooltip = value.retest_tooltip;
-                                badge.textContent = 'Bù';
-                                span.appendChild(badge);
-                            }
-
-                            td.appendChild(span);
-                            tr.appendChild(td);
-                        });
-
-                        const average = document.createElement('td');
-                        if (row.uses_pass_fail) {
-                            average.appendChild(createCell('span', 'Không tính TB', 'text-muted'));
-                        } else if (row.average !== null && row.average !== undefined) {
-                            average.appendChild(createCell('span', row.average, 'badge bg-info'));
-                        } else {
-                            average.appendChild(createCell('span', '-', 'text-muted'));
-                        }
-                        tr.appendChild(average);
-                        tr.appendChild(createTermCell(row.term_averages?.hk1));
-                        tr.appendChild(createTermCell(row.term_averages?.hk2));
-                        tr.appendChild(createTermCell(row.term_averages?.year));
-                        tableBody.appendChild(tr);
+                        const tr = document.createElement('tr'); tr.appendChild(createCell('td', row.subject_name || '-', 'fw-semibold'));
+                        (row.values || []).forEach((value, index) => { const td = document.createElement('td'); td.dataset.scoreFamily = headers[index]?.family || ''; const span = document.createElement('span'); span.className = value.muted ? 'text-muted' : 'score-chip'; span.textContent = value.text || '-'; if (value.is_retest && value.retest_tooltip) { const badge = document.createElement('span'); badge.className = 'score-retest-badge'; badge.dataset.tooltip = value.retest_tooltip; badge.textContent = 'Bù'; span.appendChild(badge); } td.appendChild(span); tr.appendChild(td); });
+                        const average = document.createElement('td'); average.dataset.scoreFamily = 'average';
+                        if (row.uses_pass_fail) average.appendChild(createCell('span', 'Không tính TB', 'text-muted')); else if (row.average !== null && row.average !== undefined) average.appendChild(createCell('span', row.average, 'badge bg-info')); else average.appendChild(createCell('span', '-', 'text-muted'));
+                        tr.appendChild(average); tr.appendChild(createTermCell(row.term_averages?.hk1)); tr.appendChild(createTermCell(row.term_averages?.hk2)); tr.appendChild(createTermCell(row.term_averages?.year)); tableBody.appendChild(tr);
                     });
                 }
-
-                const gpaRow = document.createElement('tr');
-                gpaRow.className = 'student-report-gpa-row';
-                const gpaLabel = createCell('td', 'Điểm trung bình học kỳ (Tất cả các môn)');
-                gpaLabel.colSpan = Math.max(1, colspan - 1);
-                gpaRow.appendChild(gpaLabel);
-                gpaRow.appendChild(createCell('td', payload.global_gpa || '-'));
-                tableBody.appendChild(gpaRow);
+                const gpaRow = document.createElement('tr'); gpaRow.className = 'student-report-gpa-row'; gpaRow.dataset.reportGpaRow = 'true'; const gpaLabel = createCell('td', 'Điểm trung bình học kỳ (Tất cả các môn)'); gpaLabel.colSpan = Math.max(1, colspan - 1); gpaRow.appendChild(gpaLabel); gpaRow.appendChild(createCell('td', payload.global_gpa || '-')); tableBody.appendChild(gpaRow); applyScoreColumnFilter(activeColumnFilter);
             };
-
-            const fetchReport = async () => {
-                const params = new URLSearchParams({
-                    school_year_id: yearSelect.value,
-                    semester_id: semesterSelect.value,
-                });
-
-                const response = await fetch(`${form.dataset.url}?${params.toString()}`, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-                const payload = await response.json().catch(() => ({}));
-
-                if (! response.ok) {
-                    throw new Error(payload.message || 'Không thể tải phiếu điểm.');
-                }
-
-                renderReport(payload);
-            };
-
-            [yearSelect, semesterSelect].forEach((select) => {
-                select.addEventListener('change', () => {
-                    fetchReport().catch((error) => {
-                        console.error(error);
-                    });
-                });
-            });
+            const fetchReport = async () => { const params = new URLSearchParams({ school_year_id: yearSelect.value, semester_id: semesterSelect.value }); const response = await fetch(`${form.dataset.url}?${params.toString()}`, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } }); const payload = await response.json().catch(() => ({})); if (! response.ok) throw new Error(payload.message || 'Không thể tải phiếu điểm.'); renderReport(payload); };
+            [yearSelect, semesterSelect].forEach((select) => select.addEventListener('change', () => fetchReport().catch((error) => console.error(error))));
+            filterButtons.forEach((button) => button.addEventListener('click', () => applyScoreColumnFilter(button.dataset.reportColumnFilter || 'all')));
+            applyScoreColumnFilter('all');
         })();
-    </script>
-@else
+    </script>@else
     @php
         $isScoreAdmin = auth()->user()->isAdmin() || auth()->user()->isStaff();
         $availableGrades = $classes->pluck('grade_level')->filter()->unique()->sort()->values();
@@ -1005,15 +897,15 @@
     @endphp
 
     <x-page-header
-        :title="$isScoreAdmin ? 'Quản lý bảng điểm tập trung' : 'Nhập điểm số học sinh'"
+        :title="$isScoreAdmin ? 'Qu?n l� b?ng di?m t?p trung' : 'Nh?p di?m s? h?c sinh'"
         :subtitle="$isScoreAdmin
-            ? 'Tra cứu, giám sát tiến độ nhập điểm và phê duyệt yêu cầu sửa đổi điểm số của giáo viên toàn trường.'
-            : 'Giáo viên bộ môn nhập điểm theo các cột điểm do Admin cấu hình.'"
+            ? 'Tra c?u, gi�m s�t ti?n d? nh?p di?m v� ph� duy?t y�u c?u s?a d?i di?m s? c?a gi�o vi�n to�n tru?ng.'
+            : 'Gi�o vi�n b? m�n nh?p di?m theo c�c c?t di?m do Admin c?u h�nh.'"
     >
         <x-bulk-excel-actions module="scores" :context="$scoreBulkContext" :allow-import="! $isScoreAdmin" />
         @if(auth()->user()->hasPermission('scores.manage'))
             <button type="button" class="score-config-shortcut-btn" data-bs-toggle="modal" data-bs-target="#scoreColumnConfigModal">
-                ⚙️ Quản lý cấu hình cột điểm
+                ?? Qu?n l� c?u h�nh c?t di?m
             </button>
         @endif
     </x-page-header>
@@ -1033,7 +925,7 @@
                 'headers' => [],
                 'rows' => [],
                 'summary' => [],
-                'pagination' => ['label' => 'Hiển thị 0 trong tổng số 0 học sinh', 'show_controls' => false],
+                'pagination' => ['label' => 'Hi?n th? 0 trong t?ng s? 0 h?c sinh', 'show_controls' => false],
                 'selected_term_index' => 1,
             ];
             $adminMatrixJson = json_encode($adminMatrix, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -1048,25 +940,25 @@
                 <input
                     type="search"
                     class="form-control admin-score-search"
-                    placeholder="Tìm mã HS hoặc họ tên"
+                    placeholder="T�m m� HS ho?c h? t�n"
                     data-admin-score-search
                     value="{{ $adminMatrix['filters']['q'] ?? '' }}"
                 >
                 <input type="hidden" data-admin-score-year value="{{ $adminMatrix['filters']['school_year_id'] ?? $selectedYearId }}">
                 <select class="form-select" data-admin-score-grade>
-                    <option value="">Chọn Khối</option>
+                    <option value="">Ch?n Kh?i</option>
                     @foreach([10, 11, 12] as $grade)
-                        <option value="{{ $grade }}" @selected((string) ($adminMatrix['filters']['grade_level'] ?? '') === (string) $grade)>Khối {{ $grade }}</option>
+                        <option value="{{ $grade }}" @selected((string) ($adminMatrix['filters']['grade_level'] ?? '') === (string) $grade)>Kh?i {{ $grade }}</option>
                     @endforeach
                 </select>
                 <select class="form-select" data-admin-score-class>
-                    <option value="">Tất cả lớp</option>
+                    <option value="">T?t c? l?p</option>
                     @foreach(($adminMatrix['classes'] ?? []) as $classOption)
                         <option value="{{ $classOption['id'] }}" @selected((string) ($adminMatrix['filters']['class_id'] ?? '') === (string) $classOption['id'])>{{ $classOption['name'] }}</option>
                     @endforeach
                 </select>
                 <select class="form-select" data-admin-score-subject>
-                    <option value="">Tất cả môn học</option>
+                    <option value="">T?t c? m�n h?c</option>
                     @foreach(($adminMatrix['subjects'] ?? []) as $subjectOption)
                         <option value="{{ $subjectOption['id'] }}">{{ $subjectOption['name'] }}</option>
                     @endforeach
@@ -1078,19 +970,19 @@
                 </select>
                 <div class="admin-eval-toggle d-inline-flex align-items-center gap-1 ms-auto" data-admin-eval-toggle style="display: none;">
                     <button type="button" class="btn text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs" data-eval-tab="GRADE_10">
-                        📊 Môn chấm điểm
+                        ?? M�n ch?m di?m
                     </button>
                     <button type="button" class="btn text-xs font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all" data-eval-tab="ASSESSMENT">
-                        ☑️ Môn nhận xét
+                        ?? M�n nh?n x�t
                     </button>
                 </div>
                 <button type="button" class="admin-score-reset-btn" data-admin-score-reset>
-                    <i class="bi bi-arrow-counterclockwise"></i>Đặt lại lọc
+                    <i class="bi bi-arrow-counterclockwise"></i>�?t l?i l?c
                 </button>
             </div>
 
             <div class="admin-score-context" data-admin-score-context>
-                Chọn lớp để xem ma trận điểm tất cả các môn.
+                Ch?n l?p d? xem ma tr?n di?m t?t c? c�c m�n.
             </div>
 
             <div class="card">
@@ -1101,37 +993,37 @@
                     </table>
                 </div>
                 <div class="admin-score-footer">
-                    <span data-admin-score-count>{{ $adminMatrix['pagination']['label'] ?? 'Hiển thị 0 trong tổng số 0 học sinh' }}</span>
+                    <span data-admin-score-count>{{ $adminMatrix['pagination']['label'] ?? 'Hi?n th? 0 trong t?ng s? 0 h?c sinh' }}</span>
                     <div class="admin-score-pager" data-admin-score-pager></div>
                 </div>
             </div>
 
             <div class="admin-score-summary">
-                <span>🟢 Điểm TB Học kỳ 1 (Tổng các môn): <strong data-admin-score-summary-hk1>-</strong></span>
-                <span>🔵 Điểm TB Học kỳ 2 (Tổng các môn): <strong data-admin-score-summary-hk2>-</strong></span>
-                <span class="master">🔥 ĐIỂM TRUNG BÌNH CẢ NĂM: <strong data-admin-score-summary-year>-</strong></span>
+                <span>?? �i?m TB H?c k? 1 (T?ng c�c m�n): <strong data-admin-score-summary-hk1>-</strong></span>
+                <span>?? �i?m TB H?c k? 2 (T?ng c�c m�n): <strong data-admin-score-summary-hk2>-</strong></span>
+                <span class="master">?? �I?M TRUNG B�NH C? NAM: <strong data-admin-score-summary-year>-</strong></span>
             </div>
 
             <div class="admin-score-modal-backdrop" data-admin-score-modal aria-hidden="true">
                 <div class="admin-score-modal">
                     <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
                         <div>
-                            <h5 class="admin-score-modal-title" data-admin-score-modal-title>Chi tiết điểm học sinh</h5>
+                            <h5 class="admin-score-modal-title" data-admin-score-modal-title>Chi ti?t di?m h?c sinh</h5>
                             <div class="admin-score-modal-subtitle" data-admin-score-modal-subtitle></div>
                         </div>
-                        <button type="button" class="btn-close" data-admin-score-modal-close aria-label="Đóng"></button>
+                        <button type="button" class="btn-close" data-admin-score-modal-close aria-label="��ng"></button>
                     </div>
                     <div class="table-responsive">
                         <table class="table align-middle admin-score-ledger-table" data-admin-table-skip>
                             <thead>
                                 <tr>
-                                    <th>Môn học</th>
-                                    <th>Điểm Miệng</th>
-                                    <th>15 phút (Lần 1)</th>
-                                    <th>15 phút (Lần 2)</th>
-                                    <th>Điểm Giữa kỳ</th>
-                                    <th>Điểm Cuối kỳ</th>
-                                    <th>Điểm TB Môn</th>
+                                    <th>M�n h?c</th>
+                                    <th>�i?m Mi?ng</th>
+                                    <th>15 ph�t (L?n 1)</th>
+                                    <th>15 ph�t (L?n 2)</th>
+                                    <th>�i?m Gi?a k?</th>
+                                    <th>�i?m Cu?i k?</th>
+                                    <th>�i?m TB M�n</th>
                                 </tr>
                             </thead>
                             <tbody data-admin-score-ledger></tbody>
@@ -1199,8 +1091,8 @@
                                 const rawA = getValueFn(a);
                                 const rawB = getValueFn(b);
 
-                                const numA = (rawA !== null && rawA !== undefined && rawA !== '' && rawA !== '—') ? Number(rawA) : (currentSortDirection === 'desc' ? -999 : 999);
-                                const numB = (rawB !== null && rawB !== undefined && rawB !== '' && rawB !== '—') ? Number(rawB) : (currentSortDirection === 'desc' ? -999 : 999);
+                                const numA = (rawA !== null && rawA !== undefined && rawA !== '' && rawA !== '�') ? Number(rawA) : (currentSortDirection === 'desc' ? -999 : 999);
+                                const numB = (rawB !== null && rawB !== undefined && rawB !== '' && rawB !== '�') ? Number(rawB) : (currentSortDirection === 'desc' ? -999 : 999);
 
                                 if (isNaN(numA) && isNaN(numB)) {
                                     const strA = String(rawA || '');
@@ -1243,7 +1135,7 @@
                         (items || []).forEach((item) => {
                             const option = document.createElement('option');
                             const fullLabel = item.name || '';
-                            const shortLabel = fullLabel.length > 24 ? `${fullLabel.slice(0, 23)}…` : fullLabel;
+                            const shortLabel = fullLabel.length > 24 ? `${fullLabel.slice(0, 23)}�` : fullLabel;
                             option.value = item.id;
                             option.textContent = shortLabel;
                             option.title = fullLabel;
@@ -1264,26 +1156,26 @@
                     const renderContext = (payload) => {
                         const classContext = payload.class_context;
                         if (!classContext) {
-                            context.innerHTML = 'Chọn lớp để xem ma trận điểm tất cả các môn.';
+                            context.innerHTML = 'Ch?n l?p d? xem ma tr?n di?m t?t c? c�c m�n.';
                             return;
                         }
 
-                        const homeroomTeacher = classContext.class_teacher?.name || 'Chưa phân công GVCN';
+                        const homeroomTeacher = classContext.class_teacher?.name || 'Chua ph�n c�ng GVCN';
                         const total = classContext.students?.length || 0;
 
                         let subjectTeacherText = '';
                         const selectedSubjectId = controls.subject?.value || payload.filters?.subject_id;
                         if (selectedSubjectId && classContext.subject_teachers?.[selectedSubjectId]) {
                             const teacherName = classContext.subject_teachers[selectedSubjectId];
-                            subjectTeacherText = ` · <span class="text-orange-700 font-medium ms-1">💡 Giáo viên phụ trách: ${teacherName}</span>`;
+                            subjectTeacherText = ` � <span class="text-orange-700 font-medium ms-1">?? Gi�o vi�n ph? tr�ch: ${teacherName}</span>`;
                         }
 
-                        context.innerHTML = `<strong>${classContext.name}</strong> · GVCN: ${homeroomTeacher} · ${total} HS${subjectTeacherText}`;
+                        context.innerHTML = `<strong>${classContext.name}</strong> � GVCN: ${homeroomTeacher} � ${total} HS${subjectTeacherText}`;
                     };
 
                     const renderFilters = (payload) => {
-                        setOptions(controls.classRoom, payload.classes || [], 'Tất cả lớp', payload.filters?.class_id || controls.classRoom?.value || '');
-                        setOptions(controls.subject, payload.subjects || [], 'Tất cả môn học', controls.subject?.value || '');
+                        setOptions(controls.classRoom, payload.classes || [], 'T?t c? l?p', payload.filters?.class_id || controls.classRoom?.value || '');
+                        setOptions(controls.subject, payload.subjects || [], 'T?t c? m�n h?c', controls.subject?.value || '');
                         if (payload.semesters) {
                             setOptions(controls.semester, payload.semesters, null, payload.filters?.semester_id || controls.semester?.value || '');
                         }
@@ -1292,7 +1184,7 @@
                     const termText = (value, locked = false) => {
                         const span = document.createElement('span');
                         span.className = locked || !value ? 'admin-score-term locked' : 'admin-score-value';
-                        span.textContent = locked ? '—' : (value || '—');
+                        span.textContent = locked ? '�' : (value || '�');
                         return span;
                     };
 
@@ -1328,7 +1220,7 @@
                         const createSortableTh = (label, columnKey, getValueFn, extraClass = '') => {
                             const th = document.createElement('th');
                             th.className = `${extraClass} cursor-pointer select-none align-middle`.trim();
-                            th.title = `Click để sắp xếp điểm ${label}`;
+                            th.title = `Click d? s?p x?p di?m ${label}`;
 
                             const labelText = document.createTextNode(label);
                             th.appendChild(labelText);
@@ -1337,7 +1229,7 @@
                             const isActive = currentSortColumn === columnKey;
 
                             iconSpan.className = 'text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs';
-                            iconSpan.textContent = '↕';
+                            iconSpan.textContent = '?';
 
                             th.appendChild(iconSpan);
 
@@ -1353,7 +1245,7 @@
                         const appendTermHeaders = (row) => {
                             row.appendChild(createSortableTh('HK1', 'hk1', (r) => r.summary?.hk1_gpa, 'admin-score-term bg-orange-50/20'));
                             row.appendChild(createSortableTh('HK2', 'hk2', (r) => r.summary?.hk2_gpa, 'admin-score-term bg-orange-50/20'));
-                            row.appendChild(createSortableTh('Cả Năm', 'year', (r) => r.summary?.year_gpa, 'admin-score-term bg-orange-50/20'));
+                            row.appendChild(createSortableTh('C? Nam', 'year', (r) => r.summary?.year_gpa, 'admin-score-term bg-orange-50/20'));
                         };
                         const appendSummaryCells = (rowEl, row) => {
                             const hk1 = document.createElement('td');
@@ -1374,27 +1266,27 @@
                         const scoreText = (value) => {
                             const span = document.createElement('span');
                             span.className = value ? 'admin-score-value' : 'admin-score-empty';
-                            span.textContent = value || '—';
+                            span.textContent = value || '�';
                             return span;
                         };
 
                         head.innerHTML = '';
                         const tr = document.createElement('tr');
-                        tr.appendChild(cell('th', 'Mã HS', 'w-24'));
-                        tr.appendChild(cell('th', 'Họ tên', 'w-44'));
+                        tr.appendChild(cell('th', 'M� HS', 'w-24'));
+                        tr.appendChild(cell('th', 'H? t�n', 'w-44'));
                         switch (mode) {
                             case 'grade_summary':
-                                tr.appendChild(cell('th', 'Tên Lớp'));
+                                tr.appendChild(cell('th', 'T�n L?p'));
                                 appendTermHeaders(tr);
                                 break;
                             case 'subject_details': {
                                 const detailKeyMap = [
-                                    { label: 'Điểm Miệng', key: 'oral' },
-                                    { label: '15 phút (1)', key: 'fifteen_1' },
-                                    { label: '15 phút (2)', key: 'fifteen_2' },
-                                    { label: 'Giữa kỳ', key: 'midterm' },
-                                    { label: 'Cuối kỳ', key: 'final' },
-                                    { label: 'TB Môn', key: 'average' },
+                                    { label: '�i?m Mi?ng', key: 'oral' },
+                                    { label: '15 ph�t (1)', key: 'fifteen_1' },
+                                    { label: '15 ph�t (2)', key: 'fifteen_2' },
+                                    { label: 'Gi?a k?', key: 'midterm' },
+                                    { label: 'Cu?i k?', key: 'final' },
+                                    { label: 'TB M�n', key: 'average' },
                                 ];
                                 detailKeyMap.forEach((item) => {
                                     tr.appendChild(createSortableTh(item.label, item.key, (r) => r.detail_cells?.[item.key]));
@@ -1411,15 +1303,15 @@
                                 appendTermHeaders(tr);
                                 break;
                         }
-                        tr.appendChild(cell('th', 'Thao tác', 'text-end w-16'));
+                        tr.appendChild(cell('th', 'Thao t�c', 'text-end w-16'));
                         head.appendChild(tr);
 
                         body.innerHTML = '';
                         if (!payload.rows || payload.rows.length === 0) {
                             const empty = document.createElement('tr');
                             const emptyMessage = mode === 'empty'
-                                ? 'Chọn khối hoặc lớp để tải ma trận điểm.'
-                                : 'Không có học sinh phù hợp bộ lọc.';
+                                ? 'Ch?n kh?i ho?c l?p d? t?i ma tr?n di?m.'
+                                : 'Kh�ng c� h?c sinh ph� h?p b? l?c.';
                             const emptyCell = cell('td', emptyMessage, 'text-muted');
                             emptyCell.colSpan = mode === 'subject_details'
                                 ? 9
@@ -1467,9 +1359,9 @@
                                 const eyeBtn = document.createElement('button');
                                 eyeBtn.type = 'button';
                                 eyeBtn.className = 'text-gray-500 bg-gray-50 p-2 rounded-md hover:bg-orange-50 hover:text-orange-600 transition-all shadow-xs inline-flex items-center justify-center border-0 cursor-pointer';
-                                eyeBtn.title = 'Xem chi tiết';
-                                eyeBtn.setAttribute('aria-label', 'Xem chi tiết');
-                                eyeBtn.innerHTML = '👁️';
+                                eyeBtn.title = 'Xem chi ti?t';
+                                eyeBtn.setAttribute('aria-label', 'Xem chi ti?t');
+                                eyeBtn.innerHTML = '???';
                                 eyeBtn.addEventListener('click', () => openLedger(index));
                                 actionTd.appendChild(eyeBtn);
                                 rowEl.appendChild(actionTd);
@@ -1478,10 +1370,10 @@
                             });
                         }
 
-                        count.textContent = payload.pagination?.label || 'Hiển thị 0 trong tổng số 0 học sinh';
+                        count.textContent = payload.pagination?.label || 'Hi?n th? 0 trong t?ng s? 0 h?c sinh';
                         pager.innerHTML = '';
                         if (payload.pagination?.show_controls && payload.pagination?.total_pages > 1) {
-                            ['Trước', 'Sau'].forEach((label) => {
+                            ['Tru?c', 'Sau'].forEach((label) => {
                                 const button = document.createElement('button');
                                 button.type = 'button';
                                 button.className = 'btn btn-sm btn-outline-warning';
@@ -1491,12 +1383,12 @@
                         }
 
                         summaryHk1.textContent = payload.summary?.hk1_gpa || '-';
-                        summaryHk2.textContent = lockYearColumns ? '—' : (payload.summary?.hk2_gpa || '-');
-                        summaryYear.textContent = lockYearColumns ? '—' : (payload.summary?.year_gpa || '-');
+                        summaryHk2.textContent = lockYearColumns ? '�' : (payload.summary?.hk2_gpa || '-');
+                        summaryYear.textContent = lockYearColumns ? '�' : (payload.summary?.year_gpa || '-');
                     };
 
                     const renderTeachers = (teachers = []) => {
-                        setOptions(controls.teacher, teachers, 'Chọn Giáo viên', controls.teacher?.value || '');
+                        setOptions(controls.teacher, teachers, 'Ch?n Gi�o vi�n', controls.teacher?.value || '');
                     };
 
                     const requestJson = async (url, searchParams) => {
@@ -1508,7 +1400,7 @@
                         });
                         const payload = await response.json().catch(() => ({}));
                         if (!response.ok) {
-                            throw new Error(payload.message || 'Không thể tải dữ liệu điểm số.');
+                            throw new Error(payload.message || 'Kh�ng th? t?i d? li?u di?m s?.');
                         }
 
                         return payload;
@@ -1520,8 +1412,8 @@
                         const selectedSubjectForDropdown = !isResettingFilters && hadSubject
                             ? (payload.selected_subject_id || controls.subject?.value || '')
                             : '';
-                        setOptions(controls.classRoom, payload.classes || [], 'Tất cả lớp', payload.filters?.class_id || controls.classRoom?.value || '');
-                        setOptions(controls.subject, payload.subjects || [], 'Tất cả môn học', selectedSubjectForDropdown);
+                        setOptions(controls.classRoom, payload.classes || [], 'T?t c? l?p', payload.filters?.class_id || controls.classRoom?.value || '');
+                        setOptions(controls.subject, payload.subjects || [], 'T?t c? m�n h?c', selectedSubjectForDropdown);
 
                         if (!isResettingFilters && hadSubject && payload.selected_subject_id && controls.subject) {
                             controls.subject.value = payload.selected_subject_id;
@@ -1539,7 +1431,7 @@
                     const emptyMark = () => {
                         const span = document.createElement('span');
                         span.className = 'empty-mark text-gray-300 font-normal';
-                        span.textContent = '—';
+                        span.textContent = '�';
                         return span;
                     };
 
@@ -1583,13 +1475,13 @@
 
                         const selectedYear = (matrix.years || []).find((year) => String(year.id).trim() == String(matrix.filters?.school_year_id).trim());
                         modalTitle.textContent = `${(row.student.name || '').toUpperCase()} - ${row.student.student_code || ''}`;
-                        modalSubtitle.textContent = `Lớp: ${matrix.class_context?.name || '-'} • Năm học: ${selectedYear?.name || '-'}`;
+                        modalSubtitle.textContent = `L?p: ${matrix.class_context?.name || '-'} � Nam h?c: ${selectedYear?.name || '-'}`;
                         modalLedger.innerHTML = '';
                         const ledger = (row.ledger || []).filter((item) => String(item.assessment_type).trim().toUpperCase() !== 'NONE');
 
                         if (ledger.length === 0) {
                             const tr = document.createElement('tr');
-                            const td = cell('td', 'Chưa có môn học được đánh giá.', 'text-muted');
+                            const td = cell('td', 'Chua c� m�n h?c du?c d�nh gi�.', 'text-muted');
                             td.colSpan = 7;
                             tr.appendChild(td);
                             modalLedger.appendChild(tr);
@@ -1729,7 +1621,7 @@
                     <input type="hidden" name="subject_id" data-score-subject-id value="{{ $firstAssignment?->subject_id }}">
                     <input type="hidden" name="semester_id" data-score-semester-id value="{{ $firstAssignment?->semester_id }}">
                     <div class="score-filter-field">
-                        <label>Lớp</label>
+                        <label>L?p</label>
                         <select class="form-select" data-score-assignment-class @disabled($assignments->isEmpty())>
                             @forelse($assignments as $assignment)
                                 <option
@@ -1737,14 +1629,14 @@
                                     data-class-id="{{ $assignment->class_id }}"
                                     data-subject-id="{{ $assignment->subject_id }}"
                                     data-semester-id="{{ $assignment->semester_id }}"
-                                >{{ $assignment->classRoom?->name ?? 'Không rõ lớp' }}</option>
+                                >{{ $assignment->classRoom?->name ?? 'Kh�ng r� l?p' }}</option>
                             @empty
-                                <option value="">Chưa có lớp</option>
+                                <option value="">Chua c� l?p</option>
                             @endforelse
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>Môn</label>
+                        <label>M�n</label>
                         <select class="form-select" data-score-assignment-subject @disabled($assignments->isEmpty())>
                             @forelse($assignments as $assignment)
                                 <option
@@ -1752,14 +1644,14 @@
                                     data-class-id="{{ $assignment->class_id }}"
                                     data-subject-id="{{ $assignment->subject_id }}"
                                     data-semester-id="{{ $assignment->semester_id }}"
-                                >{{ $assignment->subject?->name ?? 'Không rõ môn' }}</option>
+                                >{{ $assignment->subject?->name ?? 'Kh�ng r� m�n' }}</option>
                             @empty
-                                <option value="">Chưa có môn</option>
+                                <option value="">Chua c� m�n</option>
                             @endforelse
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>Học kỳ</label>
+                        <label>H?c k?</label>
                         <select class="form-select" data-score-assignment-semester @disabled($assignments->isEmpty())>
                             @forelse($assignments as $assignment)
                                 <option
@@ -1767,51 +1659,51 @@
                                     data-class-id="{{ $assignment->class_id }}"
                                     data-subject-id="{{ $assignment->subject_id }}"
                                     data-semester-id="{{ $assignment->semester_id }}"
-                                >{{ $assignment->semester?->normalizedName() ?? 'Không rõ học kỳ' }}</option>
+                                >{{ $assignment->semester?->normalizedName() ?? 'Kh�ng r� h?c k?' }}</option>
                             @empty
-                                <option value="">Chưa có học kỳ</option>
+                                <option value="">Chua c� h?c k?</option>
                             @endforelse
                         </select>
                     </div>
                 @else
                     <div class="score-filter-field compact">
-                        <label>Khối</label>
+                        <label>Kh?i</label>
                         <select name="grade_level" class="form-select" data-score-admin-grade>
-                            <option value="">Tất cả khối</option>
+                            <option value="">T?t c? kh?i</option>
                             @foreach($availableGrades as $grade)
-                                <option value="{{ $grade }}">Khối {{ $grade }}</option>
+                                <option value="{{ $grade }}">Kh?i {{ $grade }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>Lớp</label>
+                        <label>L?p</label>
                         <select name="class_id" class="form-select" required data-score-admin-class>
-                            <option value="">Chọn lớp</option>
+                            <option value="">Ch?n l?p</option>
                             @foreach($classes as $class)
                                 <option value="{{ $class->id }}" data-grade="{{ $class->grade_level }}">{{ $class->name }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>Môn học</label>
+                        <label>M�n h?c</label>
                         <select name="subject_id" class="form-select" required>
-                            <option value="">Chọn môn học</option>
+                            <option value="">Ch?n m�n h?c</option>
                             @foreach($subjects as $subject)
                                 <option value="{{ $subject->id }}">{{ $subject->name }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>Giáo viên</label>
+                        <label>Gi�o vi�n</label>
                         <select name="teacher_id" class="form-select" data-score-admin-teacher>
-                            <option value="">Tất cả giáo viên</option>
+                            <option value="">T?t c? gi�o vi�n</option>
                             @foreach(($teachers ?? collect()) as $teacher)
                                 <option value="{{ $teacher->id }}">{{ $teacher->name }}{{ $teacher->teacher_code ? ' - ' . $teacher->teacher_code : '' }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>Học kỳ</label>
+                        <label>H?c k?</label>
                         <select name="semester_id" class="form-select" required data-score-admin-semester>
                             @foreach($semesters as $semester)
                                 <option value="{{ $semester->id }}" @selected($selectedSemesterId === $semester->id)>
@@ -1823,7 +1715,7 @@
                 @endif
                 <button class="btn score-open-sheet-btn" @disabled((! $isScoreAdmin && auth()->user()->isTeacher()) && $assignments->isEmpty())>
                     <i class="bi bi-box-arrow-in-right"></i>
-                    {{ $isScoreAdmin ? 'Tra cứu bảng điểm' : 'Mở bảng nhập' }}
+                    {{ $isScoreAdmin ? 'Tra c?u b?ng di?m' : 'M? b?ng nh?p' }}
                 </button>
             </form>
         </div>
@@ -1831,8 +1723,8 @@
         @if(! $isScoreAdmin)
             <div class="score-assignment-strip">
                 <div class="score-assignment-heading">
-                    <span>Phân công của bạn</span>
-                    <small>Chọn nhanh lớp và môn để bắt đầu nhập điểm</small>
+                    <span>Ph�n c�ng c?a b?n</span>
+                    <small>Ch?n nhanh l?p v� m�n d? b?t d?u nh?p di?m</small>
                 </div>
                 <div class="score-assignment-badges">
                     @forelse($assignments as $assignment)
@@ -1845,13 +1737,13 @@
                             class="score-assignment-badge"
                             data-score-assignment-badge="{{ $assignment->id }}"
                         >
-                            <strong>{{ $assignment->classRoom?->name ?? 'Không rõ lớp' }}</strong>
-                            <span>{{ $assignment->subject?->name ?? 'Không rõ môn' }} · {{ $assignment->semester?->normalizedName() ?? 'Không rõ học kỳ' }}</span>
+                            <strong>{{ $assignment->classRoom?->name ?? 'Kh�ng r� l?p' }}</strong>
+                            <span>{{ $assignment->subject?->name ?? 'Kh�ng r� m�n' }} � {{ $assignment->semester?->normalizedName() ?? 'Kh�ng r� h?c k?' }}</span>
                         </a>
                     @empty
                         <div class="score-entry-empty">
                             <i class="bi bi-inbox"></i>
-                            Thầy/cô vui lòng chọn Lớp và Môn học để bắt đầu nhập điểm.
+                            Th?y/c� vui l�ng ch?n L?p v� M�n h?c d? b?t d?u nh?p di?m.
                         </div>
                     @endforelse
                 </div>
@@ -1863,8 +1755,8 @@
         <i class="bi bi-clipboard-data"></i>
         <span>
             {{ $isScoreAdmin
-                ? 'Vui lòng lựa chọn Khối, Lớp và Môn học để tiến hành tra cứu bảng điểm số.'
-                : 'Thầy/cô vui lòng chọn Lớp và Môn học để bắt đầu nhập điểm.' }}
+                ? 'Vui l�ng l?a ch?n Kh?i, L?p v� M�n h?c d? ti?n h�nh tra c?u b?ng di?m s?.'
+                : 'Th?y/c� vui l�ng ch?n L?p v� M�n h?c d? b?t d?u nh?p di?m.' }}
         </span>
     </div>
 

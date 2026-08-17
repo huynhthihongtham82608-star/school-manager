@@ -163,8 +163,10 @@
             $strictAcademicResultItems[] = $adminItem('bi-star', 'Hạnh kiểm', route('conduct.index'), ['conduct.*', 'conduct*'], 'conduct.view');
         }
 
+        $strictAcademicResultItems[] = $adminItem('bi-award', 'Khen thưởng', route('rewards.index'), ['rewards.*', 'rewards*']);
+
         $strictContentItems = [
-            $adminItem('bi-globe2', '🌐 Thông tin & Diện mạo trường', route('system.settings.edit'), ['system.settings.*', 'system/settings*'], 'system.settings'),
+            $adminItem('bi-globe2', 'Diện mạo trường', route('system.settings.edit'), ['system.settings.*', 'system/settings*'], 'system.settings'),
             $adminItem('bi-megaphone', 'Thông báo', route('announcements.index'), ['announcements.*', 'announcements*'], 'content.manage'),
             $adminItem('bi-calendar-event', 'Sự kiện', route('events.index'), ['events.*', 'events*'], 'content.manage'),
             $adminItem('bi-journal-bookmark', 'Tài liệu học tập', route('documents.index'), ['documents.*', 'documents*'], 'documents.manage'),
@@ -180,11 +182,14 @@
 
         $strictSystemRegulationItems = [
             $adminItem('bi-sliders', 'Cấu hình đầu điểm', route('score-columns.index'), ['score-columns.*', 'score-columns*'], 'scores.manage'),
-            $adminItem('bi-bar-chart-steps', 'Mốc xếp loại học lực', route('system.regulations.index'), ['system.regulations.*', 'system/regulations*'], 'system.settings'),
-            $adminItem('bi-person-lines-fill', 'Định mức nề nếp', route('system.regulations.index'), ['system.regulations.*', 'system/regulations*'], 'system.settings'),
+            $adminItem('bi-graph-up-arrow', '⚖️ Mốc điểm học lực', route('system.academic-levels.index'), ['system.academic-levels.*', 'system/academic-levels*'], 'system.settings'),
+            $adminItem('bi-award', '🏆 Định mức hạnh kiểm', route('system.conduct-levels.index'), ['system.conduct-levels.*', 'system/conduct-levels*'], 'system.settings'),
+            $adminItem('bi-receipt-cutoff', 'Cấu hình mức thu', route('system.tuition-levels.index'), ['system.tuition-levels.*', 'system/tuition-levels*'], 'system.settings'),
+            $adminItem('bi-calendar2-plus', 'Lịch dạy thay', route('substitute-teachings.index'), ['substitute-teachings.*', 'substitute-teachings*'], 'system.settings'),
         ];
 
         $strictSystemOperationItems = [
+            $adminItem('bi-cash-coin', 'Quản lý học phí', route('tuition-fees.index'), ['tuition-fees.*', 'tuition-fees*'], 'system.settings'),
             $adminItem('bi-database-down', 'Sao lưu & Khôi phục', route('system.backups.index'), ['system.backups.*', 'system/backups*'], 'backups.manage'),
             $adminItem('bi-shield-check', 'Nhật ký hoạt động', route('audit-logs.index'), ['audit-logs.*', 'audit-logs*'], 'audit_logs.view'),
             $adminItem('bi-shield-lock', 'Vai trò & Quyền', route('rbac-roles.index'), ['rbac-roles.*', 'rbac-roles*'], 'manage_roles'),
@@ -218,7 +223,7 @@
             $strictReportItems[] = $adminItem('bi-bar-chart', 'Báo cáo', route('reports.index'), ['reports.*', 'reports*'], 'reports.view');
         }
         $addAdminGroup('reports', 'bi-graph-up', 'Báo cáo', $strictReportItems);
-        $addAdminGroup('content', 'bi-megaphone', 'Quản lý nội dung', $strictContentItems);
+        $addAdminGroup('content', 'bi-megaphone', 'Nội dung', $strictContentItems);
         $addAdminGroup('communication', 'bi-chat-dots', 'Giao tiếp', [
             $adminItem('bi-inbox', 'Hộp thư đến', route('messages.inbox'), ['messages.inbox'], 'messages.manage'),
             $adminItem('bi-send', 'Đã gửi', route('messages.sent'), ['messages.sent'], 'messages.manage'),
@@ -284,6 +289,8 @@
                     $makeRoleItem('bi-clipboard-data', 'Theo dõi điểm toàn lớp', route('teacher.homeroom.scores'), 'teacher/homeroom/scores*'),
                     $makeRoleItem('bi-calendar-check', 'Điểm danh & Duyệt nghỉ học', route('attendance.index', ['scope' => 'homeroom']), 'attendance*', ['query' => ['scope' => 'homeroom']]),
                     $makeRoleItem('bi-clipboard-check', 'Đánh giá hạnh kiểm', route('conduct.index'), 'conduct*'),
+                    $makeRoleItem('bi-award', 'Khen thưởng', route('rewards.index'), 'rewards*'),
+                    $makeRoleItem('bi-cash-coin', 'Học phí lớp chủ nhiệm', route('teacher.tuition-fees.homeroom'), 'teacher/homeroom/tuition-fees*'),
                 ]);
             }
 
@@ -310,6 +317,7 @@
             $addRoleItem('bi-calendar2-check', 'Lịch kiểm tra', route('exam-schedules.index'), 'exam-schedules*');
             $addRoleItem('bi-person-check', 'Điểm danh', route('attendance.index'), 'attendance*');
             $addRoleItem('bi-clipboard-check', 'Hạnh kiểm', route('conduct.index'), 'conduct*');
+            $addRoleItem('bi-cash-coin', 'Học phí & Khoản thu', route('parent.tuition-fees.index'), 'parent/tuition-fees*');
             $addRoleItem('bi-envelope-paper', 'Xin nghỉ học', route('parent.leave-requests.index'), 'parent/leave-requests*');
             $addRoleItem('bi-chat-dots', 'Tin nhắn', route('messages.inbox'), 'messages*');
             $addRoleItem('bi-megaphone', 'Thông báo', route('announcements.index'), 'announcements*');
