@@ -132,6 +132,22 @@ class ParentController extends Controller
         return back()->with('success', 'Đã đặt lại mật khẩu phụ huynh về 12345678.');
     }
 
+    public function toggleLogin(ParentProfile $parent)
+    {
+        $user = $this->ensureParentUser($parent);
+
+        $user->update(['login_status' => ! (bool) ($user->login_status ?? true)]);
+
+        AuditLogger::log(
+            'parent_login_status_changed',
+            ParentProfile::class,
+            (string) $parent->getKey(),
+            (($user->login_status ?? true) ? 'Mở khóa' : 'Khóa') . ' đăng nhập phụ huynh ' . $parent->name
+        );
+
+        return back()->with('success', ($user->login_status ?? true) ? 'Đã mở khóa tài khoản đăng nhập phụ huynh.' : 'Đã khóa tài khoản đăng nhập phụ huynh.');
+    }
+
     private function validatedData(Request $request, ?ParentProfile $parent = null): array
     {
         return $request->validate([

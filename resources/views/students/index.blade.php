@@ -99,6 +99,7 @@
             @forelse($students as $student)
                 @php
                     $deleteCheck = $deleteChecks[(string) $student->getKey()] ?? ['allowed' => false, 'message' => null];
+                    $loginLocked = (int) ($student->user?->login_status ?? 1) !== 1;
                 @endphp
                 <tr>
                     <td class="fw-semibold">{{ $student->student_code }}</td>
@@ -112,7 +113,10 @@
                                 @endif
                             </div>
                             <div>
-                                <div class="fw-semibold">{{ $student->name }}</div>
+                                <div class="fw-semibold d-flex align-items-center gap-1.5 text-left">
+                                    <span class="{{ $loginLocked ? 'text-red-600' : 'text-green-600' }} text-xs leading-none">{{ $loginLocked ? '🔴' : '🟢' }}</span>
+                                    <span>{{ $student->name }}</span>
+                                </div>
                                 <div class="text-muted small">{{ $student->genderLabel() }}{{ $student->dob ? ' - '.$student->dob->format('d/m/Y') : '' }}</div>
                             </div>
                         </div>
@@ -142,6 +146,13 @@
                                                 @csrf
                                                 <button type="submit" class="dropdown-item">
                                                     <i class="bi bi-key me-2"></i>Đặt lại mật khẩu
+                                                </button>
+                                            </form>
+                                            <form action="{{ route('students.toggle-login', $student) }}" method="POST" onsubmit="return confirm('{{ $loginLocked ? 'Bạn có chắc muốn mở khóa tài khoản đăng nhập học sinh này?' : 'Bạn có chắc muốn khóa tài khoản đăng nhập học sinh này?' }}');">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" class="dropdown-item text-left {{ $loginLocked ? 'text-success' : 'text-orange-700' }}">
+                                                    <i class="bi {{ $loginLocked ? 'bi-unlock' : 'bi-lock' }} me-2"></i>{{ $loginLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản' }}
                                                 </button>
                                             </form>
 	                                        @if($deleteCheck['allowed'])

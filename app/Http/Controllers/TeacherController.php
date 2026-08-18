@@ -169,6 +169,30 @@ class TeacherController extends Controller
         return back()->with('success', 'Đã đặt lại mật khẩu giáo viên về 12345678.');
     }
 
+    public function toggleLogin(Teacher $teacher)
+    {
+        $user = $teacher->user ?: User::create([
+            'username' => $teacher->teacher_code,
+            'role' => 'teacher',
+            'teacher_id' => $teacher->id,
+            'password_hash' => Hash::make('12345678'),
+            'force_change_password' => true,
+            'is_active' => $teacher->isWorking() ? 1 : 0,
+            'login_status' => 1,
+        ]);
+
+        $user->update(['login_status' => ! (bool) ($user->login_status ?? true)]);
+
+        AuditLogger::log(
+            'teacher_login_status_changed',
+            Teacher::class,
+            (string) $teacher->getKey(),
+            (($user->login_status ?? true) ? 'Mở khóa' : 'Khóa') . ' đăng nhập giáo viên ' . $teacher->name
+        );
+
+        return back()->with('success', ($user->login_status ?? true) ? 'Đã mở khóa tài khoản đăng nhập giáo viên.' : 'Đã khóa tài khoản đăng nhập giáo viên.');
+    }
+
     public function destroy(Teacher $teacher)
     {
         if ($teacher->user && $teacher->user->role === 'admin') {

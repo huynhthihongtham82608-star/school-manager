@@ -39,11 +39,15 @@
                         ->unique()
                         ->implode(', ');
                     $studentLabels = $parent->students->map(fn ($student) => ($student->student_code ?: '-') . ' - ' . $student->name);
+                    $loginLocked = (int) ($parent->user?->login_status ?? 1) !== 1;
                 @endphp
                 <tr>
                     <td class="fw-semibold">{{ $parent->parent_code ?: 'Chưa có mã' }}</td>
                     <td>
-                        <div class="fw-semibold">{{ $parent->name }}</div>
+                        <div class="fw-semibold d-flex align-items-center gap-1.5 text-left">
+                            <span class="{{ $loginLocked ? 'text-red-600' : 'text-green-600' }} text-xs leading-none">{{ $loginLocked ? '🔴' : '🟢' }}</span>
+                            <span>{{ $parent->name }}</span>
+                        </div>
                         <div class="text-muted small">{{ $parent->phone ?: 'Chưa cập nhật số điện thoại' }}</div>
                     </td>
                     <td>{{ $relations ?: '-' }}</td>
@@ -81,6 +85,15 @@
                                             @csrf
                                             <button type="submit" class="dropdown-item">
                                                 <i class="bi bi-key me-2"></i>Đặt lại mật khẩu
+                                            </button>
+                                        </form>
+                                    </li>
+                                    <li>
+                                        <form method="POST" action="{{ route('parents.toggle-login', $parent) }}" onsubmit="return confirm('{{ $loginLocked ? 'Bạn có chắc muốn mở khóa tài khoản đăng nhập phụ huynh này?' : 'Bạn có chắc muốn khóa tài khoản đăng nhập phụ huynh này?' }}');">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="dropdown-item text-left {{ $loginLocked ? 'text-success' : 'text-orange-700' }}">
+                                                <i class="bi {{ $loginLocked ? 'bi-unlock' : 'bi-lock' }} me-2"></i>{{ $loginLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản' }}
                                             </button>
                                         </form>
                                     </li>

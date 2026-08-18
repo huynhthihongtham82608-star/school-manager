@@ -25,6 +25,7 @@ class User extends Authenticatable
         'parent_id',
         'password_hash',
         'is_active',
+        'login_status',
         'is_super_admin',
         'force_change_password',
     ];
@@ -37,6 +38,7 @@ class User extends Authenticatable
     {
         return [
             'is_active' => 'boolean',
+            'login_status' => 'boolean',
             'is_super_admin' => 'boolean',
             'force_change_password' => 'boolean',
         ];

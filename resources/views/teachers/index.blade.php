@@ -56,10 +56,16 @@
             </thead>
             <tbody>
             @forelse($teachers as $teacher)
+                @php
+                    $loginLocked = (int) ($teacher->user?->login_status ?? 1) !== 1;
+                @endphp
                 <tr>
                     <td class="fw-semibold">{{ $teacher->teacher_code }}</td>
                     <td>
-                        <div class="fw-semibold">{{ $teacher->name }}</div>
+                        <div class="fw-semibold d-flex align-items-center gap-1.5 text-left">
+                            <span class="{{ $loginLocked ? 'text-red-600' : 'text-green-600' }} text-xs leading-none">{{ $loginLocked ? '🔴' : '🟢' }}</span>
+                            <span>{{ $teacher->name }}</span>
+                        </div>
                         <div class="text-muted small">{{ $teacher->phone ?: '-' }}</div>
                     </td>
                     <td>{{ $teacher->primarySubjectName() }}</td>
@@ -92,6 +98,13 @@
                                         @csrf
                                         <button type="submit" class="dropdown-item">
                                             <i class="bi bi-key me-2"></i>Đặt lại mật khẩu
+                                        </button>
+                                    </form>
+                                    <form action="{{ route('teachers.toggle-login', $teacher) }}" method="POST" onsubmit="return confirm('{{ $loginLocked ? 'Bạn có chắc muốn mở khóa tài khoản đăng nhập giáo viên này?' : 'Bạn có chắc muốn khóa tài khoản đăng nhập giáo viên này?' }}');">
+                                        @csrf
+                                        @method('PATCH')
+                                        <button type="submit" class="dropdown-item text-left {{ $loginLocked ? 'text-success' : 'text-orange-700' }}">
+                                            <i class="bi {{ $loginLocked ? 'bi-unlock' : 'bi-lock' }} me-2"></i>{{ $loginLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản' }}
                                         </button>
                                     </form>
                                     <div class="dropdown-divider"></div>

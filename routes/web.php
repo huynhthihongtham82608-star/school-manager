@@ -101,12 +101,15 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::resource('rooms', RoomController::class)->except(['show']);
         Route::resource('subjects', SubjectController::class)->except(['show']);
         Route::resource('departments', TeacherDepartmentController::class)->except(['show']);
+        Route::patch('teachers/{teacher}/toggle-login', [TeacherController::class, 'toggleLogin'])->name('teachers.toggle-login');
         Route::post('teachers/{teacher}/reset-password', [TeacherController::class, 'resetPassword'])->name('teachers.reset-password');
         Route::resource('teachers', TeacherController::class)->except(['show']);
         Route::get('students/import-template', [StudentController::class, 'importTemplate'])->name('students.import-template');
         Route::post('students/import', [StudentController::class, 'import'])->name('students.import');
+        Route::patch('students/{student}/toggle-login', [StudentController::class, 'toggleLogin'])->name('students.toggle-login');
         Route::post('students/{student}/reset-password', [StudentController::class, 'resetPassword'])->name('students.reset-password');
         Route::resource('students', StudentController::class)->except(['show']);
+        Route::patch('parents/{parent}/toggle-login', [ParentController::class, 'toggleLogin'])->name('parents.toggle-login');
         Route::post('parents/{parent}/reset-password', [ParentController::class, 'resetPassword'])->name('parents.reset-password');
         Route::resource('parents', ParentController::class)->except(['show']);
         Route::resource('assignments', TeachingAssignmentController::class)->except(['show']);

@@ -342,6 +342,32 @@ class StudentController extends Controller
         return back()->with('success', 'Đã đặt lại mật khẩu học sinh về 12345678.');
     }
 
+    public function toggleLogin(Student $student)
+    {
+        $this->denyHistoricalWrite();
+
+        $user = $student->user ?: User::create([
+            'username' => $student->student_code,
+            'role' => 'student',
+            'student_id' => $student->id,
+            'password_hash' => Hash::make('12345678'),
+            'force_change_password' => true,
+            'is_active' => 1,
+            'login_status' => 1,
+        ]);
+
+        $user->update(['login_status' => ! (bool) ($user->login_status ?? true)]);
+
+        AuditLogger::log(
+            'student_login_status_changed',
+            Student::class,
+            (string) $student->getKey(),
+            (($user->login_status ?? true) ? 'Mở khóa' : 'Khóa') . ' đăng nhập học sinh ' . $student->name
+        );
+
+        return back()->with('success', ($user->login_status ?? true) ? 'Đã mở khóa tài khoản đăng nhập học sinh.' : 'Đã khóa tài khoản đăng nhập học sinh.');
+    }
+
     private function formData(): array
     {
         return [

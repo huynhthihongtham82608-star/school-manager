@@ -35,6 +35,16 @@ class AuthController extends Controller
             'password' => $credentials['password'],
             'is_active' => 1,
         ])) {
+            if ((int) (Auth::user()->login_status ?? 1) !== 1) {
+                Auth::guard()->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return back()
+                    ->withErrors(['username' => '❌ Tài khoản của bạn đã bị khóa bởi Quản trị viên. Vui lòng liên hệ nhà trường để được hỗ trợ.'])
+                    ->onlyInput('username');
+            }
+
             $request->session()->regenerate();
             $request->session()->forget([
                 'url.intended',
