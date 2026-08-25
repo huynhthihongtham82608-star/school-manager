@@ -138,23 +138,14 @@
                     </td>
                     <td class="text-end">
                         <div class="content-action-group justify-content-end" data-action-synced="true">
+                            <button type="button" class="content-action-btn icon-only detail" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}" title="Xem chi tiết" aria-label="Xem chi tiết">
+                                <i class="bi bi-eye"></i><span class="visually-hidden">Xem chi tiết</span>
+                            </button>
                             @unless($readOnly)
                                 <a href="{{ route('assignments.edit', $firstAssignment) }}" class="content-action-btn icon-only edit" title="Sửa phân công" aria-label="Sửa phân công">
                                     <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa phân công</span>
                                 </a>
                             @endunless
-                            <div class="dropdown">
-                                <button type="button" class="content-action-btn icon-only dropdown-toggle-clean more" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
-                                    <i class="bi bi-three-dots-vertical"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end content-action-menu">
-                                    <li>
-                                        <button type="button" class="dropdown-item font-normal" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}">
-                                            <i class="bi bi-eye"></i>Xem chi tiết
-                                        </button>
-                                    </li>
-                                </ul>
-                            </div>
                         </div>
                     </td>
                 </tr>

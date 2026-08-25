@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -125,15 +126,32 @@ class StudentController extends Controller
             return back()->withErrors(['file' => 'File import không có dữ liệu hợp lệ.']);
         }
 
-        if ($class->currentStudentCount() + count($rows) > $class->maxCapacity()) {
+        $newRowCount = collect($rows)->filter(function (array $row) use ($class) {
+            $phone = trim((string) ($row['sdt_phu_huynh'] ?? ''));
+            $name = trim((string) ($row['ho_ten'] ?? ''));
+            $dob = $this->parseDateValue($row['ngay_sinh'] ?? null);
+
+            if ($phone === '' && $name !== '' && $dob) {
+                return ! Student::where('name', $name)
+                    ->whereDate('dob', $dob)
+                    ->where('class_id', $class->id)
+                    ->exists();
+            }
+
+            return true;
+        })->count();
+
+        if ($class->currentStudentCount() + $newRowCount > $class->maxCapacity()) {
             return back()->withErrors([
                 'file' => 'Số học sinh import vượt quá sức chứa tối đa của lớp.',
             ]);
         }
 
         $created = 0;
+        $updated = 0;
+        $duplicateWarnings = [];
 
-        DB::transaction(function () use ($rows, $class, &$created) {
+        DB::transaction(function () use ($rows, $class, &$created, &$updated, &$duplicateWarnings) {
             foreach ($rows as $index => $row) {
                 $name = trim((string) ($row['ho_ten'] ?? ''));
                 $phone = trim((string) ($row['sdt_phu_huynh'] ?? ''));
@@ -145,21 +163,46 @@ class StudentController extends Controller
                 }
 
                 $enrollmentDate = $this->parseDateValue($row['ngay_nhap_hoc'] ?? null) ?: now()->toDateString();
+                $dob = $this->parseDateValue($row['ngay_sinh'] ?? null);
                 $admissionType = $this->normalizeAdmissionType($row['loai_nhap_hoc'] ?? null, $index + 2);
                 $transferGradeLevel = $this->normalizeTransferGradeLevel($row['khoi_hien_tai'] ?? null, $index + 2)
                     ?: (int) $class->grade_level;
                 $status = $this->normalizeStudentStatus($row['trang_thai'] ?? null, $index + 2);
 
-                $student = Student::create([
-                    'student_code' => $this->generateStudentCode($enrollmentDate),
+                $matchedStudent = null;
+
+                if ($phone === '' && $dob) {
+                    $sameIdentityDifferentClass = Student::where('name', $name)
+                        ->whereDate('dob', $dob)
+                        ->where('class_id', '!=', $class->id)
+                        ->first();
+
+                    if ($sameIdentityDifferentClass) {
+                        $duplicateWarnings[] = 'Dòng ' . ($index + 2) . ': ⚠️ Nghi vấn trùng - ' . $name . ' (' . $dob . ') đang ở lớp khác.';
+                        Log::warning('Student import duplicate warning', [
+                            'row' => $index + 2,
+                            'name' => $name,
+                            'dob' => $dob,
+                            'import_class_id' => $class->id,
+                            'matched_student_id' => $sameIdentityDifferentClass->id,
+                            'matched_class_id' => $sameIdentityDifferentClass->class_id,
+                        ]);
+                    }
+
+                    $matchedStudent = Student::where('name', $name)
+                        ->whereDate('dob', $dob)
+                        ->where('class_id', $class->id)
+                        ->first();
+                }
+
+                $studentData = [
                     'name' => $name,
-                    'dob' => $this->parseDateValue($row['ngay_sinh'] ?? null),
+                    'dob' => $dob,
                     'gender' => $this->normalizeGender($row['gioi_tinh'] ?? null, $index + 2),
                     'address' => $row['dia_chi'] ?? null,
                     'place_of_birth' => $row['noi_sinh'] ?? null,
                     'ethnicity' => trim((string) ($row['dan_toc'] ?? '')) ?: 'Kinh',
                     'religion' => trim((string) ($row['ton_giao'] ?? '')) ?: 'Không',
-                    'parent_phone' => $phone ?: null,
                     'note' => trim((string) ($row['ghi_chu'] ?? '')) ?: null,
                     'class_id' => $class->id,
                     'school_year_id' => $class->school_year_id,
@@ -169,7 +212,19 @@ class StudentController extends Controller
                     'transfer_grade_level' => $admissionType === Student::ADMISSION_TRANSFER ? $transferGradeLevel : null,
                     'previous_class' => $admissionType === Student::ADMISSION_TRANSFER ? ($row['lop_cu'] ?? null) : null,
                     'status' => $status,
-                ]);
+                ];
+
+                if ($matchedStudent) {
+                    $student = $matchedStudent;
+                    $student->fill($studentData)->save();
+                    $updated++;
+                } else {
+                    $student = Student::create($studentData + [
+                        'student_code' => $this->generateStudentCode($enrollmentDate),
+                        'parent_phone' => $phone ?: null,
+                    ]);
+                    $created++;
+                }
 
                 $this->createStudentUser($student);
                 if ($phone !== '') {
@@ -180,15 +235,23 @@ class StudentController extends Controller
                         'address' => trim((string) ($row['dia_chi_phu_huynh'] ?? $row['dia_chi'] ?? '')) ?: null,
                     ]);
                 }
-                $this->recordClassHistory($student, null, $student->class_id, $student->enrollment_date, 'Nhập dữ liệu học sinh');
-                $created++;
+
+                if (! $matchedStudent) {
+                    $this->recordClassHistory($student, null, $student->class_id, $student->enrollment_date, 'Nhập dữ liệu học sinh');
+                }
             }
         });
 
-        AuditLogger::log('students_imported', Student::class, null, 'Nhập dữ liệu ' . $created . ' học sinh vào lớp ' . $class->name);
+        AuditLogger::log('students_imported', Student::class, null, 'Nhập dữ liệu ' . $created . ' học sinh, cập nhật ' . $updated . ' hồ sơ vào lớp ' . $class->name);
+
+        $message = 'Đã import ' . $created . ' học sinh mới, cập nhật ' . $updated . ' hồ sơ cũ.';
+
+        if ($duplicateWarnings !== []) {
+            $message .= ' Có ' . count($duplicateWarnings) . ' dòng ⚠️ nghi vấn trùng, vui lòng kiểm tra log.';
+        }
 
         return redirect()->route('students.index', ['school_year_id' => $class->school_year_id, 'class_id' => $class->id])
-            ->with('success', 'Đã import ' . $created . ' học sinh.');
+            ->with('success', $message);
     }
 
     public function importTemplate()
@@ -230,6 +293,36 @@ class StudentController extends Controller
             fclose($handle);
         }, 'mau_import_hoc_sinh.csv', [
             'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    public function lookupParent(Request $request)
+    {
+        $phone = trim((string) $request->query('phone', ''));
+
+        if ($phone === '') {
+            return response()->json([
+                'exists' => false,
+                'message' => 'Chưa nhập số điện thoại phụ huynh.',
+            ]);
+        }
+
+        $parent = ParentProfile::where('phone', $phone)->first();
+
+        if (! $parent) {
+            return response()->json([
+                'exists' => false,
+                'message' => 'Số điện thoại mới, vui lòng nhập họ tên phụ huynh.',
+            ]);
+        }
+
+        return response()->json([
+            'exists' => true,
+            'id' => $parent->id,
+            'name' => $parent->name,
+            'phone' => $parent->phone,
+            'address' => $parent->address,
+            'message' => 'Phụ huynh đã có sẵn.',
         ]);
     }
 
@@ -405,7 +498,11 @@ class StudentController extends Controller
             'ethnicity_custom' => ['nullable', 'string', 'max:100', 'required_if:ethnicity_choice,Khác'],
             'religion_choice' => ['nullable', Rule::in(['Không', 'Khác'])],
             'religion_custom' => ['nullable', 'string', 'max:100', 'required_if:religion_choice,Khác'],
-            'parent_phone' => ['nullable', 'string', 'max:50'],
+            'parent_phone' => ['nullable', 'string', 'max:50', function (string $attribute, mixed $value, \Closure $fail) {
+                if ($this->userPhoneConflictForParent((string) $value)) {
+                    $fail('Thông tin này đã tồn tại trong hệ thống, vui lòng kiểm tra lại!');
+                }
+            }],
             'enrollment_date' => ['required', 'date'],
             'admission_type' => ['required', Rule::in(array_keys(Student::admissionTypeLabels()))],
             'previous_school' => ['nullable', 'string', 'max:255'],
@@ -456,7 +553,11 @@ class StudentController extends Controller
         return $request->validate([
             'parent_name' => ['required', 'string', 'max:255'],
             'parent_relation' => ['required', Rule::in(array_keys(ParentProfile::relationLabels()))],
-            'parent_phone' => ['required', 'string', 'max:50'],
+            'parent_phone' => ['required', 'string', 'max:50', function (string $attribute, mixed $value, \Closure $fail) {
+                if ($this->userPhoneConflictForParent((string) $value)) {
+                    $fail('Thông tin này đã tồn tại trong hệ thống, vui lòng kiểm tra lại!');
+                }
+            }],
             'parent_address' => ['nullable', 'string', 'max:255'],
         ], [], [
             'parent_name' => 'họ tên phụ huynh',
@@ -476,7 +577,11 @@ class StudentController extends Controller
         $validated = $request->validate([
             'parent_name' => ['nullable', 'string', 'max:255'],
             'parent_relation' => ['nullable', Rule::in(array_keys(ParentProfile::relationLabels()))],
-            'parent_phone' => ['nullable', 'string', 'max:50'],
+            'parent_phone' => ['nullable', 'string', 'max:50', function (string $attribute, mixed $value, \Closure $fail) {
+                if ($this->userPhoneConflictForParent((string) $value)) {
+                    $fail('Thông tin này đã tồn tại trong hệ thống, vui lòng kiểm tra lại!');
+                }
+            }],
             'parent_address' => ['nullable', 'string', 'max:255'],
         ], [], [
             'parent_name' => 'họ tên phụ huynh',
@@ -503,21 +608,20 @@ class StudentController extends Controller
             return;
         }
 
-        $parent = ParentProfile::where('phone', $phone)->first();
-
-        if (! $parent) {
-            $parent = ParentProfile::create([
+        $parent = ParentProfile::firstOrCreate(
+            ['phone' => $phone],
+            [
                 'parent_code' => $this->generateParentCode(),
                 'name' => $parentData['name'],
                 'phone' => $phone,
                 'address' => $parentData['address'] ?? null,
-            ]);
-        } else {
-            $parent->fill([
-                'name' => $parent->name ?: $parentData['name'],
-                'address' => $parent->address ?: ($parentData['address'] ?? null),
-            ])->save();
-        }
+            ]
+        );
+
+        $parent->fill([
+            'name' => $parent->name ?: $parentData['name'],
+            'address' => $parent->address ?: ($parentData['address'] ?? null),
+        ])->save();
 
         $parent->students()->syncWithoutDetaching([
             $student->id => ['relation' => $parentData['relation'] ?? ParentProfile::RELATION_GUARDIAN],
@@ -532,11 +636,34 @@ class StudentController extends Controller
             return;
         }
 
+        $conflict = User::where(function ($query) use ($parent) {
+                $query->where('username', $parent->phone)
+                    ->orWhere('phone', $parent->phone);
+            })
+            ->where(function ($query) use ($parent) {
+                $query->where('role', '!=', 'parent')
+                    ->orWhere(function ($parentQuery) use ($parent) {
+                        $parentQuery->where('role', 'parent')
+                            ->whereNotNull('parent_id')
+                            ->where('parent_id', '!=', $parent->id);
+                    });
+            })
+            ->first();
+
+        if ($conflict) {
+            throw ValidationException::withMessages([
+                'parent_phone' => 'Thông tin này đã tồn tại trong hệ thống, vui lòng kiểm tra lại!',
+            ]);
+        }
+
         $user = $parent->user ?: User::where('username', $parent->phone)->where('role', 'parent')->first();
 
         if (! $user) {
             User::create([
                 'username' => $parent->phone,
+                'full_name' => $parent->name,
+                'phone' => $parent->phone,
+                'email' => $parent->email,
                 'role' => 'parent',
                 'parent_id' => $parent->id,
                 'password_hash' => Hash::make('12345678'),
@@ -553,9 +680,37 @@ class StudentController extends Controller
 
         $user->update([
             'username' => $parent->phone,
+            'full_name' => $parent->name,
+            'phone' => $parent->phone,
+            'email' => $parent->email,
             'role' => 'parent',
             'parent_id' => $parent->id,
         ]);
+    }
+
+    private function userPhoneConflictForParent(string $phone): bool
+    {
+        $phone = trim($phone);
+
+        if ($phone === '') {
+            return false;
+        }
+
+        $parent = ParentProfile::where('phone', $phone)->first();
+
+        return User::where(function ($query) use ($phone) {
+                $query->where('username', $phone)
+                    ->orWhere('phone', $phone);
+            })
+            ->where(function ($query) use ($parent) {
+                $query->where('role', '!=', 'parent')
+                    ->orWhere(function ($parentQuery) use ($parent) {
+                        $parentQuery->where('role', 'parent')
+                            ->whereNotNull('parent_id')
+                            ->when($parent, fn ($inner) => $inner->where('parent_id', '!=', $parent->id));
+                    });
+            })
+            ->exists();
     }
 
     private function generateParentCode(): string
@@ -638,13 +793,21 @@ class StudentController extends Controller
 
     private function createStudentUser(Student $student): void
     {
-        User::create([
-            'username' => $student->student_code,
+        $user = User::firstOrNew(['username' => $student->student_code]);
+
+        $user->fill([
+            'full_name' => $student->name,
+            'phone' => $student->parent_phone,
             'role' => 'student',
             'student_id' => $student->id,
-            'password_hash' => Hash::make($student->student_code),
-            'is_active' => 1,
+            'is_active' => $student->status === Student::STATUS_STUDYING,
         ]);
+
+        if (! $user->exists) {
+            $user->password_hash = Hash::make($student->student_code);
+        }
+
+        $user->save();
     }
 
     private function storeAvatar(Request $request, ?Student $student = null): ?string

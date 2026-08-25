@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Auth\AuthController;
+use App\Http\Controllers\Api\ChatbotApiController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/chatbot/query', [ChatbotApiController::class, 'handleQuery']);
 
 Route::prefix('v1')
     ->as('api.v1.')

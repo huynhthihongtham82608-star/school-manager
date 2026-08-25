@@ -106,6 +106,7 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::resource('teachers', TeacherController::class)->except(['show']);
         Route::get('students/import-template', [StudentController::class, 'importTemplate'])->name('students.import-template');
         Route::post('students/import', [StudentController::class, 'import'])->name('students.import');
+        Route::get('students/parent-lookup', [StudentController::class, 'lookupParent'])->name('students.parent-lookup');
         Route::patch('students/{student}/toggle-login', [StudentController::class, 'toggleLogin'])->name('students.toggle-login');
         Route::post('students/{student}/reset-password', [StudentController::class, 'resetPassword'])->name('students.reset-password');
         Route::resource('students', StudentController::class)->except(['show']);

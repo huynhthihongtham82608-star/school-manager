@@ -321,17 +321,29 @@
 
         .bulk-excel-toast {
             position: fixed;
-            right: 1rem;
-            bottom: 1rem;
-            z-index: 1070;
-            padding: .75rem 1rem;
+            top: 1.5rem;
+            left: 50%;
+            z-index: 9999;
+            display: inline-flex;
+            align-items: center;
+            gap: .625rem;
+            max-width: min(24rem, calc(100vw - 2rem));
+            padding: 1rem;
             border: 1px solid #fed7aa;
-            border-radius: 8px;
+            border-radius: 12px;
             color: #9a3412;
-            background: #fff7ed;
+            background: #fff7ed !important;
+            background-color: #fff7ed !important;
+            background-image: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            opacity: 1 !important;
+            isolation: isolate;
             box-shadow: 0 16px 34px rgba(15, 23, 42, .18);
             font-size: .92rem;
             font-weight: 400;
+            text-align: left;
+            transform: translateX(-50%);
         }
     </style>
     <script>
@@ -348,7 +360,11 @@
             const toast = (message) => {
                 const element = document.createElement('div');
                 element.className = 'bulk-excel-toast';
-                element.textContent = message;
+                const icon = document.createElement('span');
+                icon.textContent = '🟠';
+                const text = document.createElement('span');
+                text.textContent = message;
+                element.append(icon, text);
                 document.body.appendChild(element);
                 setTimeout(() => element.remove(), 2600);
             };

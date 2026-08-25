@@ -305,7 +305,7 @@
                         <td>
                             <div class="d-flex flex-column gap-1 text-left">
                                 <span class="text-sm font-normal text-gray-700">{{ $slotLabel }}</span>
-                                <span class="text-xs font-normal text-gray-500">{{ $subjectLabel }}</span>
+                                <span class="text-sm font-normal text-gray-500">{{ $subjectLabel }}</span>
                             </div>
                         </td>
                         <td>{{ $substitute->originalTeacher->name ?? '-' }}</td>
@@ -333,7 +333,7 @@
                                         data-status="{{ $substitute->status }}"
                                         data-note="{{ e($substitute->note) }}"
                                     >
-                                        <i class="bi bi-pencil-square"></i><span>Duyệt</span>
+                                        <i class="bi bi-pencil-square"></i><span>Sửa</span>
                                     </button>
                                     <form method="POST" action="{{ route('substitute-teachings.destroy', $substitute) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa lịch dạy thay này?');">
                                         @csrf
@@ -343,7 +343,7 @@
                                         </button>
                                     </form>
                                 @else
-                                    <span class="text-xs font-normal text-gray-400">Chỉ xem</span>
+                                    <span class="text-sm font-normal text-gray-400">Chỉ xem</span>
                                 @endif
                             </div>
                         </td>
@@ -368,7 +368,7 @@
         <div class="substitute-modal-card w-full max-w-md bg-white p-6 rounded-xl shadow-2xl flex flex-col gap-4 text-left border border-orange-100">
             <div class="w-full text-left">
                 <h2 id="substitute-modal-title" class="text-base font-semibold text-gray-900 text-left mb-1">Lịch dạy thay</h2>
-                <p class="text-xs font-normal text-orange-700/70 text-left mb-0">Chọn phạm vi, tiết học, giáo viên dạy thay và trạng thái duyệt.</p>
+                <p class="text-sm font-normal text-orange-700/70 text-left mb-0">Chọn phạm vi, tiết học, giáo viên dạy thay và trạng thái duyệt.</p>
             </div>
 
             @if($errors->any())
@@ -380,7 +380,7 @@
             @endif
 
             <div id="substitute-suggestions" class="substitute-suggestions-box mt-2 p-3 bg-orange-50/60 border border-orange-100 rounded-lg text-left w-full flex flex-col gap-2 d-none">
-                <div class="text-xs font-normal text-orange-900 text-left">💡 Gợi ý giáo viên cùng bộ môn đang trống tiết này:</div>
+                <div class="text-sm font-normal text-orange-900 text-left">💡 Gợi ý giáo viên cùng bộ môn đang trống tiết này:</div>
                 <div id="substitute-suggestion-list" class="w-full text-left"></div>
             </div>
 
@@ -524,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!teachers.length) {
             const empty = document.createElement('div');
-            empty.className = 'text-xs font-normal text-gray-500 text-left';
+            empty.className = 'text-sm font-normal text-gray-500 text-left';
             empty.textContent = 'Chưa tìm thấy giáo viên cùng bộ môn đang trống tiết này.';
             suggestionList.appendChild(empty);
         }
@@ -532,7 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
         teachers.forEach((teacher) => {
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = 'substitute-suggestion-btn text-xs font-normal text-orange-850 bg-white border border-orange-200 px-2 py-1 rounded-md hover:bg-orange-100 transition-all cursor-pointer inline-block mr-2';
+            button.className = 'substitute-suggestion-btn text-sm font-normal text-orange-850 bg-white border border-orange-200 px-2 py-1 rounded-md hover:bg-orange-100 transition-all cursor-pointer inline-block mr-2';
             button.textContent = `${teacher.teacher_code ? teacher.teacher_code + ' - ' : ''}${teacher.name}`;
             button.title = [teacher.subject, teacher.department].filter(Boolean).join(' • ');
             button.addEventListener('click', () => {
@@ -643,7 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-substitute-open-edit]').forEach((button) => {
         button.addEventListener('click', () => {
-            title.textContent = 'Duyệt lịch dạy thay';
+            title.textContent = 'Sửa lịch dạy thay';
             form.action = button.dataset.action;
             methodInput.disabled = false;
             ignoreInput.value = button.dataset.id || '';

@@ -153,7 +153,7 @@
             <button type="button" class="btn btn-primary" data-reward-open-create>
                 <i class="bi bi-plus-lg me-1"></i>Thêm quyết định mới
             </button>
-            <button type="button" class="bg-orange-100 text-orange-700 hover:bg-orange-200 border border-orange-300 px-3.5 py-2 rounded-lg text-xs md:text-sm font-normal cursor-pointer transition-all font-sans inline-flex items-center gap-1 ml-2" data-reward-scan>
+            <button type="button" class="bg-orange-100 text-orange-700 hover:bg-orange-200 border border-orange-300 px-3.5 py-2 rounded-lg text-sm font-normal cursor-pointer transition-all font-sans inline-flex items-center gap-1 ml-2" data-reward-scan>
                 🚀 Tự động quét danh hiệu
             </button>
         </div>
@@ -215,14 +215,14 @@
                         <td>{{ $reward->student->name ?? '-' }}</td>
                         <td>{{ $reward->classRoom->name ?? '-' }}</td>
                         <td>
-                            <span class="bg-orange-50 text-orange-700 border border-orange-100 text-xs font-normal px-2.5 py-0.5 rounded-full inline-flex items-center">
+                            <span class="bg-orange-50 text-orange-700 border border-orange-100 text-sm font-normal px-2.5 py-0.5 rounded-full inline-flex items-center">
                                 {{ $reward->typeLabel() }}
                             </span>
                         </td>
                         <td>
                             <div class="d-flex flex-column gap-1 text-left">
                                 <span class="text-sm font-normal text-gray-700">{{ $reward->decision_number ?: '-' }}</span>
-                                <span class="text-xs font-normal text-gray-500">{{ $reward->detail ?: '-' }}</span>
+                                <span class="text-sm font-normal text-gray-500">{{ $reward->detail ?: '-' }}</span>
                             </div>
                         </td>
                         <td>
@@ -250,7 +250,7 @@
                                         </button>
                                     </form>
                                 @else
-                                    <span class="text-xs font-normal text-gray-400">Chỉ xem</span>
+                                    <span class="text-sm font-normal text-gray-400">Chỉ xem</span>
                                 @endif
                             </div>
                         </td>
@@ -275,7 +275,7 @@
         <div class="w-full max-w-md bg-white p-6 rounded-xl shadow-2xl flex flex-col gap-4 text-left border border-orange-100">
             <div class="w-full text-left">
                 <h2 id="reward-modal-title" class="text-base font-semibold text-gray-900 text-left mb-1">Khen thưởng</h2>
-                <p class="text-xs font-normal text-orange-700/70 text-left mb-0">Cập nhật quyết định khen thưởng rồi lưu về hệ thống.</p>
+                <p class="text-sm font-normal text-orange-700/70 text-left mb-0">Cập nhật quyết định khen thưởng rồi lưu về hệ thống.</p>
             </div>
 
             <form id="reward-form" method="POST" action="{{ route('rewards.store') }}" class="flex flex-col gap-3 text-left">

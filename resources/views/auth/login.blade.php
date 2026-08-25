@@ -90,15 +90,40 @@
                 <div class="text-muted small">Quản lý trường THPT</div>
             </div>
             @include('partials.flash')
-            <form method="POST" action="{{ route('login.perform') }}">
+            <form method="POST" action="{{ route('login.perform') }}" autocomplete="off" data-login-form>
                 @csrf
+                <input type="text" name="fake_username" tabindex="-1" autocomplete="off" class="d-none" aria-hidden="true">
+                <input type="password" name="fake_password" tabindex="-1" autocomplete="new-password" class="d-none" aria-hidden="true">
                 <div class="mb-3">
                     <label class="form-label">Tên đăng nhập</label>
-                    <input type="text" name="username" class="form-control" value="{{ old('username') }}" required autofocus autocomplete="username">
+                    <input
+                        type="text"
+                        name="username"
+                        class="form-control"
+                        value=""
+                        required
+                        autofocus
+                        autocomplete="new-password"
+                        autocapitalize="off"
+                        autocorrect="off"
+                        spellcheck="false"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-login-username
+                    >
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Mật khẩu</label>
-                    <input type="password" name="password" class="form-control" required autocomplete="current-password">
+                    <input
+                        type="password"
+                        name="password"
+                        class="form-control"
+                        required
+                        autocomplete="new-password"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-login-password
+                    >
                 </div>
                 <button class="btn btn-primary w-100"><i class="bi bi-box-arrow-in-right me-1"></i>Đăng nhập</button>
             </form>
@@ -110,6 +135,22 @@
             if (event.persisted) {
                 window.location.reload();
             }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const form = document.querySelector('[data-login-form]');
+            const username = document.querySelector('[data-login-username]');
+            const password = document.querySelector('[data-login-password]');
+
+            if (username) {
+                username.value = '';
+            }
+
+            if (password) {
+                password.value = '';
+            }
+
+            form?.setAttribute('autocomplete', 'off');
         });
     </script>
 </body>

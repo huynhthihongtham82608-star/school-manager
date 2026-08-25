@@ -26,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -542,17 +543,43 @@ class BulkExcelController extends Controller
             }
 
             $code = trim((string) $this->rowValue($row, ['ma_hs', 'ma_hoc_sinh', 'student_code']));
+            $name = trim((string) $this->rowValue($row, ['ho_ten', 'ho_va_ten', 'name']));
+            $dob = $this->parseDate($this->rowValue($row, ['ngay_sinh', 'dob']));
+            $parentPhone = trim((string) $this->rowValue($row, ['sdt_phu_huynh', 'parent_phone']));
             $student = $code !== '' ? Student::where('student_code', $code)->first() : null;
+
+            if (! $student && $code === '' && $parentPhone === '' && $name !== '' && $dob) {
+                $sameIdentityDifferentClass = Student::where('name', $name)
+                    ->whereDate('dob', $dob)
+                    ->where('class_id', '!=', $class->id)
+                    ->first();
+
+                if ($sameIdentityDifferentClass) {
+                    Log::warning('Bulk Excel student duplicate warning', [
+                        'name' => $name,
+                        'dob' => $dob,
+                        'import_class_id' => $class->id,
+                        'matched_student_id' => $sameIdentityDifferentClass->id,
+                        'matched_class_id' => $sameIdentityDifferentClass->class_id,
+                    ]);
+                }
+
+                $student = Student::where('name', $name)
+                    ->whereDate('dob', $dob)
+                    ->where('class_id', $class->id)
+                    ->first();
+            }
+
             $student ??= new Student(['student_code' => $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date']))]);
-            $student->fill([
-                'name' => trim((string) $this->rowValue($row, ['ho_ten', 'ho_va_ten', 'name'])),
-                'dob' => $this->parseDate($this->rowValue($row, ['ngay_sinh', 'dob'])),
+            $preserveExistingParent = $code === '' && $parentPhone === '' && $student->exists;
+            $studentData = [
+                'name' => $name,
+                'dob' => $dob,
                 'gender' => $this->normalizeGender($this->rowValue($row, ['gioi_tinh', 'gender'], 'Nam')),
                 'address' => trim((string) $this->rowValue($row, ['dia_chi', 'dia_chi_thuong_tru', 'address'])) ?: null,
                 'place_of_birth' => trim((string) $this->rowValue($row, ['noi_sinh', 'place_of_birth'])) ?: null,
                 'ethnicity' => trim((string) $this->rowValue($row, ['dan_toc', 'ethnicity'])) ?: null,
                 'religion' => trim((string) $this->rowValue($row, ['ton_giao', 'religion'])) ?: null,
-                'parent_phone' => trim((string) $this->rowValue($row, ['sdt_phu_huynh', 'parent_phone'])) ?: null,
                 'email' => trim((string) $this->rowValue($row, ['email'])) ?: null,
                 'class_id' => $class->id,
                 'school_year_id' => $class->school_year_id,
@@ -563,7 +590,13 @@ class BulkExcelController extends Controller
                 'previous_class' => trim((string) $this->rowValue($row, ['previous_class', 'lop_cu'])) ?: null,
                 'note' => trim((string) $this->rowValue($row, ['note', 'ghi_chu'])) ?: null,
                 'status' => $this->normalizeStudentStatus($this->rowValue($row, ['trang_thai', 'status'])),
-            ]);
+            ];
+
+            if (! $preserveExistingParent) {
+                $studentData['parent_phone'] = $parentPhone ?: null;
+            }
+
+            $student->fill($studentData);
             if (Schema::hasColumn('students', 'student_phone')) {
                 $student->setAttribute('student_phone', trim((string) $this->rowValue($row, ['sdt_hoc_sinh', 'student_phone', 'phone'])) ?: null);
             }
@@ -2018,7 +2051,10 @@ class BulkExcelController extends Controller
             ? ParentProfile::where('parent_code', $parentCode)->first()
             : ParentProfile::where('phone', $phone)->first();
 
-        return User::where('username', $phone)
+        return User::where(function ($query) use ($phone) {
+                $query->where('username', $phone)
+                    ->orWhere('phone', $phone);
+            })
             ->where(function ($query) use ($parent) {
                 $query->where('role', '!=', 'parent')
                     ->orWhere(function ($parentQuery) use ($parent) {
@@ -2031,18 +2067,22 @@ class BulkExcelController extends Controller
 
     private function ensureStudentUser(Student $student): void
     {
-        User::updateOrCreate(
-            ['username' => $student->student_code],
-            [
-                'full_name' => $student->name,
-                'email' => $student->email,
-                'phone' => $student->parent_phone,
-                'role' => 'student',
-                'student_id' => $student->id,
-                'password_hash' => Hash::make($student->student_code),
-                'is_active' => $student->status === Student::STATUS_STUDYING,
-            ]
-        );
+        $user = User::firstOrNew(['username' => $student->student_code]);
+
+        $user->fill([
+            'full_name' => $student->name,
+            'email' => $student->email,
+            'phone' => $student->parent_phone,
+            'role' => 'student',
+            'student_id' => $student->id,
+            'is_active' => $student->status === Student::STATUS_STUDYING,
+        ]);
+
+        if (! $user->exists) {
+            $user->password_hash = Hash::make($student->student_code);
+        }
+
+        $user->save();
     }
 
     private function ensureTeacherUser(Teacher $teacher): void
@@ -2067,7 +2107,10 @@ class BulkExcelController extends Controller
             return;
         }
 
-        $conflict = User::where('username', $parent->phone)
+        $conflict = User::where(function ($query) use ($parent) {
+                $query->where('username', $parent->phone)
+                    ->orWhere('phone', $parent->phone);
+            })
             ->where(function ($query) use ($parent) {
                 $query->where('role', '!=', 'parent')
                     ->orWhere(function ($parentQuery) use ($parent) {

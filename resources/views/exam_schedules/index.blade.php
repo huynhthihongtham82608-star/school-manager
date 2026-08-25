@@ -339,7 +339,7 @@
                     <td>{{ optional($schedule->exam_date)->format('d/m/Y') }}</td>
                     <td>{{ $schedule->timeRange() }}</td>
                     <td>{{ $schedule->room ?: 'Đang cập nhật' }}</td>
-                    <td>
+                    <td class="text-end">
                         <span class="badge {{ $schedule->scoreInputBadgeClass() }}">{{ $schedule->scoreInputStatusLabel() }}</span>
                         <div class="text-muted small">
                             {{ optional($schedule->score_input_opens_at)->format('d/m/Y') ?: 'Chưa đặt' }}
@@ -349,27 +349,54 @@
                     </td>
                     <td><span class="badge {{ $statusClass($schedule) }}">{{ $schedule->statusLabel() }}</span></td>
                     <td>
-                        <div class="content-action-group justify-content-end">
+                        <div class="content-action-group justify-content-end" data-action-synced="true">
                             @if($canSyncThisExam)
-                                <button type="button" class="exam-score-sync-btn" data-bs-toggle="modal" data-bs-target="#{{ $scoreInputId }}" title="Nhập điểm và đồng bộ sổ điểm" aria-label="Nhập điểm và đồng bộ sổ điểm">
+                                <button type="button" class="exam-score-sync-btn d-none" data-bs-toggle="modal" data-bs-target="#{{ $scoreInputId }}" title="Nhập điểm và đồng bộ sổ điểm" aria-label="Nhập điểm và đồng bộ sổ điểm" aria-hidden="true">
                                     <i class="bi bi-journal-check"></i>
                                 </button>
                             @endif
-                            <button type="button" class="content-action-btn icon-only detail" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}" title="Xem chi tiết" aria-label="Xem chi tiết">
+                            <button type="button" class="content-action-btn icon-only detail d-none" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}" title="Xem chi tiết" aria-label="Xem chi tiết" aria-hidden="true">
                                 <i class="bi bi-eye"></i><span class="visually-hidden">Xem chi tiết</span>
                             </button>
                             @if($canManageSchedules)
-                                <button type="button" class="content-action-btn icon-only edit" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa">
+                                <button type="button" class="content-action-btn icon-only edit d-none" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa" aria-hidden="true">
                                     <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                 </button>
                                 <form method="POST" action="{{ route('exam-schedules.destroy', $schedule) }}">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="content-action-btn icon-only delete" title="Xóa" aria-label="Xóa" data-bs-toggle="tooltip">
+                                    <button type="submit" class="content-action-btn icon-only delete d-none" title="Xóa" aria-label="Xóa" data-bs-toggle="tooltip" aria-hidden="true">
                                         <i class="bi bi-trash"></i><span class="visually-hidden">Xóa</span>
                                     </button>
                                 </form>
                             @endif
+                            <div class="dropdown">
+                                <button type="button" class="content-action-btn icon-only dropdown-toggle-clean more" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end content-action-menu">
+                                    @if($canSyncThisExam)
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $scoreInputId }}">
+                                            <i class="bi bi-journal-check"></i>Nhập điểm
+                                        </button>
+                                    @endif
+                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}">
+                                        <i class="bi bi-eye"></i>Xem chi tiết
+                                    </button>
+                                    @if($canManageSchedules)
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $editId }}">
+                                            <i class="bi bi-pencil-square"></i>Sửa thông tin
+                                        </button>
+                                        <form method="POST" action="{{ route('exam-schedules.destroy', $schedule) }}">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="dropdown-item danger">
+                                                <i class="bi bi-trash"></i>Xóa bỏ
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </div>
                         </div>
                     </td>
                 </tr>

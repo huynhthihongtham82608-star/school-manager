@@ -12,8 +12,8 @@
 @endphp
 
 <x-page-header
-    title="Cấu hình nội dung hệ thống"
-    subtitle="Quản lý giao diện trang chủ, biên tập các bài viết tin tức, chỉnh sửa thư viện ảnh và thông tin hiển thị trên cổng thông tin nhà trường."
+    title="Diện mạo trường"
+    subtitle="Quản lý định danh, logo, banner và nội dung giới thiệu hiển thị xuyên suốt hệ thống."
 >
     <a href="{{ route('home') }}" class="btn btn-outline-primary" target="_blank" rel="noopener">
         <i class="bi bi-box-arrow-up-right me-2"></i>Xem trang chủ
@@ -52,7 +52,7 @@
                 <label class="form-label">Hình ảnh Banner / Slider</label>
                 <input type="hidden" name="banner_image_url" value="{{ $bannerImageUrl }}">
                 <input type="file" name="banner_image_file" accept="image/*" class="form-control" data-banner-file>
-                <div class="form-text text-xs text-gray-500 mt-1">Hỗ trợ hình ảnh định dạng JPG, PNG, WEBP. Tối đa 20MB.</div>
+                <div class="form-text text-base text-gray-500 mt-1">Hỗ trợ hình ảnh định dạng JPG, PNG, WEBP. Tối đa 20MB.</div>
                 <div class="home-banner-preview {{ $bannerImagePreviewUrl ? '' : 'is-empty' }}" data-banner-preview>
                     @if($bannerImagePreviewUrl)
                         <img src="{{ $bannerImagePreviewUrl }}" alt="Banner hiện tại">
@@ -186,8 +186,8 @@
             const showHomepageToast = (message, type = 'success') => {
                 const toast = document.createElement('div');
                 toast.className = `homepage-config-toast ${type === 'success' ? 'success' : 'error'}`;
-                const icon = document.createElement('i');
-                icon.className = `bi ${type === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'}`;
+                const icon = document.createElement('span');
+                icon.textContent = type === 'success' ? '🟢' : '🔴';
                 const text = document.createElement('span');
                 text.textContent = message;
                 toast.append(icon, text);

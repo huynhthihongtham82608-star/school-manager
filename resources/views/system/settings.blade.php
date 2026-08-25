@@ -68,7 +68,7 @@
     .appearance-card-title {
         color: #111827;
         font-size: 1rem;
-        font-weight: 600;
+        font-weight: 400;
         margin: 0;
         text-align: left;
     }
@@ -173,11 +173,6 @@
     <div id="school-appearance-layout" class="w-full flex flex-row gap-6 items-start justify-between text-left">
         <div class="w-[65%] flex flex-col gap-6" data-appearance-left>
             <section class="appearance-card bg-white border border-orange-100 p-5 rounded-xl shadow-2xs text-left w-full">
-                <div class="w-full text-left mb-5">
-                    <h2 class="appearance-card-title">Định danh & Liên hệ</h2>
-                    <p class="appearance-card-subtitle">Thông tin nhận diện và kênh liên hệ chính thức của nhà trường.</p>
-                </div>
-
                 <div class="appearance-field-grid grid grid-cols-2 gap-4">
                     <div class="appearance-field text-left">
                         <label for="school_name" class="form-label">Tên trường</label>

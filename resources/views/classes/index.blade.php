@@ -189,11 +189,6 @@
                     <td><span class="class-status-pill {{ $statusVisual['class'] }}">{{ $statusVisual['label'] }}</span></td>
                     <td class="text-end">
                         <div class="content-action-group justify-content-end" data-action-synced="true">
-                            @if(! $readOnly && $class->canEdit())
-                                <button type="button" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="modal" data-bs-target="#editClass{{ $class->id }}">
-                                    <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
-                                </button>
-                            @endif
                             <div class="dropdown">
                                 <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
                                     <i class="bi bi-three-dots-vertical"></i>
@@ -201,25 +196,18 @@
                                 <ul class="dropdown-menu dropdown-menu-end content-action-menu class-action-menu">
                                     <li>
                                         <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#classDetail{{ $class->id }}">
-                                            <i class="bi bi-eye"></i>Xem chi tiết & Học sinh
+                                            <i class="bi bi-eye"></i>Xem chi tiết
                                         </button>
                                     </li>
                                     @if(! $readOnly)
-                                        <li>
-                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#transferStudents{{ $class->id }}">
-                                                <i class="bi bi-arrow-left-right"></i>Chuyển lớp học sinh
-                                            </button>
-                                        </li>
-                                        @if($class->isDraft())
+                                        @if($class->canEdit())
                                             <li>
-                                                <form action="{{ route('classes.activate', $class) }}" method="POST">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <button type="submit" class="dropdown-item">
-                                                        <i class="bi bi-unlock"></i>Kích hoạt hoạt động
-                                                    </button>
-                                                </form>
+                                                <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#editClass{{ $class->id }}">
+                                                    <i class="bi bi-pencil-square"></i>Sửa thông tin
+                                                </button>
                                             </li>
+                                        @else
+                                            <li><span class="dropdown-item text-muted"><i class="bi bi-pencil-square"></i>Sửa thông tin</span></li>
                                         @endif
                                         @if($class->canLock() && ! $class->isLocked())
                                             <li>
@@ -227,7 +215,7 @@
                                                     @csrf
                                                     @method('PATCH')
                                                     <button type="submit" class="dropdown-item">
-                                                        <i class="bi bi-lock"></i>Khóa / Lưu trữ lớp
+                                                        <i class="bi bi-lock"></i>Khóa lớp
                                                     </button>
                                                 </form>
                                             </li>
@@ -237,12 +225,12 @@
                                                     @csrf
                                                     @method('PATCH')
                                                     <button type="submit" class="dropdown-item">
-                                                        <i class="bi bi-archive"></i>Khóa / Lưu trữ lớp
+                                                        <i class="bi bi-archive"></i>Lưu trữ lớp
                                                     </button>
                                                 </form>
                                             </li>
                                         @else
-                                            <li><span class="dropdown-item text-muted"><i class="bi bi-lock"></i>Khóa / Lưu trữ lớp</span></li>
+                                            <li><span class="dropdown-item text-muted"><i class="bi bi-lock"></i>Khóa lớp</span></li>
                                         @endif
                                         @if($deleteCheck['allowed'])
                                             <li>
@@ -250,12 +238,12 @@
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item danger">
-                                                        <i class="bi bi-trash"></i>Xóa lớp
+                                                        <i class="bi bi-trash"></i>Xóa bỏ
                                                     </button>
                                                 </form>
                                             </li>
                                         @else
-                                            <li><span class="dropdown-item text-muted"><i class="bi bi-trash"></i>Xóa lớp</span></li>
+                                            <li><span class="dropdown-item text-muted"><i class="bi bi-trash"></i>Xóa bỏ</span></li>
                                         @endif
                                     @else
                                         <li><span class="dropdown-item text-muted">Chỉ xem</span></li>

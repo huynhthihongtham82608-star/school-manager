@@ -290,15 +290,15 @@
         'selectedParentStudent' => $selectedParentStudent,
     ])
 @else
-    <div class="{{ $user->isTeacher() ? 'w-full col-span-full bg-white border border-orange-100 p-5 rounded-xl shadow-xs text-left mb-3 teacher-portal-hero' : 'role-hero mb-3' }}">
-        <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
-            <div>
+    <div class="{{ $user->isTeacher() ? 'w-full col-span-full bg-white border border-orange-100 p-5 rounded-xl shadow-xs text-left mb-3 teacher-portal-hero overflow-hidden' : 'role-hero mb-3' }}">
+        <div class="d-flex flex-column flex-lg-row align-items-start justify-content-between gap-3 w-100 text-left">
+            <div class="min-w-0 flex-grow-1 text-left">
                 <h5 class="role-hero-title">Xin chào, {{ $user->display_name }}</h5>
                 <div class="role-hero-meta">
                     {{ $user->isTeacher() ? 'Hệ thống quản lý học vụ giảng dạy' : $roleLabel . ' · Truy cập nhanh các chức năng thường dùng' }}
                 </div>
             </div>
-            <span class="badge badge-role align-self-start">{{ $roleLabel }}</span>
+            <span class="badge badge-role align-self-start flex-shrink-0 whitespace-normal text-left max-w-full">{{ $roleLabel }}</span>
         </div>
     </div>
 

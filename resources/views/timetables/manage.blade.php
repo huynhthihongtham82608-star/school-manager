@@ -442,21 +442,33 @@
 
     .scheduler-toast {
         position: fixed;
-        right: 1rem;
-        bottom: 1rem;
-        z-index: 1080;
-        min-width: 280px;
+        top: 1.5rem;
+        left: 50%;
+        z-index: 9999;
+        display: inline-flex;
+        align-items: center;
+        gap: .625rem;
+        width: min(24rem, calc(100vw - 2rem));
         border: 1px solid #fed7aa;
-        border-radius: 8px;
+        border-radius: 12px;
         color: #9a3412;
-        background: #fff7ed;
+        background: #fff7ed !important;
+        background-color: #fff7ed !important;
+        background-image: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        opacity: 1 !important;
+        isolation: isolate;
         box-shadow: 0 18px 42px rgba(15, 23, 42, .14);
+        text-align: left;
+        transform: translateX(-50%);
     }
 
     .scheduler-toast.is-error {
         border-color: #fecaca;
         color: #991b1b;
-        background: #fef2f2;
+        background: #fef2f2 !important;
+        background-color: #fef2f2 !important;
     }
 </style>
 
@@ -685,7 +697,11 @@
                 const toast = document.createElement('div');
                 toast.className = `scheduler-toast p-3 ${isError ? 'is-error' : ''}`;
                 toast.setAttribute('role', 'status');
-                toast.textContent = message;
+                const icon = document.createElement('span');
+                icon.textContent = isError ? '🔴' : '🟠';
+                const text = document.createElement('span');
+                text.textContent = message;
+                toast.append(icon, text);
                 document.body.appendChild(toast);
                 window.setTimeout(() => toast.remove(), 3600);
             };

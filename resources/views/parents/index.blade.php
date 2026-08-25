@@ -42,10 +42,10 @@
                     $loginLocked = (int) ($parent->user?->login_status ?? 1) !== 1;
                 @endphp
                 <tr>
-                    <td class="fw-semibold">{{ $parent->parent_code ?: 'Chưa có mã' }}</td>
+                    <td class="fw-normal">{{ $parent->parent_code ?: 'Chưa có mã' }}</td>
                     <td>
-                        <div class="fw-semibold d-flex align-items-center gap-1.5 text-left">
-                            <span class="{{ $loginLocked ? 'text-red-600' : 'text-green-600' }} text-xs leading-none">{{ $loginLocked ? '🔴' : '🟢' }}</span>
+                        <div class="fw-normal d-flex align-items-center gap-1.5 text-left">
+                            <span class="{{ $loginLocked ? 'text-red-600' : 'text-green-600' }} text-sm leading-none">{{ $loginLocked ? '🔴' : '🟢' }}</span>
                             <span>{{ $parent->name }}</span>
                         </div>
                         <div class="text-muted small">{{ $parent->phone ?: 'Chưa cập nhật số điện thoại' }}</div>
@@ -65,19 +65,24 @@
                             <span class="badge bg-secondary">Chưa kích hoạt</span>
                         @endif
                     </td>
-                    <td class="text-end">
-                        <div class="content-action-group justify-content-end">
-                            <button type="button" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="modal" data-bs-target="#parentEdit{{ $parent->id }}">
+                    <td class="text-end action-column text-right">
+                        <div class="content-action-group justify-content-end ms-auto w-100" data-action-synced="true">
+                            <button type="button" class="content-action-btn icon-only edit d-none" title="Sửa" aria-label="Sửa" data-bs-toggle="modal" data-bs-target="#parentEdit{{ $parent->id }}" aria-hidden="true">
                                 <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                             </button>
                             <div class="dropdown">
                                 <button class="content-action-btn icon-only" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
                                     <i class="bi bi-three-dots-vertical"></i>
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
+                                <ul class="dropdown-menu dropdown-menu-end content-action-menu">
                                     <li>
                                         <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#parentDetail{{ $parent->id }}">
                                             <i class="bi bi-eye me-2"></i>Xem chi tiết
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#parentEdit{{ $parent->id }}">
+                                            <i class="bi bi-pencil-square me-2"></i>Sửa thông tin
                                         </button>
                                     </li>
                                     <li>
@@ -230,7 +235,7 @@
                                 <tbody>
                                     @forelse($parent->students as $student)
                                         <tr>
-                                            <td class="fw-semibold">{{ $student->student_code }}</td>
+                                            <td class="fw-normal">{{ $student->student_code }}</td>
                                             <td>{{ $student->name }}</td>
                                             <td>{{ $student->classRoom?->name ?? '-' }}</td>
                                         </tr>

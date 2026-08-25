@@ -1900,31 +1900,42 @@
 
 .score-column-toast {
     position: fixed;
-    top: 92px;
-    right: 24px;
-    z-index: 1100;
-    max-width: 360px;
-    padding: .78rem 1rem;
+    top: 1.5rem;
+    left: 50%;
+    z-index: 9999;
+    display: inline-flex;
+    max-width: min(24rem, calc(100vw - 2rem));
+    align-items: center;
+    gap: .625rem;
+    padding: 1rem;
     border-radius: 14px;
-    border: 1px solid #fed7aa;
-    background: #fff7ed;
-    color: #9a3412;
+    border: 1px solid #bbf7d0;
+    background: #f0fdf4 !important;
+    background-color: #f0fdf4 !important;
+    background-image: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    color: #166534;
     box-shadow: 0 18px 45px rgba(154, 52, 18, .16);
     font-size: .92rem;
-    font-weight: 800;
-    opacity: 0;
-    transform: translateY(-8px);
+    font-weight: 400;
+    text-align: left;
+    opacity: 1 !important;
+    isolation: isolate;
+    transform: translate(-50%, -8px);
     transition: opacity .2s ease, transform .2s ease;
 }
 
 .score-column-toast.show {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0);
 }
 
 .score-column-toast.error {
     border-color: #fecaca;
-    background: #fef2f2;
+    background: #fef2f2 !important;
+    background-color: #fef2f2 !important;
+    background-image: none !important;
     color: #b91c1c;
 }
 
@@ -13347,34 +13358,42 @@ form.card > .mt-3 .btn-primary {
 
 .homepage-config-toast {
     position: fixed;
-    right: 1.25rem;
-    bottom: 1.25rem;
-    z-index: 1080;
+    top: 1.5rem;
+    left: 50%;
+    z-index: 9999;
     display: inline-flex;
     max-width: min(420px, calc(100vw - 2rem));
     align-items: center;
     gap: .65rem;
-    padding: .85rem 1rem;
-    border: 1px solid rgba(var(--sm-primary-rgb), .22);
+    padding: 1rem;
+    border: 1px solid #bbf7d0;
     border-radius: 14px;
-    background: #FFF7ED;
-    color: var(--sm-primary-strong);
+    background: #f0fdf4 !important;
+    background-color: #f0fdf4 !important;
+    background-image: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    color: #166534;
     font-size: .94rem;
-    font-weight: 800;
+    font-weight: 400;
+    text-align: left;
     box-shadow: 0 18px 40px rgba(15, 23, 42, .18);
-    opacity: 0;
-    transform: translateY(10px);
+    opacity: 1 !important;
+    isolation: isolate;
+    transform: translate(-50%, -10px);
     transition: opacity .18s ease, transform .18s ease;
 }
 
 .homepage-config-toast.show {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0);
 }
 
 .homepage-config-toast.error {
     border-color: #FECACA;
-    background: #FEF2F2;
+    background: #fef2f2 !important;
+    background-color: #fef2f2 !important;
+    background-image: none !important;
     color: #B91C1C;
 }
 
@@ -14494,4 +14513,875 @@ input[type="search"].form-control:focus {
 .assignment-class-period-tag strong {
     color: #c2410c;
     font-weight: 800;
+}
+
+/* Admin flat design-system sync */
+body.role-admin .content,
+body.role-staff .content {
+    font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-weight: 400;
+    color: #374151;
+    text-align: left;
+}
+
+body.role-admin .content *,
+body.role-staff .content * {
+    text-align: left;
+}
+
+body.role-admin .content .fw-bold,
+body.role-staff .content .fw-bold,
+body.role-admin .content .font-bold,
+body.role-staff .content .font-bold {
+    font-weight: 400 !important;
+}
+
+body.role-admin .content .card,
+body.role-staff .content .card,
+body.role-admin .content .admin-flat-card,
+body.role-staff .content .admin-flat-card {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid #ffedd5;
+    border-radius: 12px;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, .03);
+    text-align: left;
+    margin-bottom: 1.5rem;
+}
+
+body.role-admin .content .table-responsive,
+body.role-staff .content .table-responsive,
+body.role-admin .content .admin-table-wrap,
+body.role-staff .content .admin-table-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    border-radius: 12px;
+}
+
+body.role-admin .content table.table,
+body.role-staff .content table.table,
+body.role-admin .content .admin-flat-table,
+body.role-staff .content .admin-flat-table {
+    width: 100%;
+    max-width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    color: #374151;
+    font-size: .875rem;
+    font-weight: 400;
+    text-align: left;
+}
+
+body.role-admin .content table.table thead,
+body.role-staff .content table.table thead,
+body.role-admin .content .admin-flat-table thead,
+body.role-staff .content .admin-flat-table thead {
+    background: rgba(255, 247, 237, .72);
+    color: #431407;
+    border-bottom: 1px solid rgba(254, 215, 170, .7);
+}
+
+body.role-admin .content table.table thead th,
+body.role-staff .content table.table thead th,
+body.role-admin .content .admin-flat-table thead th,
+body.role-staff .content .admin-flat-table thead th {
+    padding: .75rem;
+    color: #431407;
+    font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: .875rem;
+    font-weight: 500;
+    text-align: left !important;
+    vertical-align: middle;
+    white-space: normal;
+    border-bottom: 1px solid rgba(254, 215, 170, .7);
+}
+
+body.role-admin .content table.table tbody td,
+body.role-staff .content table.table tbody td,
+body.role-admin .content .admin-flat-table tbody td,
+body.role-staff .content .admin-flat-table tbody td {
+    padding: .75rem;
+    color: #374151;
+    font-size: .875rem;
+    font-weight: 400;
+    text-align: left !important;
+    vertical-align: middle;
+    white-space: normal;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+body.role-admin .content table.table tbody tr:nth-child(even),
+body.role-staff .content table.table tbody tr:nth-child(even),
+body.role-admin .content .admin-flat-table tbody tr:nth-child(even),
+body.role-staff .content .admin-flat-table tbody tr:nth-child(even) {
+    background: rgba(255, 247, 237, .18);
+}
+
+body.role-admin .content table.table tbody tr:hover,
+body.role-staff .content table.table tbody tr:hover,
+body.role-admin .content .admin-flat-table tbody tr:hover,
+body.role-staff .content .admin-flat-table tbody tr:hover {
+    background: rgba(255, 247, 237, .42);
+}
+
+body.role-admin .content .content-action-group,
+body.role-staff .content .content-action-group,
+body.role-admin .content .evaluation-action-group,
+body.role-staff .content .evaluation-action-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start !important;
+    gap: .4rem;
+    text-align: left;
+    flex-wrap: nowrap;
+}
+
+body.role-admin .content .content-action-group form,
+body.role-staff .content .content-action-group form,
+body.role-admin .content .evaluation-action-group form,
+body.role-staff .content .evaluation-action-group form {
+    margin: 0;
+}
+
+body.role-admin .content .content-action-btn,
+body.role-staff .content .content-action-btn,
+body.role-admin .content .tuition-action-btn,
+body.role-staff .content .tuition-action-btn,
+body.role-admin .content .substitute-action-btn,
+body.role-staff .content .substitute-action-btn {
+    min-height: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: .25rem;
+    padding: .375rem .625rem;
+    border-radius: 8px;
+    font-size: .8125rem;
+    font-weight: 400;
+    line-height: 1.2;
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    box-shadow: none;
+    transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+    transform: none;
+}
+
+body.role-admin .content .content-action-btn:hover,
+body.role-staff .content .content-action-btn:hover,
+body.role-admin .content .content-action-btn:focus,
+body.role-staff .content .content-action-btn:focus,
+body.role-admin .content .tuition-action-btn:hover,
+body.role-staff .content .tuition-action-btn:hover,
+body.role-admin .content .substitute-action-btn:hover,
+body.role-staff .content .substitute-action-btn:hover {
+    box-shadow: none;
+    transform: none;
+    outline: 0;
+}
+
+body.role-admin .content .content-action-btn.icon-only,
+body.role-staff .content .content-action-btn.icon-only,
+body.role-admin .content .content-action-btn.more,
+body.role-staff .content .content-action-btn.more {
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    color: #9a3412 !important;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+}
+
+body.role-admin .content .content-action-btn.edit,
+body.role-staff .content .content-action-btn.edit,
+body.role-admin .content .tuition-action-btn,
+body.role-staff .content .tuition-action-btn,
+body.role-admin .content .substitute-action-btn.edit,
+body.role-staff .content .substitute-action-btn.edit,
+body.role-admin .content .evaluation-action-group button:not(.delete-row-btn),
+body.role-staff .content .evaluation-action-group button:not(.delete-row-btn) {
+    color: #c2410c !important;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+}
+
+body.role-admin .content .content-action-btn.edit:hover,
+body.role-staff .content .content-action-btn.edit:hover,
+body.role-admin .content .tuition-action-btn:hover,
+body.role-staff .content .tuition-action-btn:hover,
+body.role-admin .content .substitute-action-btn.edit:hover,
+body.role-staff .content .substitute-action-btn.edit:hover,
+body.role-admin .content .evaluation-action-group button:not(.delete-row-btn):hover,
+body.role-staff .content .evaluation-action-group button:not(.delete-row-btn):hover {
+    color: #9a3412 !important;
+    background: #ffedd5;
+}
+
+body.role-admin .content .content-action-btn.delete,
+body.role-staff .content .content-action-btn.delete,
+body.role-admin .content .substitute-action-btn.delete,
+body.role-staff .content .substitute-action-btn.delete,
+body.role-admin .content .delete-row-btn,
+body.role-staff .content .delete-row-btn {
+    color: #b91c1c !important;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+}
+
+body.role-admin .content .content-action-btn.delete:hover,
+body.role-staff .content .content-action-btn.delete:hover,
+body.role-admin .content .substitute-action-btn.delete:hover,
+body.role-staff .content .substitute-action-btn.delete:hover,
+body.role-admin .content .delete-row-btn:hover,
+body.role-staff .content .delete-row-btn:hover {
+    color: #991b1b !important;
+    background: #fee2e2;
+}
+
+body.role-admin .content .btn-primary,
+body.role-staff .content .btn-primary,
+body.role-admin .content .btn-add,
+body.role-staff .content .btn-add,
+body.role-admin .content [data-open-create-modal],
+body.role-staff .content [data-open-create-modal] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .375rem;
+    color: #ffffff !important;
+    background: #ea580c !important;
+    border: 1px solid #ea580c !important;
+    border-radius: 10px;
+    padding: .5rem .875rem;
+    font-size: .875rem;
+    font-weight: 400;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background-color 150ms ease, border-color 150ms ease;
+    text-align: left;
+}
+
+body.role-admin .content .btn-primary:hover,
+body.role-staff .content .btn-primary:hover,
+body.role-admin .content .btn-add:hover,
+body.role-staff .content .btn-add:hover,
+body.role-admin .content [data-open-create-modal]:hover,
+body.role-staff .content [data-open-create-modal]:hover {
+    background: #c2410c !important;
+    border-color: #c2410c !important;
+}
+
+body.role-admin .content .content-action-menu,
+body.role-staff .content .content-action-menu,
+body.role-admin .content .dropdown-menu.content-action-menu,
+body.role-staff .content .dropdown-menu.content-action-menu {
+    min-width: 12rem;
+    padding: .35rem;
+    border: 1px solid #ffedd5;
+    border-radius: 10px;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, .14);
+    text-align: left;
+}
+
+body.role-admin .content .content-action-menu .dropdown-item,
+body.role-staff .content .content-action-menu .dropdown-item,
+body.role-admin .content .dropdown-menu .dropdown-item,
+body.role-staff .content .dropdown-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: .5rem;
+    width: 100%;
+    padding: .45rem .6rem;
+    color: #374151;
+    font-size: .875rem;
+    font-weight: 400;
+    text-align: left !important;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    white-space: nowrap;
+}
+
+body.role-admin .content .content-action-menu .dropdown-item:hover,
+body.role-staff .content .content-action-menu .dropdown-item:hover,
+body.role-admin .content .dropdown-menu .dropdown-item:hover,
+body.role-staff .content .dropdown-menu .dropdown-item:hover {
+    color: #9a3412;
+    background: #fff7ed;
+}
+
+body.role-admin .content .content-action-menu .dropdown-item.danger,
+body.role-staff .content .content-action-menu .dropdown-item.danger,
+body.role-admin .content .dropdown-menu .dropdown-item.text-danger,
+body.role-staff .content .dropdown-menu .dropdown-item.text-danger,
+body.role-admin .content .dropdown-menu .dropdown-item.delete,
+body.role-staff .content .dropdown-menu .dropdown-item.delete {
+    color: #b91c1c !important;
+}
+
+body.role-admin .content .content-action-menu .dropdown-item.danger:hover,
+body.role-staff .content .content-action-menu .dropdown-item.danger:hover,
+body.role-admin .content .dropdown-menu .dropdown-item.text-danger:hover,
+body.role-staff .content .dropdown-menu .dropdown-item.text-danger:hover,
+body.role-admin .content .dropdown-menu .dropdown-item.delete:hover,
+body.role-staff .content .dropdown-menu .dropdown-item.delete:hover {
+    color: #991b1b !important;
+    background: #fef2f2;
+}
+
+body.role-admin .content table .text-xs,
+body.role-staff .content table .text-xs,
+body.role-admin .content table.text-xs,
+body.role-staff .content table.text-xs {
+    font-size: .875rem !important;
+    line-height: 1.25rem !important;
+}
+
+body.role-admin .content .action-column-header,
+body.role-staff .content .action-column-header,
+body.role-admin .content td.text-end,
+body.role-staff .content td.text-end,
+body.role-admin .content th.text-end,
+body.role-staff .content th.text-end {
+    text-align: right !important;
+}
+
+body.role-admin .content td.text-end .content-action-group,
+body.role-staff .content td.text-end .content-action-group,
+body.role-admin .content td.text-end .evaluation-action-group,
+body.role-staff .content td.text-end .evaluation-action-group {
+    margin-left: auto;
+}
+
+body.role-admin .content .scores-page,
+body.role-staff .content .scores-page,
+body.role-admin .content [data-admin-score-app],
+body.role-staff .content [data-admin-score-app] {
+    font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Final admin typography flattening and upscaling */
+body.role-admin,
+body.role-staff,
+body.role-admin .content,
+body.role-staff .content,
+body.role-admin .admin-sidebar,
+body.role-staff .admin-sidebar {
+    font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-weight: 400 !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body.role-admin .content *,
+body.role-staff .content *,
+body.role-admin .admin-sidebar *,
+body.role-staff .admin-sidebar *,
+body.role-admin .topbar *,
+body.role-staff .topbar * {
+    font-weight: 400 !important;
+}
+
+body.role-admin .page-header h1,
+body.role-staff .page-header h1,
+body.role-admin .content h1,
+body.role-staff .content h1 {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 400 !important;
+    text-align: left;
+}
+
+body.role-admin .page-header p,
+body.role-staff .page-header p,
+body.role-admin .content .content-page-memo,
+body.role-staff .content .content-page-memo {
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 400 !important;
+    color: #fb923c;
+    text-align: left;
+}
+
+body.role-admin .admin-sidebar .admin-nav-link,
+body.role-staff .admin-sidebar .admin-nav-link,
+body.role-admin .admin-sidebar .admin-menu-heading,
+body.role-staff .admin-sidebar .admin-menu-heading,
+body.role-admin .admin-sidebar-collapse,
+body.role-staff .admin-sidebar-collapse {
+    font-size: 1.125rem !important;
+    line-height: 1.65rem !important;
+    font-weight: 400 !important;
+}
+
+body.role-admin .admin-sidebar .admin-nav-link i,
+body.role-staff .admin-sidebar .admin-nav-link i {
+    font-size: 1.05rem !important;
+}
+
+body.role-admin .content table.table,
+body.role-staff .content table.table,
+body.role-admin .content .admin-flat-table,
+body.role-staff .content .admin-flat-table,
+body.role-admin .content .content-table,
+body.role-staff .content .content-table {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+    font-weight: 400 !important;
+}
+
+body.role-admin .content table.table thead th,
+body.role-staff .content table.table thead th,
+body.role-admin .content table.table tbody td,
+body.role-staff .content table.table tbody td,
+body.role-admin .content .admin-flat-table th,
+body.role-staff .content .admin-flat-table th,
+body.role-admin .content .admin-flat-table td,
+body.role-staff .content .admin-flat-table td,
+body.role-admin .content .content-table th,
+body.role-staff .content .content-table th,
+body.role-admin .content .content-table td,
+body.role-staff .content .content-table td {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+    font-weight: 400 !important;
+}
+
+body.role-admin .content table .text-xs,
+body.role-staff .content table .text-xs,
+body.role-admin .content table .text-sm,
+body.role-staff .content table .text-sm,
+body.role-admin .content table.text-xs,
+body.role-staff .content table.text-xs,
+body.role-admin .content table.text-sm,
+body.role-staff .content table.text-sm {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+}
+
+body.role-admin .content td.text-end .content-action-group,
+body.role-staff .content td.text-end .content-action-group,
+body.role-admin .content td.text-right .content-action-group,
+body.role-staff .content td.text-right .content-action-group {
+    width: 100%;
+    justify-content: flex-end !important;
+    margin-left: auto;
+}
+
+body.role-admin .content .fw-bold,
+body.role-staff .content .fw-bold,
+body.role-admin .content .fw-semibold,
+body.role-staff .content .fw-semibold,
+body.role-admin .content .font-bold,
+body.role-staff .content .font-bold,
+body.role-admin .content .font-semibold,
+body.role-staff .content .font-semibold,
+body.role-admin .content .font-medium,
+body.role-staff .content .font-medium,
+body.role-admin .admin-sidebar .fw-bold,
+body.role-staff .admin-sidebar .fw-bold,
+body.role-admin .admin-sidebar .fw-semibold,
+body.role-staff .admin-sidebar .fw-semibold,
+body.role-admin .admin-sidebar .font-bold,
+body.role-staff .admin-sidebar .font-bold,
+body.role-admin .admin-sidebar .font-semibold,
+body.role-staff .admin-sidebar .font-semibold,
+body.role-admin .admin-sidebar .font-medium,
+body.role-staff .admin-sidebar .font-medium {
+    font-weight: 400 !important;
+}
+
+body.role-admin .content .appearance-card-title,
+body.role-staff .content .appearance-card-title,
+body.role-admin .content .management-card-title,
+body.role-staff .content .management-card-title {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+    font-weight: 400 !important;
+    text-align: left !important;
+}
+
+body.role-admin .content table.table th:last-child,
+body.role-staff .content table.table th:last-child,
+body.role-admin .content table.table td:last-child,
+body.role-staff .content table.table td:last-child {
+    text-align: right !important;
+}
+
+body.role-admin .content table.table td:last-child > .content-action-group,
+body.role-staff .content table.table td:last-child > .content-action-group,
+body.role-admin .content table.table td:last-child > .dropdown,
+body.role-staff .content table.table td:last-child > .dropdown {
+    margin-left: auto !important;
+    justify-content: flex-end !important;
+}
+
+/* Portal typography and table sync: teacher, student, parent */
+body.role-teacher,
+body.role-homeroom,
+body.role-student,
+body.role-parent,
+body.role-teacher .content,
+body.role-homeroom .content,
+body.role-student .content,
+body.role-parent .content,
+body.role-teacher .role-sidebar,
+body.role-homeroom .role-sidebar,
+body.role-student .role-sidebar,
+body.role-parent .role-sidebar,
+body.role-teacher .topbar,
+body.role-homeroom .topbar,
+body.role-student .topbar,
+body.role-parent .topbar {
+    font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    font-weight: 400 !important;
+    text-align: left !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body.role-teacher .content *,
+body.role-homeroom .content *,
+body.role-student .content *,
+body.role-parent .content *,
+body.role-teacher .role-sidebar *,
+body.role-homeroom .role-sidebar *,
+body.role-student .role-sidebar *,
+body.role-parent .role-sidebar *,
+body.role-teacher .topbar *,
+body.role-homeroom .topbar *,
+body.role-student .topbar *,
+body.role-parent .topbar * {
+    font-weight: 400 !important;
+}
+
+body.role-teacher .content .font-bold,
+body.role-homeroom .content .font-bold,
+body.role-student .content .font-bold,
+body.role-parent .content .font-bold,
+body.role-teacher .content .font-semibold,
+body.role-homeroom .content .font-semibold,
+body.role-student .content .font-semibold,
+body.role-parent .content .font-semibold,
+body.role-teacher .content .font-medium,
+body.role-homeroom .content .font-medium,
+body.role-student .content .font-medium,
+body.role-parent .content .font-medium,
+body.role-teacher .content .fw-bold,
+body.role-homeroom .content .fw-bold,
+body.role-student .content .fw-bold,
+body.role-parent .content .fw-bold,
+body.role-teacher .content .fw-semibold,
+body.role-homeroom .content .fw-semibold,
+body.role-student .content .fw-semibold,
+body.role-parent .content .fw-semibold {
+    font-weight: 400 !important;
+}
+
+body.role-teacher .role-sidebar-title,
+body.role-homeroom .role-sidebar-title,
+body.role-student .role-sidebar-title,
+body.role-parent .role-sidebar-title,
+body.role-teacher .school-heading,
+body.role-homeroom .school-heading,
+body.role-student .school-heading,
+body.role-parent .school-heading {
+    font-size: 1.125rem !important;
+    line-height: 1.55rem !important;
+    font-weight: 400 !important;
+    text-align: left !important;
+    white-space: normal !important;
+}
+
+body.role-teacher .role-nav-link,
+body.role-homeroom .role-nav-link,
+body.role-student .role-nav-link,
+body.role-parent .role-nav-link,
+body.role-teacher .role-nav-group-title,
+body.role-homeroom .role-nav-group-title,
+body.role-student .role-nav-group-title,
+body.role-parent .role-nav-group-title {
+    font-size: 1.125rem !important;
+    line-height: 1.65rem !important;
+    font-weight: 400 !important;
+    text-align: left !important;
+}
+
+body.role-teacher .role-nav-link.active,
+body.role-homeroom .role-nav-link.active,
+body.role-student .role-nav-link.active,
+body.role-parent .role-nav-link.active {
+    font-weight: 400 !important;
+    color: #9a3412 !important;
+    background: #fff7ed !important;
+    border-color: #fed7aa !important;
+}
+
+body.role-teacher .content .card,
+body.role-homeroom .content .card,
+body.role-student .content .card,
+body.role-parent .content .card,
+body.role-teacher .content .dashboard-card,
+body.role-homeroom .content .dashboard-card,
+body.role-student .content .dashboard-card,
+body.role-parent .content .dashboard-card,
+body.role-teacher .content .portal-card,
+body.role-homeroom .content .portal-card,
+body.role-student .content .portal-card,
+body.role-parent .content .portal-card,
+body.role-teacher .content .tuition-parent-card,
+body.role-homeroom .content .tuition-parent-card,
+body.role-student .content .tuition-parent-card,
+body.role-parent .content .tuition-parent-card,
+body.role-teacher .content .tuition-homeroom-card,
+body.role-homeroom .content .tuition-homeroom-card,
+body.role-student .content .tuition-homeroom-card,
+body.role-parent .content .tuition-homeroom-card,
+body.role-teacher .content .teacher-attendance-card,
+body.role-homeroom .content .teacher-attendance-card,
+body.role-student .content .teacher-attendance-card,
+body.role-parent .content .teacher-attendance-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    background: #fff !important;
+    border: 1px solid #ffedd5 !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 1px 1px rgba(15, 23, 42, .035) !important;
+    text-align: left !important;
+}
+
+body.role-teacher .content .page-header,
+body.role-homeroom .content .page-header,
+body.role-student .content .page-header,
+body.role-parent .content .page-header,
+body.role-teacher .content .page-heading,
+body.role-homeroom .content .page-heading,
+body.role-student .content .page-heading,
+body.role-parent .content .page-heading {
+    width: 100% !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+    text-align: left !important;
+}
+
+body.role-teacher .content .page-header h1,
+body.role-homeroom .content .page-header h1,
+body.role-student .content .page-header h1,
+body.role-parent .content .page-header h1,
+body.role-teacher .content .page-heading h1,
+body.role-homeroom .content .page-heading h1,
+body.role-student .content .page-heading h1,
+body.role-parent .content .page-heading h1,
+body.role-teacher .content h1,
+body.role-homeroom .content h1,
+body.role-student .content h1,
+body.role-parent .content h1 {
+    font-size: 1.5rem !important;
+    line-height: 2rem !important;
+    font-weight: 400 !important;
+    text-align: left !important;
+}
+
+body.role-teacher .content .page-header p,
+body.role-homeroom .content .page-header p,
+body.role-student .content .page-header p,
+body.role-parent .content .page-header p,
+body.role-teacher .content .page-heading p,
+body.role-homeroom .content .page-heading p,
+body.role-student .content .page-heading p,
+body.role-parent .content .page-heading p,
+body.role-teacher .content .content-page-memo,
+body.role-homeroom .content .content-page-memo,
+body.role-student .content .content-page-memo,
+body.role-parent .content .content-page-memo {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+    font-weight: 400 !important;
+    color: #fb923c !important;
+    text-align: left !important;
+}
+
+body.role-teacher .content .text-center,
+body.role-homeroom .content .text-center,
+body.role-student .content .text-center,
+body.role-parent .content .text-center,
+body.role-teacher .content .items-center,
+body.role-homeroom .content .items-center,
+body.role-student .content .items-center,
+body.role-parent .content .items-center,
+body.role-teacher .content .justify-center,
+body.role-homeroom .content .justify-center,
+body.role-student .content .justify-center,
+body.role-parent .content .justify-center,
+body.role-teacher .content .mx-auto,
+body.role-homeroom .content .mx-auto,
+body.role-student .content .mx-auto,
+body.role-parent .content .mx-auto {
+    text-align: left !important;
+}
+
+body.role-teacher .content .mx-auto,
+body.role-homeroom .content .mx-auto,
+body.role-student .content .mx-auto,
+body.role-parent .content .mx-auto {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+body.role-teacher .content table,
+body.role-homeroom .content table,
+body.role-student .content table,
+body.role-parent .content table,
+body.role-teacher .content table.table,
+body.role-homeroom .content table.table,
+body.role-student .content table.table,
+body.role-parent .content table.table,
+body.role-teacher .content .teacher-attendance-table,
+body.role-homeroom .content .teacher-attendance-table,
+body.role-student .content .teacher-attendance-table,
+body.role-parent .content .teacher-attendance-table,
+body.role-teacher .content .teacher-attendance-history-table,
+body.role-homeroom .content .teacher-attendance-history-table,
+body.role-student .content .teacher-attendance-history-table,
+body.role-parent .content .teacher-attendance-history-table,
+body.role-teacher .content .student-report-table,
+body.role-homeroom .content .student-report-table,
+body.role-student .content .student-report-table,
+body.role-parent .content .student-report-table,
+body.role-teacher .content .tuition-table,
+body.role-homeroom .content .tuition-table,
+body.role-student .content .tuition-table,
+body.role-parent .content .tuition-table,
+body.role-teacher .content .tuition-homeroom-table,
+body.role-homeroom .content .tuition-homeroom-table,
+body.role-student .content .tuition-homeroom-table,
+body.role-parent .content .tuition-homeroom-table,
+body.role-teacher .content .attendance-register-table,
+body.role-homeroom .content .attendance-register-table,
+body.role-student .content .attendance-register-table,
+body.role-parent .content .attendance-register-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    text-align: left !important;
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+    font-weight: 400 !important;
+    overflow: hidden !important;
+}
+
+body.role-teacher .content table thead,
+body.role-homeroom .content table thead,
+body.role-student .content table thead,
+body.role-parent .content table thead {
+    background: rgba(255, 247, 237, .4) !important;
+    color: #431407 !important;
+    border-bottom: 1px solid rgba(255, 237, 213, .75) !important;
+}
+
+body.role-teacher .content table th,
+body.role-homeroom .content table th,
+body.role-student .content table th,
+body.role-parent .content table th,
+body.role-teacher .content table td,
+body.role-homeroom .content table td,
+body.role-student .content table td,
+body.role-parent .content table td {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+    font-weight: 400 !important;
+    text-align: left !important;
+    vertical-align: middle !important;
+}
+
+body.role-teacher .content table .text-xs,
+body.role-homeroom .content table .text-xs,
+body.role-student .content table .text-xs,
+body.role-parent .content table .text-xs,
+body.role-teacher .content table .text-sm,
+body.role-homeroom .content table .text-sm,
+body.role-student .content table .text-sm,
+body.role-parent .content table .text-sm,
+body.role-teacher .content table.text-xs,
+body.role-homeroom .content table.text-xs,
+body.role-student .content table.text-xs,
+body.role-parent .content table.text-xs,
+body.role-teacher .content table.text-sm,
+body.role-homeroom .content table.text-sm,
+body.role-student .content table.text-sm,
+body.role-parent .content table.text-sm {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+}
+
+body.role-teacher .content table th:last-child,
+body.role-homeroom .content table th:last-child,
+body.role-student .content table th:last-child,
+body.role-parent .content table th:last-child,
+body.role-teacher .content table td:last-child,
+body.role-homeroom .content table td:last-child,
+body.role-student .content table td:last-child,
+body.role-parent .content table td:last-child,
+body.role-teacher .content td.text-end,
+body.role-homeroom .content td.text-end,
+body.role-student .content td.text-end,
+body.role-parent .content td.text-end,
+body.role-teacher .content td.text-right,
+body.role-homeroom .content td.text-right,
+body.role-student .content td.text-right,
+body.role-parent .content td.text-right {
+    text-align: right !important;
+}
+
+body.role-teacher .content table td:last-child > .content-action-group,
+body.role-homeroom .content table td:last-child > .content-action-group,
+body.role-student .content table td:last-child > .content-action-group,
+body.role-parent .content table td:last-child > .content-action-group,
+body.role-teacher .content table td:last-child > .dropdown,
+body.role-homeroom .content table td:last-child > .dropdown,
+body.role-student .content table td:last-child > .dropdown,
+body.role-parent .content table td:last-child > .dropdown,
+body.role-teacher .content td.text-end .content-action-group,
+body.role-homeroom .content td.text-end .content-action-group,
+body.role-student .content td.text-end .content-action-group,
+body.role-parent .content td.text-end .content-action-group,
+body.role-teacher .content td.text-right .content-action-group,
+body.role-homeroom .content td.text-right .content-action-group,
+body.role-student .content td.text-right .content-action-group,
+body.role-parent .content td.text-right .content-action-group {
+    margin-left: auto !important;
+    justify-content: flex-end !important;
+}
+
+body.role-teacher .content .content-action-btn,
+body.role-homeroom .content .content-action-btn,
+body.role-student .content .content-action-btn,
+body.role-parent .content .content-action-btn,
+body.role-teacher .content .btn-add,
+body.role-homeroom .content .btn-add,
+body.role-student .content .btn-add,
+body.role-parent .content .btn-add,
+body.role-teacher .content [data-open-create-modal],
+body.role-homeroom .content [data-open-create-modal],
+body.role-student .content [data-open-create-modal],
+body.role-parent .content [data-open-create-modal] {
+    font-size: .875rem !important;
+    line-height: 1.25rem !important;
+    font-weight: 400 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: .375rem !important;
+    text-align: left !important;
 }

@@ -1033,7 +1033,11 @@
     const showScoreColumnToast = (message, type = 'success') => {
         const toast = document.createElement('div');
         toast.className = `score-column-toast ${type === 'success' ? 'success' : 'error'}`;
-        toast.textContent = message;
+        const icon = document.createElement('span');
+        icon.textContent = type === 'success' ? '🟢' : '🔴';
+        const text = document.createElement('span');
+        text.textContent = message;
+        toast.append(icon, text);
         document.body.appendChild(toast);
 
         window.setTimeout(() => toast.classList.add('show'), 20);

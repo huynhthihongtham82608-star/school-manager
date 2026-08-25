@@ -72,9 +72,9 @@
                     </td>
                     <td><span class="badge {{ $subject->statusBadgeClass() }}">{{ $subject->statusLabel() }}</span></td>
                     <td class="text-end">
-                        <div class="content-action-group justify-content-end">
+                        <div class="content-action-group justify-content-end" data-action-synced="true">
                             @unless($readOnly)
-                                <a href="{{ route('subjects.edit', $subject) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
+                                <a href="{{ route('subjects.edit', $subject) }}" class="content-action-btn icon-only edit d-none" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip" aria-hidden="true">
                                     <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                 </a>
                             @endunless
@@ -82,7 +82,14 @@
                                 <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
                                     <i class="bi bi-three-dots-vertical"></i>
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
+                                <ul class="dropdown-menu dropdown-menu-end content-action-menu">
+                                    @unless($readOnly)
+                                        <li>
+                                            <a href="{{ route('subjects.edit', $subject) }}" class="dropdown-item">
+                                                <i class="bi bi-pencil-square me-2"></i>Sửa thông tin
+                                            </a>
+                                        </li>
+                                    @endunless
                                     <li>
                                         <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}">
                                             <i class="bi bi-eye me-2"></i>Xem chi tiết

@@ -9,7 +9,7 @@
     $parentRequired = ! $isEdit;
 @endphp
 
-<form method="POST" action="{{ $action }}" enctype="multipart/form-data" class="student-form-shell in-modal" data-student-form>
+<form method="POST" action="{{ $action }}" enctype="multipart/form-data" class="student-form-shell in-modal" data-student-form data-parent-lookup-url="{{ route('students.parent-lookup') }}">
     @csrf
     @if($isEdit)
         @method('PUT')
@@ -180,25 +180,26 @@
 
         <div class="student-form-grid">
             <div class="student-form-field">
-                <label class="form-label">Họ tên phụ huynh</label>
-                <input type="text" name="parent_name" class="form-control" value="{{ old('parent_name', $primaryParent?->name) }}" @required($parentRequired)>
+                <label class="form-label">SĐT phụ huynh</label>
+                <input type="text" name="parent_phone" class="form-control text-base font-normal text-left" value="{{ $parentPhone }}" @required($parentRequired) data-parent-phone>
+                <div class="text-base font-normal text-orange-500 mt-1 text-left d-none" data-parent-lookup-status></div>
+                @error('parent_phone')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+            </div>
+
+            <div class="student-form-field">
+                <label class="form-label">Họ và tên phụ huynh</label>
+                <input type="text" name="parent_name" class="form-control text-base font-normal text-left" value="{{ old('parent_name', $primaryParent?->name) }}" @required($parentRequired) data-parent-name>
                 @error('parent_name')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
             </div>
 
             <div class="student-form-field">
                 <label class="form-label">Quan hệ</label>
-                <select name="parent_relation" class="form-select" @required($parentRequired)>
+                <select name="parent_relation" class="form-select text-base font-normal text-left" @required($parentRequired)>
                     @foreach(\App\Models\ParentProfile::relationLabels() as $value => $label)
                         <option value="{{ $value }}" @selected($parentRelation === $value)>{{ $label }}</option>
                     @endforeach
                 </select>
                 @error('parent_relation')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-            </div>
-
-            <div class="student-form-field">
-                <label class="form-label">SĐT phụ huynh</label>
-                <input type="text" name="parent_phone" class="form-control" value="{{ $parentPhone }}" @required($parentRequired)>
-                @error('parent_phone')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
             </div>
 
             <div class="student-form-field span-3">

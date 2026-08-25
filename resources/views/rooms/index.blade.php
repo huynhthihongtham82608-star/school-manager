@@ -71,9 +71,9 @@
                     <td class="text-muted">{{ \Illuminate\Support\Str::limit($room->note, 80) ?: '-' }}</td>
                     <td>{{ $room->fixedClass?->name ?? '-' }}</td>
                     <td class="text-end">
-                        <div class="content-action-group justify-content-end">
+                        <div class="content-action-group justify-content-end" data-action-synced="true">
                             @unless($readOnly)
-                                <a href="{{ route('rooms.edit', $room) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
+                                <a href="{{ route('rooms.edit', $room) }}" class="content-action-btn icon-only edit d-none" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip" aria-hidden="true">
                                     <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                 </a>
                             @endunless
@@ -88,6 +88,11 @@
                                         </button>
                                     </li>
                                     @unless($readOnly)
+                                        <li>
+                                            <a href="{{ route('rooms.edit', $room) }}" class="dropdown-item">
+                                                <i class="bi bi-pencil-square"></i>Sửa thông tin
+                                            </a>
+                                        </li>
                                         @if($room->canDelete())
                                             <li>
                                                 <form action="{{ route('rooms.destroy', $room) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn xóa phòng học này? Hành động này không thể hoàn tác.');">

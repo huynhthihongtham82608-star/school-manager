@@ -2,11 +2,9 @@
 @section('title', 'Sá»± kiá»‡n')
 
 @section('content')
-<div class="page-heading">
-    <div>
-        <h5>Sá»± kiá»‡n nhÃ  trÆ°á»ng</h5>
-        <div class="text-muted">Danh sÃ¡ch hoáº¡t Ä‘á»™ng vÃ  sá»± kiá»‡n Ä‘Æ°á»£c cÃ´ng bá»‘.</div>
-    </div>
+<div class="w-full text-left mb-6">
+    <h1 class="text-2xl font-normal text-gray-900 text-left mb-1">Sự kiện</h1>
+    <p class="text-base font-normal text-orange-400 text-left mb-0">Danh sách sự kiện - Hoạt động đã công bố được hiển thị cho người dùng theo quyền truy cập.</p>
 </div>
 
 <div class="card">
@@ -18,7 +16,7 @@
                     <th>Thá»i gian</th>
                     <th>Äá»‹a Ä‘iá»ƒm</th>
                     <th>MÃ´ táº£</th>
-                    <th class="text-end">Thao tÃ¡c</th>
+                    <th class="text-end action-column-header" aria-label="Thao tác"></th>
                 </tr>
             </thead>
             <tbody>
@@ -28,12 +26,12 @@
                     $description = $event->description ?: 'ChÆ°a cÃ³ mÃ´ táº£.';
                 @endphp
                 <tr>
-                    <td class="fw-semibold">{{ $event->title }}</td>
+                    <td class="fw-normal">{{ $event->title }}</td>
                     <td>{{ optional($event->starts_at)->format('d/m/Y H:i') ?: 'Äang cáº­p nháº­t' }}</td>
                     <td>{{ $event->location ?: 'Äang cáº­p nháº­t' }}</td>
                     <td>{{ \Illuminate\Support\Str::limit($description, 120, '...') }}</td>
-                    <td>
-                        <div class="content-action-group justify-content-end">
+                    <td class="text-end">
+                        <div class="content-action-group justify-content-end" data-action-synced="true">
                             <button type="button" class="content-action-btn icon-only detail" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}" title="Xem chi tiáº¿t" aria-label="Xem chi tiáº¿t">
                                 <i class="bi bi-eye"></i><span class="visually-hidden">Xem chi tiáº¿t</span>
                             </button>

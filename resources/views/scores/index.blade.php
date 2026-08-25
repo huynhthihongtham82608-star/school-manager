@@ -43,7 +43,7 @@
         margin: 0 0 1rem;
         color: #111827;
         font-size: 1rem;
-        font-weight: 700;
+        font-weight: 400;
     }
 
     .score-formula-title::before {
@@ -173,7 +173,7 @@
 
     .student-report-table th {
         color: #111827;
-        font-weight: 500;
+        font-weight: 400;
         background: rgba(255, 247, 237, .72);
         border-bottom: 1px solid rgba(254, 215, 170, .7);
     }
@@ -190,7 +190,7 @@
         color: #c2410c;
         background: #fff7ed;
         font-size: 1rem;
-        font-weight: 700;
+        font-weight: 400;
     }
 
     .student-report-toggle {
@@ -223,7 +223,7 @@
     .student-report-term-value {
         color: #ea580c;
         font-size: 1rem;
-        font-weight: 700;
+        font-weight: 400;
     }
 
     .student-report-term-muted {
@@ -254,13 +254,13 @@
 
     .student-report-summary-item strong {
         color: #ea580c;
-        font-weight: 700;
+        font-weight: 400;
     }
 
     .student-report-summary-item.master {
         color: #111827;
         font-size: 1.12rem;
-        font-weight: 500;
+        font-weight: 400;
     }
 
     @media (min-width: 576px) {
@@ -430,7 +430,8 @@
 
     .w-full { width: 100% !important; }
     .table-fixed { table-layout: fixed !important; }
-    .text-xs { font-size: 0.75rem !important; line-height: 1rem !important; }
+    .text-xs,
+    .text-sm { font-size: 1rem !important; line-height: 1.5rem !important; }
     .text-orange-700 { color: #c2410c !important; }
     .text-orange-800 { color: #9a3412 !important; }
     .text-orange-400\/80 { color: rgba(251, 146, 60, .8) !important; }
@@ -458,14 +459,14 @@
 
     .admin-score-grid th {
         color: #111827;
-        font-weight: 500;
+        font-weight: 400;
         background: #fff;
     }
 
     .admin-score-student {
         color: #111827;
         font-size: 1rem;
-        font-weight: 600;
+        font-weight: 400;
         cursor: pointer;
     }
 
@@ -475,7 +476,7 @@
 
     .admin-score-value {
         color: #ea580c;
-        font-weight: 700;
+        font-weight: 400;
     }
 
     .admin-score-empty {
@@ -509,7 +510,7 @@
     .admin-score-summary span {
         color: #ea580c;
         font-size: 1rem;
-        font-weight: 700;
+        font-weight: 400;
     }
 
     .admin-score-summary .master {
@@ -570,7 +571,7 @@
         margin: 0;
         color: #111827;
         font-size: 1.15rem;
-        font-weight: 700;
+        font-weight: 400;
         text-transform: uppercase;
     }
 
@@ -594,7 +595,7 @@
         margin: 0 0 .55rem;
         color: #111827;
         font-size: .95rem;
-        font-weight: 600;
+        font-weight: 400;
     }
 
     .admin-score-modal-subtitle {
@@ -616,7 +617,7 @@
 
     .admin-score-ledger-table th {
         color: #111827;
-        font-weight: 500;
+        font-weight: 400;
         background: #fff7ed;
     }
 
@@ -633,7 +634,7 @@
 
     .admin-score-ledger-table .average-mark {
         color: #ea580c;
-        font-weight: 700;
+        font-weight: 400;
     }
 
     .admin-score-chip {
@@ -709,16 +710,16 @@
     <div class="w-full bg-white border border-orange-100 p-5 rounded-xl shadow-2xs text-left mb-3 font-sans">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-left">
             <div>
-                <div class="text-xs font-normal text-gray-400">Học sinh</div>
-                <div class="text-sm font-medium text-gray-900 truncate">{{ $student?->student_code }} - {{ $student?->name }}</div>
+                <div class="text-sm font-normal text-gray-400">Học sinh</div>
+                <div class="text-sm font-normal text-gray-900 truncate">{{ $student?->student_code }} - {{ $student?->name }}</div>
             </div>
             <div>
-                <div class="text-xs font-normal text-gray-400">Lớp</div>
-                <div class="text-sm font-medium text-gray-900 truncate">{{ $student?->classRoom?->name ?? 'Chưa phân lớp' }}</div>
+                <div class="text-sm font-normal text-gray-400">Lớp</div>
+                <div class="text-sm font-normal text-gray-900 truncate">{{ $student?->classRoom?->name ?? 'Chưa phân lớp' }}</div>
             </div>
             <div>
-                <div class="text-xs font-normal text-gray-400">Học kỳ</div>
-                <div class="text-sm font-medium text-gray-900 truncate">{{ $semesters->firstWhere('id', $selectedSemesterId)?->normalizedName() ?? 'Học kỳ hiện hành' }}</div>
+                <div class="text-sm font-normal text-gray-400">Học kỳ</div>
+                <div class="text-sm font-normal text-gray-900 truncate">{{ $semesters->firstWhere('id', $selectedSemesterId)?->normalizedName() ?? 'Học kỳ hiện hành' }}</div>
             </div>
         </div>
     </div>
@@ -754,7 +755,7 @@
 
     <div class="student-report-card" data-student-report-card>
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap bg-white border-bottom border-orange-100 px-4 py-3 text-left">
-            <span class="text-sm font-medium text-gray-900">Phiếu điểm tổng hợp học kỳ</span>
+            <span class="text-sm font-normal text-gray-900">Phiếu điểm tổng hợp học kỳ</span>
             <a href="{{ route('scores.report-card.export', ['school_year_id' => $selectedYearId, 'semester_id' => $selectedSemesterId]) }}" class="student-report-export-btn" data-report-export>
                 📥 Xuất phiếu điểm học kỳ
             </a>
@@ -781,7 +782,7 @@
                         $columnsByFamily = collect($studentReportColumnsBySubject->get($subject->id, []));
                     @endphp
                     <tr>
-                        <td class="fw-semibold">{{ $subject->name ?? '-' }}</td>
+                        <td class="fw-normal">{{ $subject->name ?? '-' }}</td>
                         @foreach($studentReportColumnHeaders as $header)
                             @php
                                 $familyColumns = collect($columnsByFamily->get($header['family'], []))->values();
@@ -870,7 +871,7 @@
                     const emptyRow = document.createElement('tr'); const emptyCell = createCell('td', 'Chưa có dữ liệu điểm trong học kỳ này.', 'text-muted'); emptyCell.colSpan = colspan; emptyRow.appendChild(emptyCell); tableBody.appendChild(emptyRow);
                 } else {
                     payload.rows.forEach((row) => {
-                        const tr = document.createElement('tr'); tr.appendChild(createCell('td', row.subject_name || '-', 'fw-semibold'));
+                        const tr = document.createElement('tr'); tr.appendChild(createCell('td', row.subject_name || '-', 'fw-normal'));
                         (row.values || []).forEach((value, index) => { const td = document.createElement('td'); td.dataset.scoreFamily = headers[index]?.family || ''; const span = document.createElement('span'); span.className = value.muted ? 'text-muted' : 'score-chip'; span.textContent = value.text || '-'; if (value.is_retest && value.retest_tooltip) { const badge = document.createElement('span'); badge.className = 'score-retest-badge'; badge.dataset.tooltip = value.retest_tooltip; badge.textContent = 'Bù'; span.appendChild(badge); } td.appendChild(span); tr.appendChild(td); });
                         const average = document.createElement('td'); average.dataset.scoreFamily = 'average';
                         if (row.uses_pass_fail) average.appendChild(createCell('span', 'Không tính TB', 'text-muted')); else if (row.average !== null && row.average !== undefined) average.appendChild(createCell('span', row.average, 'badge bg-info')); else average.appendChild(createCell('span', '-', 'text-muted'));
@@ -897,15 +898,15 @@
     @endphp
 
     <x-page-header
-        :title="$isScoreAdmin ? 'Qu?n l� b?ng di?m t?p trung' : 'Nh?p di?m s? h?c sinh'"
+        :title="$isScoreAdmin ? 'Quản lý bảng điểm tập trung' : 'Nhập điểm số học sinh'"
         :subtitle="$isScoreAdmin
-            ? 'Tra c?u, gi�m s�t ti?n d? nh?p di?m v� ph� duy?t y�u c?u s?a d?i di?m s? c?a gi�o vi�n to�n tru?ng.'
-            : 'Gi�o vi�n b? m�n nh?p di?m theo c�c c?t di?m do Admin c?u h�nh.'"
+            ? 'Tra cứu, giám sát tiến độ nhập điểm và phê duyệt yêu cầu sửa đổi điểm số của giáo viên toàn trường.'
+            : 'Giáo viên bộ môn nhập điểm theo các cột điểm do Admin cấu hình.'"
     >
         <x-bulk-excel-actions module="scores" :context="$scoreBulkContext" :allow-import="! $isScoreAdmin" />
         @if(auth()->user()->hasPermission('scores.manage'))
             <button type="button" class="score-config-shortcut-btn" data-bs-toggle="modal" data-bs-target="#scoreColumnConfigModal">
-                ?? Qu?n l� c?u h�nh c?t di?m
+                ⚙️ Quản lý cấu hình cột điểm
             </button>
         @endif
     </x-page-header>
@@ -925,13 +926,14 @@
                 'headers' => [],
                 'rows' => [],
                 'summary' => [],
-                'pagination' => ['label' => 'Hi?n th? 0 trong t?ng s? 0 h?c sinh', 'show_controls' => false],
+                'pagination' => ['label' => 'Hiển thị 0 trong tổng số 0 học sinh', 'show_controls' => false],
                 'selected_term_index' => 1,
             ];
             $adminMatrixJson = json_encode($adminMatrix, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         @endphp
 
         <div
+            class="scores-page font-sans antialiased"
             data-admin-score-app
             data-cascade-url="{{ route('scores.cascade') }}"
             data-matrix-url="{{ route('scores.admin-matrix') }}"
@@ -940,25 +942,25 @@
                 <input
                     type="search"
                     class="form-control admin-score-search"
-                    placeholder="T�m m� HS ho?c h? t�n"
+                    placeholder="Tìm mã HS hoặc họ tên"
                     data-admin-score-search
                     value="{{ $adminMatrix['filters']['q'] ?? '' }}"
                 >
                 <input type="hidden" data-admin-score-year value="{{ $adminMatrix['filters']['school_year_id'] ?? $selectedYearId }}">
                 <select class="form-select" data-admin-score-grade>
-                    <option value="">Ch?n Kh?i</option>
+                    <option value="">Chọn Khối</option>
                     @foreach([10, 11, 12] as $grade)
-                        <option value="{{ $grade }}" @selected((string) ($adminMatrix['filters']['grade_level'] ?? '') === (string) $grade)>Kh?i {{ $grade }}</option>
+                        <option value="{{ $grade }}" @selected((string) ($adminMatrix['filters']['grade_level'] ?? '') === (string) $grade)>Khối {{ $grade }}</option>
                     @endforeach
                 </select>
                 <select class="form-select" data-admin-score-class>
-                    <option value="">T?t c? l?p</option>
+                    <option value="">Tất cả lớp</option>
                     @foreach(($adminMatrix['classes'] ?? []) as $classOption)
                         <option value="{{ $classOption['id'] }}" @selected((string) ($adminMatrix['filters']['class_id'] ?? '') === (string) $classOption['id'])>{{ $classOption['name'] }}</option>
                     @endforeach
                 </select>
                 <select class="form-select" data-admin-score-subject>
-                    <option value="">T?t c? m�n h?c</option>
+                    <option value="">Tất cả môn học</option>
                     @foreach(($adminMatrix['subjects'] ?? []) as $subjectOption)
                         <option value="{{ $subjectOption['id'] }}">{{ $subjectOption['name'] }}</option>
                     @endforeach
@@ -969,20 +971,20 @@
                     @endforeach
                 </select>
                 <div class="admin-eval-toggle d-inline-flex align-items-center gap-1 ms-auto" data-admin-eval-toggle style="display: none;">
-                    <button type="button" class="btn text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs" data-eval-tab="GRADE_10">
-                        ?? M�n ch?m di?m
+                    <button type="button" class="btn text-sm font-normal text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs" data-eval-tab="GRADE_10">
+                        📊 Môn chấm điểm
                     </button>
-                    <button type="button" class="btn text-xs font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all" data-eval-tab="ASSESSMENT">
-                        ?? M�n nh?n x�t
+                    <button type="button" class="btn text-sm font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all" data-eval-tab="ASSESSMENT">
+                        📝 Môn nhận xét
                     </button>
                 </div>
                 <button type="button" class="admin-score-reset-btn" data-admin-score-reset>
-                    <i class="bi bi-arrow-counterclockwise"></i>�?t l?i l?c
+                    <i class="bi bi-arrow-counterclockwise"></i>Đặt lại lọc
                 </button>
             </div>
 
             <div class="admin-score-context" data-admin-score-context>
-                Ch?n l?p d? xem ma tr?n di?m t?t c? c�c m�n.
+                Chọn lớp để xem ma trận điểm tất cả các môn.
             </div>
 
             <div class="card">
@@ -993,37 +995,37 @@
                     </table>
                 </div>
                 <div class="admin-score-footer">
-                    <span data-admin-score-count>{{ $adminMatrix['pagination']['label'] ?? 'Hi?n th? 0 trong t?ng s? 0 h?c sinh' }}</span>
+                    <span data-admin-score-count>{{ $adminMatrix['pagination']['label'] ?? 'Hiển thị 0 trong tổng số 0 học sinh' }}</span>
                     <div class="admin-score-pager" data-admin-score-pager></div>
                 </div>
             </div>
 
             <div class="admin-score-summary">
-                <span>?? �i?m TB H?c k? 1 (T?ng c�c m�n): <strong data-admin-score-summary-hk1>-</strong></span>
-                <span>?? �i?m TB H?c k? 2 (T?ng c�c m�n): <strong data-admin-score-summary-hk2>-</strong></span>
-                <span class="master">?? �I?M TRUNG B�NH C? NAM: <strong data-admin-score-summary-year>-</strong></span>
+                <span>📊 Điểm TB Học kỳ 1 (Tổng các môn): <strong data-admin-score-summary-hk1>-</strong></span>
+                <span>📊 Điểm TB Học kỳ 2 (Tổng các môn): <strong data-admin-score-summary-hk2>-</strong></span>
+                <span class="master">📌 Điểm trung bình cả năm: <strong data-admin-score-summary-year>-</strong></span>
             </div>
 
             <div class="admin-score-modal-backdrop" data-admin-score-modal aria-hidden="true">
                 <div class="admin-score-modal">
                     <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
                         <div>
-                            <h5 class="admin-score-modal-title" data-admin-score-modal-title>Chi ti?t di?m h?c sinh</h5>
+                            <h5 class="admin-score-modal-title" data-admin-score-modal-title>Chi tiết điểm học sinh</h5>
                             <div class="admin-score-modal-subtitle" data-admin-score-modal-subtitle></div>
                         </div>
-                        <button type="button" class="btn-close" data-admin-score-modal-close aria-label="��ng"></button>
+                        <button type="button" class="btn-close" data-admin-score-modal-close aria-label="Đóng"></button>
                     </div>
                     <div class="table-responsive">
                         <table class="table align-middle admin-score-ledger-table" data-admin-table-skip>
                             <thead>
                                 <tr>
-                                    <th>M�n h?c</th>
-                                    <th>�i?m Mi?ng</th>
-                                    <th>15 ph�t (L?n 1)</th>
-                                    <th>15 ph�t (L?n 2)</th>
-                                    <th>�i?m Gi?a k?</th>
-                                    <th>�i?m Cu?i k?</th>
-                                    <th>�i?m TB M�n</th>
+                                    <th>Môn học</th>
+                                    <th>Điểm Miệng</th>
+                                    <th>15 phút (Lần 1)</th>
+                                    <th>15 phút (Lần 2)</th>
+                                    <th>Điểm Giữa kỳ</th>
+                                    <th>Điểm Cuối kỳ</th>
+                                    <th>Điểm TB Môn</th>
                                 </tr>
                             </thead>
                             <tbody data-admin-score-ledger></tbody>
@@ -1091,8 +1093,8 @@
                                 const rawA = getValueFn(a);
                                 const rawB = getValueFn(b);
 
-                                const numA = (rawA !== null && rawA !== undefined && rawA !== '' && rawA !== '�') ? Number(rawA) : (currentSortDirection === 'desc' ? -999 : 999);
-                                const numB = (rawB !== null && rawB !== undefined && rawB !== '' && rawB !== '�') ? Number(rawB) : (currentSortDirection === 'desc' ? -999 : 999);
+                                const numA = (rawA !== null && rawA !== undefined && rawA !== '' && rawA !== '–') ? Number(rawA) : (currentSortDirection === 'desc' ? -999 : 999);
+                                const numB = (rawB !== null && rawB !== undefined && rawB !== '' && rawB !== '–') ? Number(rawB) : (currentSortDirection === 'desc' ? -999 : 999);
 
                                 if (isNaN(numA) && isNaN(numB)) {
                                     const strA = String(rawA || '');
@@ -1135,7 +1137,7 @@
                         (items || []).forEach((item) => {
                             const option = document.createElement('option');
                             const fullLabel = item.name || '';
-                            const shortLabel = fullLabel.length > 24 ? `${fullLabel.slice(0, 23)}�` : fullLabel;
+                            const shortLabel = fullLabel.length > 24 ? `${fullLabel.slice(0, 23)}…` : fullLabel;
                             option.value = item.id;
                             option.textContent = shortLabel;
                             option.title = fullLabel;
@@ -1156,26 +1158,26 @@
                     const renderContext = (payload) => {
                         const classContext = payload.class_context;
                         if (!classContext) {
-                            context.innerHTML = 'Ch?n l?p d? xem ma tr?n di?m t?t c? c�c m�n.';
+                            context.innerHTML = 'Chọn lớp để xem ma trận điểm tất cả các môn.';
                             return;
                         }
 
-                        const homeroomTeacher = classContext.class_teacher?.name || 'Chua ph�n c�ng GVCN';
+                        const homeroomTeacher = classContext.class_teacher?.name || 'Chưa phân công GVCN';
                         const total = classContext.students?.length || 0;
 
                         let subjectTeacherText = '';
                         const selectedSubjectId = controls.subject?.value || payload.filters?.subject_id;
                         if (selectedSubjectId && classContext.subject_teachers?.[selectedSubjectId]) {
                             const teacherName = classContext.subject_teachers[selectedSubjectId];
-                            subjectTeacherText = ` � <span class="text-orange-700 font-medium ms-1">?? Gi�o vi�n ph? tr�ch: ${teacherName}</span>`;
+                            subjectTeacherText = ` • <span class="text-orange-700 font-normal ms-1">Giáo viên phụ trách: ${teacherName}</span>`;
                         }
 
-                        context.innerHTML = `<strong>${classContext.name}</strong> � GVCN: ${homeroomTeacher} � ${total} HS${subjectTeacherText}`;
+                        context.innerHTML = `<strong>${classContext.name}</strong> • GVCN: ${homeroomTeacher} • ${total} HS${subjectTeacherText}`;
                     };
 
                     const renderFilters = (payload) => {
-                        setOptions(controls.classRoom, payload.classes || [], 'T?t c? l?p', payload.filters?.class_id || controls.classRoom?.value || '');
-                        setOptions(controls.subject, payload.subjects || [], 'T?t c? m�n h?c', controls.subject?.value || '');
+                        setOptions(controls.classRoom, payload.classes || [], 'Tất cả lớp', payload.filters?.class_id || controls.classRoom?.value || '');
+                        setOptions(controls.subject, payload.subjects || [], 'Tất cả môn học', controls.subject?.value || '');
                         if (payload.semesters) {
                             setOptions(controls.semester, payload.semesters, null, payload.filters?.semester_id || controls.semester?.value || '');
                         }
@@ -1184,7 +1186,7 @@
                     const termText = (value, locked = false) => {
                         const span = document.createElement('span');
                         span.className = locked || !value ? 'admin-score-term locked' : 'admin-score-value';
-                        span.textContent = locked ? '�' : (value || '�');
+                        span.textContent = locked ? '–' : (value || '–');
                         return span;
                     };
 
@@ -1206,8 +1208,8 @@
                             }
 
                             if (grade10TabBtn && assessmentTabBtn) {
-                                const activeClass = 'btn text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs';
-                                const inactiveClass = 'btn text-xs font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all';
+                                const activeClass = 'btn text-sm font-normal text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs';
+                                const inactiveClass = 'btn text-sm font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all';
                                 grade10TabBtn.className = (activeEvaluationType === 'GRADE_10' || activeEvaluationType === 'numeric') ? activeClass : inactiveClass;
                                 assessmentTabBtn.className = (activeEvaluationType === 'ASSESSMENT' || activeEvaluationType === 'pass_fail') ? activeClass : inactiveClass;
                             }
@@ -1220,7 +1222,7 @@
                         const createSortableTh = (label, columnKey, getValueFn, extraClass = '') => {
                             const th = document.createElement('th');
                             th.className = `${extraClass} cursor-pointer select-none align-middle`.trim();
-                            th.title = `Click d? s?p x?p di?m ${label}`;
+                            th.title = `Click để sắp xếp điểm ${label}`;
 
                             const labelText = document.createTextNode(label);
                             th.appendChild(labelText);
@@ -1228,7 +1230,7 @@
                             const iconSpan = document.createElement('span');
                             const isActive = currentSortColumn === columnKey;
 
-                            iconSpan.className = 'text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-xs';
+                            iconSpan.className = 'text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-sm';
                             iconSpan.textContent = '?';
 
                             th.appendChild(iconSpan);
@@ -1245,7 +1247,7 @@
                         const appendTermHeaders = (row) => {
                             row.appendChild(createSortableTh('HK1', 'hk1', (r) => r.summary?.hk1_gpa, 'admin-score-term bg-orange-50/20'));
                             row.appendChild(createSortableTh('HK2', 'hk2', (r) => r.summary?.hk2_gpa, 'admin-score-term bg-orange-50/20'));
-                            row.appendChild(createSortableTh('C? Nam', 'year', (r) => r.summary?.year_gpa, 'admin-score-term bg-orange-50/20'));
+                            row.appendChild(createSortableTh('Cả Năm', 'year', (r) => r.summary?.year_gpa, 'admin-score-term bg-orange-50/20'));
                         };
                         const appendSummaryCells = (rowEl, row) => {
                             const hk1 = document.createElement('td');
@@ -1266,27 +1268,27 @@
                         const scoreText = (value) => {
                             const span = document.createElement('span');
                             span.className = value ? 'admin-score-value' : 'admin-score-empty';
-                            span.textContent = value || '�';
+                            span.textContent = value || '–';
                             return span;
                         };
 
                         head.innerHTML = '';
                         const tr = document.createElement('tr');
-                        tr.appendChild(cell('th', 'M� HS', 'w-24'));
-                        tr.appendChild(cell('th', 'H? t�n', 'w-44'));
+                        tr.appendChild(cell('th', 'Mã HS', 'w-24'));
+                        tr.appendChild(cell('th', 'Họ tên', 'w-44'));
                         switch (mode) {
                             case 'grade_summary':
-                                tr.appendChild(cell('th', 'T�n L?p'));
+                                tr.appendChild(cell('th', 'Tên Lớp'));
                                 appendTermHeaders(tr);
                                 break;
                             case 'subject_details': {
                                 const detailKeyMap = [
-                                    { label: '�i?m Mi?ng', key: 'oral' },
-                                    { label: '15 ph�t (1)', key: 'fifteen_1' },
-                                    { label: '15 ph�t (2)', key: 'fifteen_2' },
-                                    { label: 'Gi?a k?', key: 'midterm' },
-                                    { label: 'Cu?i k?', key: 'final' },
-                                    { label: 'TB M�n', key: 'average' },
+                                    { label: 'Điểm Miệng', key: 'oral' },
+                                    { label: '15 phút (1)', key: 'fifteen_1' },
+                                    { label: '15 phút (2)', key: 'fifteen_2' },
+                                    { label: 'Giữa kỳ', key: 'midterm' },
+                                    { label: 'Cuối kỳ', key: 'final' },
+                                    { label: 'TB Môn', key: 'average' },
                                 ];
                                 detailKeyMap.forEach((item) => {
                                     tr.appendChild(createSortableTh(item.label, item.key, (r) => r.detail_cells?.[item.key]));
@@ -1303,15 +1305,15 @@
                                 appendTermHeaders(tr);
                                 break;
                         }
-                        tr.appendChild(cell('th', 'Thao t�c', 'text-end w-16'));
+                        tr.appendChild(cell('th', 'Thao tác', 'text-end w-16'));
                         head.appendChild(tr);
 
                         body.innerHTML = '';
                         if (!payload.rows || payload.rows.length === 0) {
                             const empty = document.createElement('tr');
                             const emptyMessage = mode === 'empty'
-                                ? 'Ch?n kh?i ho?c l?p d? t?i ma tr?n di?m.'
-                                : 'Kh�ng c� h?c sinh ph� h?p b? l?c.';
+                                ? 'Chọn khối hoặc lớp để tải ma trận điểm.'
+                                : 'Không có học sinh phù hợp bộ lọc.';
                             const emptyCell = cell('td', emptyMessage, 'text-muted');
                             emptyCell.colSpan = mode === 'subject_details'
                                 ? 9
@@ -1321,10 +1323,10 @@
                         } else {
                             payload.rows.forEach((row, index) => {
                                 const rowEl = document.createElement('tr');
-                                rowEl.appendChild(cell('td', row.student.student_code || '', 'fw-semibold text-gray-900'));
+                                rowEl.appendChild(cell('td', row.student.student_code || '', 'fw-normal text-gray-900'));
 
                                 const nameCell = document.createElement('td');
-                                nameCell.className = 'font-semibold text-gray-900';
+                                nameCell.className = 'font-normal text-gray-900';
                                 nameCell.textContent = row.student.name || '-';
                                 rowEl.appendChild(nameCell);
 
@@ -1359,9 +1361,9 @@
                                 const eyeBtn = document.createElement('button');
                                 eyeBtn.type = 'button';
                                 eyeBtn.className = 'text-gray-500 bg-gray-50 p-2 rounded-md hover:bg-orange-50 hover:text-orange-600 transition-all shadow-xs inline-flex items-center justify-center border-0 cursor-pointer';
-                                eyeBtn.title = 'Xem chi ti?t';
-                                eyeBtn.setAttribute('aria-label', 'Xem chi ti?t');
-                                eyeBtn.innerHTML = '???';
+                                eyeBtn.title = 'Xem chi tiết';
+                                eyeBtn.setAttribute('aria-label', 'Xem chi tiết');
+                                eyeBtn.innerHTML = '👁️';
                                 eyeBtn.addEventListener('click', () => openLedger(index));
                                 actionTd.appendChild(eyeBtn);
                                 rowEl.appendChild(actionTd);
@@ -1370,10 +1372,10 @@
                             });
                         }
 
-                        count.textContent = payload.pagination?.label || 'Hi?n th? 0 trong t?ng s? 0 h?c sinh';
+                        count.textContent = payload.pagination?.label || 'Hiển thị 0 trong tổng số 0 học sinh';
                         pager.innerHTML = '';
                         if (payload.pagination?.show_controls && payload.pagination?.total_pages > 1) {
-                            ['Tru?c', 'Sau'].forEach((label) => {
+                            ['Trước', 'Sau'].forEach((label) => {
                                 const button = document.createElement('button');
                                 button.type = 'button';
                                 button.className = 'btn btn-sm btn-outline-warning';
@@ -1383,12 +1385,12 @@
                         }
 
                         summaryHk1.textContent = payload.summary?.hk1_gpa || '-';
-                        summaryHk2.textContent = lockYearColumns ? '�' : (payload.summary?.hk2_gpa || '-');
-                        summaryYear.textContent = lockYearColumns ? '�' : (payload.summary?.year_gpa || '-');
+                        summaryHk2.textContent = lockYearColumns ? '–' : (payload.summary?.hk2_gpa || '-');
+                        summaryYear.textContent = lockYearColumns ? '–' : (payload.summary?.year_gpa || '-');
                     };
 
                     const renderTeachers = (teachers = []) => {
-                        setOptions(controls.teacher, teachers, 'Ch?n Gi�o vi�n', controls.teacher?.value || '');
+                        setOptions(controls.teacher, teachers, 'Chọn Giáo viên', controls.teacher?.value || '');
                     };
 
                     const requestJson = async (url, searchParams) => {
@@ -1400,7 +1402,7 @@
                         });
                         const payload = await response.json().catch(() => ({}));
                         if (!response.ok) {
-                            throw new Error(payload.message || 'Kh�ng th? t?i d? li?u di?m s?.');
+                            throw new Error(payload.message || 'Không thể tải dữ liệu điểm số.');
                         }
 
                         return payload;
@@ -1412,8 +1414,8 @@
                         const selectedSubjectForDropdown = !isResettingFilters && hadSubject
                             ? (payload.selected_subject_id || controls.subject?.value || '')
                             : '';
-                        setOptions(controls.classRoom, payload.classes || [], 'T?t c? l?p', payload.filters?.class_id || controls.classRoom?.value || '');
-                        setOptions(controls.subject, payload.subjects || [], 'T?t c? m�n h?c', selectedSubjectForDropdown);
+                        setOptions(controls.classRoom, payload.classes || [], 'Tất cả lớp', payload.filters?.class_id || controls.classRoom?.value || '');
+                        setOptions(controls.subject, payload.subjects || [], 'Tất cả môn học', selectedSubjectForDropdown);
 
                         if (!isResettingFilters && hadSubject && payload.selected_subject_id && controls.subject) {
                             controls.subject.value = payload.selected_subject_id;
@@ -1431,7 +1433,7 @@
                     const emptyMark = () => {
                         const span = document.createElement('span');
                         span.className = 'empty-mark text-gray-300 font-normal';
-                        span.textContent = '�';
+                        span.textContent = '–';
                         return span;
                     };
 
@@ -1475,13 +1477,13 @@
 
                         const selectedYear = (matrix.years || []).find((year) => String(year.id).trim() == String(matrix.filters?.school_year_id).trim());
                         modalTitle.textContent = `${(row.student.name || '').toUpperCase()} - ${row.student.student_code || ''}`;
-                        modalSubtitle.textContent = `L?p: ${matrix.class_context?.name || '-'} � Nam h?c: ${selectedYear?.name || '-'}`;
+                        modalSubtitle.textContent = `Lớp: ${matrix.class_context?.name || '-'} • Năm học: ${selectedYear?.name || '-'}`;
                         modalLedger.innerHTML = '';
                         const ledger = (row.ledger || []).filter((item) => String(item.assessment_type).trim().toUpperCase() !== 'NONE');
 
                         if (ledger.length === 0) {
                             const tr = document.createElement('tr');
-                            const td = cell('td', 'Chua c� m�n h?c du?c d�nh gi�.', 'text-muted');
+                            const td = cell('td', 'Chưa có môn học được đánh giá.', 'text-muted');
                             td.colSpan = 7;
                             tr.appendChild(td);
                             modalLedger.appendChild(tr);
@@ -1490,7 +1492,7 @@
                         ledger.forEach((item) => {
                             const details = item.details || [];
                             const tr = document.createElement('tr');
-                            tr.appendChild(cell('td', item.subject_name || '-', 'fw-semibold'));
+                            tr.appendChild(cell('td', item.subject_name || '-', 'fw-normal'));
 
                             if (item.assessment_type === 'ASSESSMENT') {
                                 for (let i = 0; i < 5; i += 1) {
@@ -1567,8 +1569,8 @@
                         activeEvaluationType = normTab === 'ASSESSMENT' || normTab === 'PASS_FAIL' ? 'ASSESSMENT' : 'GRADE_10';
 
                         if (grade10TabBtn && assessmentTabBtn) {
-                            const activeClass = 'btn text-xs font-semibold text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs';
-                            const inactiveClass = 'btn text-xs font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all';
+                            const activeClass = 'btn text-sm font-normal text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs';
+                            const inactiveClass = 'btn text-sm font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all';
                             const isGrade10 = activeEvaluationType === 'GRADE_10';
                             grade10TabBtn.className = isGrade10 ? activeClass : inactiveClass;
                             assessmentTabBtn.className = !isGrade10 ? activeClass : inactiveClass;
@@ -1621,7 +1623,7 @@
                     <input type="hidden" name="subject_id" data-score-subject-id value="{{ $firstAssignment?->subject_id }}">
                     <input type="hidden" name="semester_id" data-score-semester-id value="{{ $firstAssignment?->semester_id }}">
                     <div class="score-filter-field">
-                        <label>L?p</label>
+                        <label>Lớp</label>
                         <select class="form-select" data-score-assignment-class @disabled($assignments->isEmpty())>
                             @forelse($assignments as $assignment)
                                 <option
@@ -1629,14 +1631,14 @@
                                     data-class-id="{{ $assignment->class_id }}"
                                     data-subject-id="{{ $assignment->subject_id }}"
                                     data-semester-id="{{ $assignment->semester_id }}"
-                                >{{ $assignment->classRoom?->name ?? 'Kh�ng r� l?p' }}</option>
+                                >{{ $assignment->classRoom?->name ?? 'Không rõ lớp' }}</option>
                             @empty
-                                <option value="">Chua c� l?p</option>
+                                <option value="">Chưa có lớp</option>
                             @endforelse
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>M�n</label>
+                        <label>Môn</label>
                         <select class="form-select" data-score-assignment-subject @disabled($assignments->isEmpty())>
                             @forelse($assignments as $assignment)
                                 <option
@@ -1644,14 +1646,14 @@
                                     data-class-id="{{ $assignment->class_id }}"
                                     data-subject-id="{{ $assignment->subject_id }}"
                                     data-semester-id="{{ $assignment->semester_id }}"
-                                >{{ $assignment->subject?->name ?? 'Kh�ng r� m�n' }}</option>
+                                >{{ $assignment->subject?->name ?? 'Không rõ môn' }}</option>
                             @empty
-                                <option value="">Chua c� m�n</option>
+                                <option value="">Chưa có môn</option>
                             @endforelse
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>H?c k?</label>
+                        <label>Học kỳ</label>
                         <select class="form-select" data-score-assignment-semester @disabled($assignments->isEmpty())>
                             @forelse($assignments as $assignment)
                                 <option
@@ -1659,51 +1661,51 @@
                                     data-class-id="{{ $assignment->class_id }}"
                                     data-subject-id="{{ $assignment->subject_id }}"
                                     data-semester-id="{{ $assignment->semester_id }}"
-                                >{{ $assignment->semester?->normalizedName() ?? 'Kh�ng r� h?c k?' }}</option>
+                                >{{ $assignment->semester?->normalizedName() ?? 'Không rõ học kỳ' }}</option>
                             @empty
-                                <option value="">Chua c� h?c k?</option>
+                                <option value="">Chưa có học kỳ</option>
                             @endforelse
                         </select>
                     </div>
                 @else
                     <div class="score-filter-field compact">
-                        <label>Kh?i</label>
+                        <label>Khối</label>
                         <select name="grade_level" class="form-select" data-score-admin-grade>
-                            <option value="">T?t c? kh?i</option>
+                            <option value="">Tất cả khối</option>
                             @foreach($availableGrades as $grade)
-                                <option value="{{ $grade }}">Kh?i {{ $grade }}</option>
+                                <option value="{{ $grade }}">Khối {{ $grade }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>L?p</label>
+                        <label>Lớp</label>
                         <select name="class_id" class="form-select" required data-score-admin-class>
-                            <option value="">Ch?n l?p</option>
+                            <option value="">Chọn lớp</option>
                             @foreach($classes as $class)
                                 <option value="{{ $class->id }}" data-grade="{{ $class->grade_level }}">{{ $class->name }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>M�n h?c</label>
+                        <label>Môn học</label>
                         <select name="subject_id" class="form-select" required>
-                            <option value="">Ch?n m�n h?c</option>
+                            <option value="">Chọn môn học</option>
                             @foreach($subjects as $subject)
                                 <option value="{{ $subject->id }}">{{ $subject->name }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>Gi�o vi�n</label>
+                        <label>Giáo viên</label>
                         <select name="teacher_id" class="form-select" data-score-admin-teacher>
-                            <option value="">T?t c? gi�o vi�n</option>
+                            <option value="">Tất cả giáo viên</option>
                             @foreach(($teachers ?? collect()) as $teacher)
                                 <option value="{{ $teacher->id }}">{{ $teacher->name }}{{ $teacher->teacher_code ? ' - ' . $teacher->teacher_code : '' }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="score-filter-field">
-                        <label>H?c k?</label>
+                        <label>Học kỳ</label>
                         <select name="semester_id" class="form-select" required data-score-admin-semester>
                             @foreach($semesters as $semester)
                                 <option value="{{ $semester->id }}" @selected($selectedSemesterId === $semester->id)>
@@ -1715,7 +1717,7 @@
                 @endif
                 <button class="btn score-open-sheet-btn" @disabled((! $isScoreAdmin && auth()->user()->isTeacher()) && $assignments->isEmpty())>
                     <i class="bi bi-box-arrow-in-right"></i>
-                    {{ $isScoreAdmin ? 'Tra c?u b?ng di?m' : 'M? b?ng nh?p' }}
+                    {{ $isScoreAdmin ? 'Tra cứu bảng điểm' : 'Mở bảng nhập' }}
                 </button>
             </form>
         </div>
@@ -1723,8 +1725,8 @@
         @if(! $isScoreAdmin)
             <div class="score-assignment-strip">
                 <div class="score-assignment-heading">
-                    <span>Ph�n c�ng c?a b?n</span>
-                    <small>Ch?n nhanh l?p v� m�n d? b?t d?u nh?p di?m</small>
+                    <span>Phân công của bạn</span>
+                    <small>Chọn nhanh lớp và môn để bắt đầu nhập điểm</small>
                 </div>
                 <div class="score-assignment-badges">
                     @forelse($assignments as $assignment)
@@ -1737,13 +1739,13 @@
                             class="score-assignment-badge"
                             data-score-assignment-badge="{{ $assignment->id }}"
                         >
-                            <strong>{{ $assignment->classRoom?->name ?? 'Kh�ng r� l?p' }}</strong>
-                            <span>{{ $assignment->subject?->name ?? 'Kh�ng r� m�n' }} � {{ $assignment->semester?->normalizedName() ?? 'Kh�ng r� h?c k?' }}</span>
+                            <strong>{{ $assignment->classRoom?->name ?? 'Không rõ lớp' }}</strong>
+                            <span>{{ $assignment->subject?->name ?? 'Không rõ môn' }} • {{ $assignment->semester?->normalizedName() ?? 'Không rõ học kỳ' }}</span>
                         </a>
                     @empty
                         <div class="score-entry-empty">
                             <i class="bi bi-inbox"></i>
-                            Th?y/c� vui l�ng ch?n L?p v� M�n h?c d? b?t d?u nh?p di?m.
+                            Thầy/cô vui lòng chọn Lớp và Môn học để bắt đầu nhập điểm.
                         </div>
                     @endforelse
                 </div>
@@ -1755,8 +1757,8 @@
         <i class="bi bi-clipboard-data"></i>
         <span>
             {{ $isScoreAdmin
-                ? 'Vui l�ng l?a ch?n Kh?i, L?p v� M�n h?c d? ti?n h�nh tra c?u b?ng di?m s?.'
-                : 'Th?y/c� vui l�ng ch?n L?p v� M�n h?c d? b?t d?u nh?p di?m.' }}
+                ? 'Vui lòng lựa chọn Khối, Lớp và Môn học để tiến hành tra cứu bảng điểm số.'
+                : 'Thầy/cô vui lòng chọn Lớp và Môn học để bắt đầu nhập điểm.' }}
         </span>
     </div>
 

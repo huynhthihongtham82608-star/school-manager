@@ -65,19 +65,29 @@
                     <td>{{ $department->leader?->name ?? 'Chưa phân công' }}</td>
                     <td><span class="badge {{ $department->statusBadgeClass() }}">{{ $department->statusLabel() }}</span></td>
                     <td class="text-end">
-                        <div class="content-action-group justify-content-end">
-                            <button type="button" class="content-action-btn icon-only" title="Xem chi tiết" aria-label="Xem chi tiết" data-bs-toggle="modal" data-bs-target="#departmentDetail{{ $department->id }}">
+                        <div class="content-action-group justify-content-end" data-action-synced="true">
+                            <button type="button" class="content-action-btn icon-only {{ $readOnly ? '' : 'd-none' }}" title="Xem chi tiết" aria-label="Xem chi tiết" data-bs-toggle="modal" data-bs-target="#departmentDetail{{ $department->id }}">
                                 <i class="bi bi-eye"></i><span class="visually-hidden">Xem chi tiết</span>
                             </button>
                             @unless($readOnly)
-                                <a href="{{ route('departments.edit', $department) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
+                                <a href="{{ route('departments.edit', $department) }}" class="content-action-btn icon-only edit d-none" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip" aria-hidden="true">
                                     <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                 </a>
                                 <div class="dropdown">
                                     <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
                                         <i class="bi bi-three-dots-vertical"></i>
                                     </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
+                                    <ul class="dropdown-menu dropdown-menu-end content-action-menu">
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#departmentDetail{{ $department->id }}">
+                                                <i class="bi bi-eye me-2"></i>Xem chi tiết
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <a href="{{ route('departments.edit', $department) }}" class="dropdown-item">
+                                                <i class="bi bi-pencil-square me-2"></i>Sửa thông tin
+                                            </a>
+                                        </li>
                                         @if($department->teachers_count === 0)
                                             <li>
                                                 <form action="{{ route('departments.destroy', $department) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa tổ chuyên môn này?');">

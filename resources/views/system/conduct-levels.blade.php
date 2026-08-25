@@ -180,7 +180,7 @@
     <div class="conduct-level-modal-card w-full max-w-md bg-white p-6 rounded-xl shadow-2xl flex flex-col gap-4 text-left border border-orange-100">
         <div class="border-b border-orange-100 pb-3 text-left">
             <h2 class="text-lg font-semibold text-gray-900 !text-left mb-1" data-modal-title>Định mức hạnh kiểm</h2>
-            <p class="text-xs font-normal text-orange-700/60 !text-left mb-0">Cập nhật một dòng cấu hình rồi lưu về hệ thống.</p>
+            <p class="text-sm font-normal text-orange-700/60 !text-left mb-0">Cập nhật một dòng cấu hình rồi lưu về hệ thống.</p>
         </div>
         <div class="flex flex-col gap-3 text-left">
             <label class="text-sm font-normal text-gray-700 text-left">

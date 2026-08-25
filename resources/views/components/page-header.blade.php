@@ -18,8 +18,8 @@
             'subtitle' => 'Giám sát danh sách tài khoản của cha mẹ, quản lý liên kết định danh giữa phụ huynh và học sinh.',
         ],
         request()->routeIs('admin.home-page.*', 'announcements.*', 'events.*', 'documents.*') => [
-            'title' => 'Cấu hình nội dung hệ thống',
-            'subtitle' => 'Quản lý giao diện trang chủ, biên tập các bài viết tin tức, chỉnh sửa thư viện ảnh và thông tin hiển thị trên cổng thông tin nhà trường.',
+            'title' => 'Nội dung',
+            'subtitle' => 'Quản lý diện mạo trường, thông báo, sự kiện và tài liệu học tập hiển thị trong hệ thống.',
         ],
         request()->routeIs('messages.*') => [
             'title' => 'Hộp thư điện tử',

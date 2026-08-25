@@ -13,8 +13,8 @@
     ];
 @endphp
 <x-page-header
-    title="Cấu hình nội dung hệ thống"
-    subtitle="Quản lý giao diện trang chủ, biên tập các bài viết tin tức, chỉnh sửa thư viện ảnh và thông tin hiển thị trên cổng thông tin nhà trường."
+    :title="$activeTab === 'events' ? 'Sự kiện' : 'Thông báo'"
+    :subtitle="$activeTab === 'events' ? 'Danh sách sự kiện - Sự kiện đã công bố sẽ được Landing Page ưu tiên hiển thị.' : 'Danh sách thông báo - Nội dung dài được rút gọn trong bảng, bấm Chi tiết để xem đầy đủ.'"
 >
     @if($activeTab === 'announcements')
         <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#announcement-create-modal">
@@ -102,12 +102,6 @@
         </div>
 
         <div class="management-card">
-            <div class="management-card-header">
-                <div>
-                    <h6>Danh sách thông báo</h6>
-                    <p>Nội dung dài được rút gọn trong bảng, bấm Chi tiết để xem đầy đủ.</p>
-                </div>
-            </div>
             <div class="table-responsive content-table-wrap">
                 <table class="table content-table align-middle">
                     <thead>
@@ -128,18 +122,18 @@
                             $editId = 'post-edit-' . $loop->index;
                         @endphp
                         <tr>
-                            <td class="fw-semibold content-break-cell">{{ $post->title }}</td>
+                            <td class="fw-normal content-break-cell">{{ $post->title }}</td>
                             <td>{{ $post->type === 'news' ? 'Tin tức' : 'Thông báo' }}</td>
                             <td>{{ optional($post->published_at)->format('d/m/Y H:i') ?: 'Đang cập nhật' }}</td>
                             <td class="content-break-cell">{{ \Illuminate\Support\Str::limit($postText ?: 'Chưa có nội dung.', 90, '......') }}</td>
-                            <td>
+                            <td class="text-end">
                                 <span class="content-status {{ $post->is_published ? 'published' : 'draft' }}">
                                     {{ $post->is_published ? ' Công bố' : ' Bản nháp' }}
                                 </span>
                             </td>
-                            <td>
-                                <div class="content-action-group justify-content-end">
-                                    <button type="button" class="content-action-btn icon-only edit" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa">
+                            <td class="text-end">
+                                <div class="content-action-group justify-content-end" data-action-synced="true">
+                                    <button type="button" class="content-action-btn icon-only edit d-none" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa" aria-hidden="true">
                                         <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                     </button>
                                     <div class="dropdown">
@@ -149,6 +143,9 @@
                                         <div class="dropdown-menu dropdown-menu-end content-action-menu">
                                             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}">
                                                 <i class="bi bi-eye"></i>Xem chi tiết
+                                            </button>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $editId }}">
+                                                <i class="bi bi-pencil-square"></i>Sửa thông tin
                                             </button>
                                             <form method="POST" action="{{ route('announcements.destroy', $post) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!')">
                                                 @csrf
@@ -359,12 +356,6 @@
         </div>
 
         <div class="management-card">
-            <div class="management-card-header">
-                <div>
-                    <h6>Danh sách sự kiện</h6>
-                    <p>Sự kiện đã công bố sẽ được Landing Page ưu tiên hiển thị.</p>
-                </div>
-            </div>
             <div class="table-responsive content-table-wrap">
                 <table class="table content-table align-middle">
                     <thead>
@@ -395,8 +386,8 @@
                                 </span>
                             </td>
                             <td>
-                                <div class="content-action-group justify-content-end">
-                                    <button type="button" class="content-action-btn icon-only edit" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa">
+                                <div class="content-action-group justify-content-end" data-action-synced="true">
+                                    <button type="button" class="content-action-btn icon-only edit d-none" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa" aria-hidden="true">
                                         <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                     </button>
                                     <div class="dropdown">
@@ -406,6 +397,9 @@
                                         <div class="dropdown-menu dropdown-menu-end content-action-menu">
                                             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $detailId }}">
                                                 <i class="bi bi-eye"></i>Xem chi tiết
+                                            </button>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $editId }}">
+                                                <i class="bi bi-pencil-square"></i>Sửa thông tin
                                             </button>
                                             <form method="POST" action="{{ route('events.destroy', $event) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!')">
                                                 @csrf

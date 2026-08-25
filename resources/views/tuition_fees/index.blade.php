@@ -327,7 +327,7 @@
                                     <i class="bi bi-pencil-square"></i><span>Cập nhật</span>
                                 </button>
                             @else
-                                <span class="text-xs font-normal text-gray-400">Chỉ xem</span>
+                                <span class="text-sm font-normal text-gray-400">Chỉ xem</span>
                             @endif
                         </td>
                     </tr>
@@ -351,7 +351,7 @@
         <div class="tuition-modal-card w-full max-w-md bg-white p-6 rounded-xl shadow-2xl flex flex-col gap-4 text-left border border-orange-100">
             <div class="w-full text-left">
                 <h2 class="text-base font-semibold text-gray-900 text-left mb-1">Cập nhật học phí</h2>
-                <p class="text-xs font-normal text-orange-700/70 text-left mb-0" data-tuition-student>Thông tin học sinh</p>
+                <p class="text-sm font-normal text-orange-700/70 text-left mb-0" data-tuition-student>Thông tin học sinh</p>
             </div>
 
             <form id="tuition-form" method="POST" class="flex flex-col gap-3 text-left">
@@ -361,7 +361,7 @@
                 <div id="tuition-items" class="flex flex-col gap-2 text-left"></div>
 
                 <div class="bg-orange-50/40 border border-orange-100 rounded-xl p-3 text-left">
-                    <div class="text-xs font-normal text-gray-500 mb-1">Tổng tiền phải đóng</div>
+                    <div class="text-sm font-normal text-gray-500 mb-1">Tổng tiền phải đóng</div>
                     <div class="text-lg font-semibold text-orange-700 text-left" data-tuition-total>0đ</div>
                 </div>
 
@@ -390,7 +390,7 @@
                     @else
                         <div class="tuition-qr-demo" aria-label="QR chuyển khoản demo"></div>
                     @endif
-                    <p class="text-xs font-normal text-gray-500 mt-2 mb-0">Vui lòng quét mã để tự động gạch nợ học phí.</p>
+                    <p class="text-sm font-normal text-gray-500 mt-2 mb-0">Vui lòng quét mã để tự động gạch nợ học phí.</p>
                 </div>
 
                 <div class="text-left">
@@ -485,7 +485,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="hidden" name="fee_items[${index}][key]" value="${item.key}">
                     ${locked ? `<input type="hidden" name="${selectName}" value="paid">` : ''}
                     <div class="text-sm font-normal text-gray-700 truncate">${item.label}</div>
-                    <div class="text-xs font-normal text-orange-700/80 mt-1">${money(item.amount)}</div>
+                    <div class="text-sm font-normal text-orange-700/80 mt-1">${money(item.amount)}</div>
                     <div class="mt-2">${itemBadge(item.status, item.exemption_label)}</div>
                 </div>
                 <select name="${selectName}" class="tuition-input" ${locked ? 'disabled' : ''} data-status-select>

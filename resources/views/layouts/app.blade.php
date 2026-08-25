@@ -33,16 +33,6 @@
         ? session('viewing_school_year_id', session('history_school_year_id'))
         : session('history_school_year_id');
     $showFloatingChatbot = (bool) $currentUser;
-    $floatingChatMessages = collect();
-
-    if ($showFloatingChatbot && \Illuminate\Support\Facades\Schema::hasTable('chatbot_messages')) {
-        $floatingChatMessages = \App\Models\ChatbotMessage::where('user_id', $currentUser->id)
-            ->latest('created_at')
-            ->limit(20)
-            ->get()
-            ->reverse()
-            ->values();
-    }
 
     if ($showSidebar && \Illuminate\Support\Facades\Schema::hasTable('school_years')) {
         $headerSchoolYears = \App\Models\SchoolYear::orderByDesc('start_date')
@@ -482,6 +472,36 @@
             padding-top: 1rem !important;
             padding-bottom: 1rem !important;
             align-items: center !important;
+            display: flex !important;
+            gap: .75rem !important;
+            overflow: hidden !important;
+            text-align: left !important;
+        }
+
+        .role-sidebar-head .brand-mark {
+            flex: 0 0 auto !important;
+        }
+
+        .role-sidebar-head > div:not(.brand-mark) {
+            min-width: 0 !important;
+            flex: 1 1 auto !important;
+            overflow: hidden !important;
+            text-align: left !important;
+        }
+
+        .role-sidebar-title {
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: normal !important;
+            text-align: left !important;
+            line-height: 1.2 !important;
+        }
+
+        .role-sidebar-subtitle {
+            display: none !important;
         }
 
         .role-content-fixed-offset {
@@ -496,17 +516,49 @@
             text-align: left !important;
         }
 
+        .role-topbar-left {
+            display: flex !important;
+            align-items: center !important;
+            gap: 1rem !important;
+            min-width: 0 !important;
+            flex: 1 1 auto !important;
+            text-align: left !important;
+        }
+
+        .role-topbar-left .school-heading {
+            flex: 0 0 auto !important;
+            white-space: nowrap !important;
+        }
+
+        .role-topbar-left .topbar-search {
+            width: min(28rem, 42vw) !important;
+            max-width: 100% !important;
+            flex: 0 1 28rem !important;
+        }
+
+        .topbar-actions .badge-role {
+            flex: 0 0 auto !important;
+            white-space: nowrap !important;
+            max-width: 22rem !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        .topbar-actions .dropdown-toggle {
+            white-space: nowrap !important;
+        }
+
         @media (min-width: 992px) {
             .role-sidebar {
                 transform: translateX(0) !important;
                 width: 14rem !important;
                 position: fixed !important;
-                left: .5rem !important;
-                top: .5rem !important;
-                height: calc(100% - 1rem) !important;
+                left: 0 !important;
+                top: 0 !important;
+                height: 100vh !important;
                 background-color: #ffffff !important;
                 border-right: 1px solid #ffedd5 !important;
-                border-radius: .75rem !important;
+                border-radius: 0 !important;
                 z-index: 40 !important;
                 text-align: left !important;
                 overflow: hidden !important;
@@ -515,7 +567,8 @@
                 display: none !important;
             }
             .main-panel {
-                padding-left: 15rem !important;
+                padding-left: 14rem !important;
+                padding-right: 0 !important;
                 width: 100% !important;
                 min-height: 100vh !important;
                 background-color: #f9fafb !important;
@@ -577,16 +630,15 @@
             }
         }
     </style>
-    <nav class="role-sidebar w-56 fixed left-2 top-2 h-full bg-white border-r border-orange-100 z-40 text-left" aria-label="Menu chức năng">
+    <nav class="role-sidebar w-56 fixed left-0 top-0 h-screen bg-white border-r border-orange-100 z-40 text-left" aria-label="Menu chức năng">
         <div class="role-sidebar-head h-16 py-4 items-center">
             @if($schoolLogoUrl)
                 <img src="{{ $schoolLogoUrl }}" alt="{{ $schoolTitle }}" class="brand-mark rounded-3 object-fit-cover">
             @else
-                <div class="brand-mark fw-bold rounded-3">{{ $schoolShortName }}</div>
+                <div class="brand-mark fw-normal rounded-3">{{ $schoolShortName }}</div>
             @endif
             <div>
                 <div class="role-sidebar-title">{{ $schoolTitle }}</div>
-                <div class="role-sidebar-subtitle">{{ $currentUser->display_name }}</div>
             </div>
             <button type="button" class="btn btn-light role-sidebar-close" data-role-menu-close aria-label="Đóng menu">
                 <i class="bi bi-x-lg"></i>
@@ -753,29 +805,6 @@
             @endif
 
             <div class="topbar-actions d-flex align-items-center gap-3">
-                @if($currentUser->isParent() && $currentUser->parentProfile)
-                    @php
-                        $headerParentChildren = $currentUser->parentProfile->students()
-                            ->with('classRoom')
-                            ->orderBy('student_code')
-                            ->get();
-                        $headerSelectedChild = $headerParentChildren->firstWhere('id', session('selected_parent_student_id'))
-                            ?: $headerParentChildren->first();
-                    @endphp
-                    <form method="POST" action="{{ route('parent.select-child') }}" class="parent-header-child-select d-flex align-items-center gap-2">
-                        @csrf
-                        <label class="small text-muted fw-semibold mb-0">Chọn học sinh</label>
-                        <select name="student_id" class="form-select form-select-sm" onchange="this.form.submit()" @disabled($headerParentChildren->isEmpty())>
-                            @forelse($headerParentChildren as $child)
-                                <option value="{{ $child->id }}" @selected(($headerSelectedChild?->id ?? null) === $child->id)>
-                                    {{ $child->student_code }} - {{ $child->name }}
-                                </option>
-                            @empty
-                                <option value="">Chưa có học sinh</option>
-                            @endforelse
-                        </select>
-                    </form>
-                @endif
                 <span class="badge badge-role">
                     @if($currentUser->isTeacher())
                         {{ $currentUser->isHomeroom() ? 'Giáo viên bộ môn kiêm GVCN' : 'Giáo viên bộ môn' }}
@@ -791,7 +820,7 @@
                 </span>
                 <div class="dropdown">
                     <button class="btn btn-link text-dark text-decoration-none dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-person-circle me-2"></i><span class="fw-semibold">{{ $currentUser->display_name }}</span>
+                        <i class="bi bi-person-circle me-2"></i><span class="fw-normal">{{ $currentUser->display_name }}</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                         <li><a class="dropdown-item" href="{{ route('profile.show') }}"><i class="bi bi-person-circle me-2"></i>Thông tin cá nhân</a></li>
@@ -849,7 +878,7 @@
         </main>
     </div>
 </div>
-@if($showFloatingChatbot)
+@if(false && $showFloatingChatbot)
 <div class="floating-chatbot {{ session('chatbot_open') || old('chatbot_widget') ? 'open' : '' }}" data-floating-chatbot>
     <button type="button" class="floating-chatbot-toggle" data-floating-chatbot-toggle aria-label="Mở chatbot hỗ trợ" aria-expanded="{{ session('chatbot_open') || old('chatbot_widget') ? 'true' : 'false' }}">
         <i class="bi bi-robot"></i>
@@ -857,7 +886,7 @@
     <section class="floating-chatbot-panel" aria-label="Chatbot hỗ trợ">
         <div class="floating-chatbot-header">
             <div>
-                <div class="floating-chatbot-title font-medium text-white">Chatbot hỗ trợ AI</div>
+                <div class="floating-chatbot-title font-normal text-white">Chatbot hỗ trợ AI</div>
                 <div class="floating-chatbot-subtitle text-xs text-orange-100 font-normal">Hỏi nhanh về thông tin trong hệ thống</div>
             </div>
             <button type="button" class="floating-chatbot-close" data-floating-chatbot-close aria-label="Đóng chatbot">
@@ -899,6 +928,170 @@
             <input name="question" class="form-control text-sm border border-orange-200 rounded-md py-1.5 px-3 w-full font-normal focus:border-orange-500 focus:ring-1 focus:ring-orange-500" placeholder="Nhập câu hỏi..." autocomplete="off" data-chatbot-input>
             <button type="button" class="btn bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-md transition-all text-sm font-normal cursor-pointer flex items-center justify-center shrink-0" aria-label="Gửi câu hỏi" data-chatbot-send-btn>
                 <i class="bi bi-send"></i>
+            </button>
+        </form>
+    </section>
+</div>
+@endif
+@if($showFloatingChatbot)
+<style>
+    #chat-toggle-btn {
+        width: 56px;
+        height: 56px;
+        position: fixed !important;
+        right: 1.5rem !important;
+        bottom: 1.5rem !important;
+        z-index: 1050 !important;
+        border: 0 !important;
+    }
+
+    #chat-window-box.hidden {
+        display: none !important;
+    }
+
+    #chat-window-box {
+        position: fixed !important;
+        right: 1.5rem !important;
+        bottom: 6rem !important;
+        z-index: 1050 !important;
+        width: 20rem !important;
+        height: 450px !important;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border: 1px solid #ffedd5;
+        border-radius: 1rem;
+        overflow: hidden;
+        animation: chatWidgetRise .22s ease-out;
+    }
+
+    .school-chatbot-message-row {
+        display: flex;
+        width: 100%;
+        margin-bottom: .6rem;
+    }
+
+    .school-chatbot-message-row.user {
+        justify-content: flex-end;
+    }
+
+    .school-chatbot-message-row.bot {
+        justify-content: flex-start;
+    }
+
+    .school-chatbot-bubble {
+        max-width: 86%;
+        border-radius: 14px;
+        padding: .65rem .8rem;
+        font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: .875rem;
+        font-weight: 400;
+        line-height: 1.45;
+        text-align: left;
+        word-break: break-word;
+        white-space: pre-wrap;
+    }
+
+    .school-chatbot-bubble.user {
+        color: #fff;
+        background: #ea580c;
+        border: 1px solid #ea580c;
+        box-shadow: 0 8px 18px rgba(234, 88, 12, .18);
+    }
+
+    .school-chatbot-bubble.bot {
+        color: #374151;
+        background: #fff;
+        border: 1px solid #fed7aa;
+        box-shadow: 0 6px 14px rgba(15, 23, 42, .05);
+    }
+
+    .school-chatbot-qr-preview {
+        width: 160px;
+        max-width: 100%;
+        margin-top: .55rem;
+        border: 1px solid #fed7aa;
+        border-radius: 12px;
+        background: #fff7ed;
+        padding: .35rem;
+    }
+
+    .school-chatbot-qr-preview img {
+        width: 100%;
+        height: auto;
+        border-radius: 9px;
+        display: block;
+    }
+
+    @keyframes chatWidgetRise {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @media (max-width: 640px) {
+        #chat-window-box {
+            right: .75rem !important;
+            left: .75rem !important;
+            bottom: 5.75rem !important;
+            width: auto !important;
+            height: min(450px, calc(100vh - 7rem)) !important;
+        }
+
+        #chat-toggle-btn {
+            right: .95rem !important;
+            bottom: .95rem !important;
+        }
+    }
+</style>
+<div class="floating-chatbot" data-school-chatbot data-user-id="{{ $currentUser->id }}">
+    <button type="button"
+            id="chat-toggle-btn"
+            class="fixed bottom-6 right-6 z-50 bg-orange-600 text-white p-3.5 rounded-full shadow-lg cursor-pointer hover:bg-orange-700 transition-all active:scale-95 flex items-center justify-center font-sans font-normal text-sm"
+            data-school-chat-toggle
+            aria-label="Mở trợ lý học vụ AI"
+            aria-expanded="false">
+        AI
+    </button>
+    <section id="chat-window-box"
+             class="fixed bottom-24 right-6 w-80 h-[450px] bg-white border border-orange-100 rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden hidden transition-all duration-300 font-sans text-left"
+             data-school-chat-window
+             aria-label="Trợ lý học vụ AI">
+        <div class="bg-orange-50 border-b border-orange-100 px-4 py-3 flex items-center justify-between text-left">
+            <div class="min-w-0 text-left">
+                <div class="text-sm font-normal text-gray-900 text-left">🌐 Trợ lý Học vụ AI</div>
+                <div class="text-xs font-normal text-orange-700/80 text-left mt-0.5">Tra cứu điểm số, học phí và nề nếp</div>
+            </div>
+            <button type="button"
+                    class="text-gray-400 hover:text-orange-700 bg-transparent border-0 p-0 text-lg leading-none cursor-pointer"
+                    data-school-chat-close
+                    aria-label="Ẩn khung chat">
+                −
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-3 bg-gray-50/50 text-left" data-school-chat-messages>
+            <div class="school-chatbot-message-row bot" data-school-chat-welcome>
+                <div class="school-chatbot-bubble bot">Xin chào! Bạn có thể hỏi nhanh: xem điểm, học phí hoặc điểm danh.</div>
+            </div>
+        </div>
+        <form class="floating-chatbot-form border-t border-orange-100 bg-white p-2 flex items-center gap-2 text-left"
+              data-school-chat-form
+              onsubmit="return false;">
+            <input name="message"
+                   class="flex-1 text-sm font-normal text-gray-700 bg-transparent border border-orange-100 rounded-lg px-3 py-2 focus:border-orange-500 focus:outline-none text-left"
+                   placeholder="Nhập câu hỏi..."
+                   autocomplete="off"
+                   data-school-chat-input>
+            <button type="button"
+                    class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-lg transition-all text-sm font-normal cursor-pointer shrink-0"
+                    aria-label="Gửi câu hỏi"
+                    data-school-chat-send>
+                Gửi
             </button>
         </form>
     </section>
@@ -1177,6 +1370,171 @@
 
                 groups.forEach((otherGroup) => setGroupOpen(otherGroup, otherGroup === group ? shouldOpen : false));
             });
+        });
+    })();
+
+    (() => {
+        const chatbot = document.querySelector('[data-school-chatbot]');
+
+        if (!chatbot) {
+            return;
+        }
+
+        const toggle = chatbot.querySelector('[data-school-chat-toggle]');
+        const closeButton = chatbot.querySelector('[data-school-chat-close]');
+        const windowBox = chatbot.querySelector('[data-school-chat-window]');
+        const messages = chatbot.querySelector('[data-school-chat-messages]');
+        const form = chatbot.querySelector('[data-school-chat-form]');
+        const input = chatbot.querySelector('[data-school-chat-input]');
+        const sendButton = chatbot.querySelector('[data-school-chat-send]');
+        const userId = chatbot.dataset.userId || '';
+
+        const scrollToBottom = () => {
+            if (!messages) {
+                return;
+            }
+
+            messages.scrollTo({
+                top: messages.scrollHeight,
+                behavior: 'smooth'
+            });
+        };
+
+        const setOpen = (isOpen) => {
+            windowBox?.classList.toggle('hidden', !isOpen);
+            toggle?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+
+            if (isOpen) {
+                window.requestAnimationFrame(scrollToBottom);
+                input?.focus();
+            }
+        };
+
+        const extractQrUrl = (text) => {
+            const urls = String(text || '').match(/https?:\/\/[^\s]+/g) || [];
+
+            return urls
+                .map((url) => url.replace(/[)\].,;]+$/g, ''))
+                .find((url) => /qr|tuition|storage|\.png|\.jpe?g|\.webp/i.test(url)) || '';
+        };
+
+        const appendMessage = (type, text, options = {}) => {
+            if (!messages) {
+                return null;
+            }
+
+            const row = document.createElement('div');
+            row.className = `school-chatbot-message-row ${type === 'user' ? 'user' : 'bot'}`;
+
+            const bubble = document.createElement('div');
+            bubble.className = `school-chatbot-bubble ${type === 'user' ? 'user' : 'bot'}`;
+            bubble.textContent = text;
+            row.appendChild(bubble);
+
+            if (options.qrUrl) {
+                const qrWrap = document.createElement('div');
+                qrWrap.className = 'school-chatbot-qr-preview';
+
+                const qrImage = document.createElement('img');
+                qrImage.src = options.qrUrl;
+                qrImage.alt = 'Mã QR học phí';
+                qrImage.loading = 'lazy';
+                qrWrap.appendChild(qrImage);
+                bubble.appendChild(qrWrap);
+            }
+
+            messages.appendChild(row);
+            scrollToBottom();
+
+            return row;
+        };
+
+        const appendLoading = () => {
+            const row = document.createElement('div');
+            row.className = 'school-chatbot-message-row bot';
+
+            const bubble = document.createElement('div');
+            bubble.className = 'school-chatbot-bubble bot';
+            bubble.textContent = 'Đang tra cứu dữ liệu...';
+            row.appendChild(bubble);
+            messages?.appendChild(row);
+            scrollToBottom();
+
+            return row;
+        };
+
+        const setBusy = (isBusy) => {
+            if (input) {
+                input.disabled = isBusy;
+            }
+
+            if (sendButton) {
+                sendButton.disabled = isBusy;
+                sendButton.classList.toggle('opacity-60', isBusy);
+                sendButton.classList.toggle('cursor-not-allowed', isBusy);
+            }
+        };
+
+        const sendMessage = async () => {
+            const message = (input?.value || '').trim();
+
+            if (!message) {
+                return;
+            }
+
+            input.value = '';
+            appendMessage('user', message);
+            const loadingRow = appendLoading();
+            setBusy(true);
+
+            try {
+                const response = await fetch('/api/chatbot/query', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        message,
+                        user_id: userId
+                    })
+                });
+
+                const payload = await response.json();
+
+                if (!response.ok || payload.status !== 'success') {
+                    throw new Error(payload.reply || payload.message || 'Không thể nhận phản hồi từ trợ lý học vụ.');
+                }
+
+                loadingRow?.remove();
+                const reply = payload.reply || 'Dạ, tôi chưa có dữ liệu phù hợp để trả lời câu hỏi này.';
+                appendMessage('bot', reply, {
+                    qrUrl: extractQrUrl(reply)
+                });
+            } catch (error) {
+                loadingRow?.remove();
+                appendMessage('bot', error.message || 'Không thể kết nối tới API Chatbot. Vui lòng thử lại sau.');
+            } finally {
+                setBusy(false);
+                input?.focus();
+            }
+        };
+
+        toggle?.addEventListener('click', () => {
+            setOpen(windowBox?.classList.contains('hidden') ?? true);
+        });
+        closeButton?.addEventListener('click', () => setOpen(false));
+        sendButton?.addEventListener('click', sendMessage);
+        form?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            sendMessage();
+        });
+        input?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendMessage();
+            }
         });
     })();
 

@@ -519,27 +519,41 @@
 
     .score-column-toast {
         position: fixed;
-        right: 1rem;
-        bottom: 1rem;
-        z-index: 1085;
-        transform: translateY(10px);
-        opacity: 0;
-        padding: .75rem .9rem;
-        border-radius: 8px;
-        color: #fff;
-        background: #ea580c;
+        top: 1.5rem;
+        left: 50%;
+        z-index: 9999;
+        transform: translate(-50%, -10px);
+        opacity: 1 !important;
+        display: inline-flex;
+        align-items: center;
+        gap: .625rem;
+        max-width: min(24rem, calc(100vw - 2rem));
+        padding: 1rem;
+        border: 1px solid #bbf7d0;
+        border-radius: 12px;
+        color: #166534;
+        background: #f0fdf4 !important;
+        background-color: #f0fdf4 !important;
+        background-image: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        isolation: isolate;
         font-size: .9rem;
         font-weight: 400;
+        text-align: left;
         box-shadow: 0 16px 32px rgba(15, 23, 42, .2);
         transition: all .2s ease;
     }
 
     .score-column-toast.error {
-        background: #b91c1c;
+        border-color: #fecaca;
+        color: #991b1b;
+        background: #fef2f2 !important;
+        background-color: #fef2f2 !important;
     }
 
     .score-column-toast.show {
-        transform: translateY(0);
+        transform: translate(-50%, 0);
         opacity: 1;
     }
 
@@ -868,7 +882,11 @@
         const showToast = (message, type = 'success') => {
             const toast = document.createElement('div');
             toast.className = `score-column-toast ${type === 'success' ? 'success' : 'error'}`;
-            toast.textContent = message;
+            const icon = document.createElement('span');
+            icon.textContent = type === 'success' ? '🟢' : '🔴';
+            const text = document.createElement('span');
+            text.textContent = message;
+            toast.append(icon, text);
             document.body.appendChild(toast);
             window.setTimeout(() => toast.classList.add('show'), 20);
             window.setTimeout(() => {

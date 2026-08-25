@@ -16,8 +16,8 @@
 @endphp
 
 <x-page-header
-    title="Cấu hình nội dung hệ thống"
-    subtitle="Quản lý giao diện trang chủ, biên tập các bài viết tin tức, chỉnh sửa thư viện ảnh và thông tin hiển thị trên cổng thông tin nhà trường."
+    title="Tài liệu học tập"
+    subtitle="Danh sách tài liệu học tập - Sửa, xóa hoặc xem chi tiết tài liệu học tập trong hệ thống."
 >
     @if($canManageDocuments)
         <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#document-create-modal">
@@ -123,12 +123,6 @@
         </div>
 
         <div class="management-card">
-            <div class="management-card-header">
-                <div>
-                    <h6>Danh sách tài liệu học tập</h6>
-                    <p>Sửa, xóa hoặc xem chi tiết tài liệu học tập trong hệ thống.</p>
-                </div>
-            </div>
             <div class="table-responsive content-table-wrap">
                 <table class="table content-table align-middle">
                     <thead>
@@ -152,8 +146,8 @@
                             $documentFileUrl = $document->fileUrl();
                         @endphp
                         <tr>
-                            <td>
-                                <div class="fw-semibold content-break-cell">{{ $document->title }}</div>
+                            <td class="text-end">
+                                <div class="fw-normal content-break-cell">{{ $document->title }}</div>
                                 <div class="small text-muted content-break-cell">{{ \Illuminate\Support\Str::limit($document->description ?: 'Chưa có mô tả.', 90, '...') }}</div>
                             </td>
                             <td>{{ $document->subject->name ?? 'Tất cả' }}</td>
@@ -166,9 +160,9 @@
                                 </span>
                             </td>
                             <td>
-                                <div class="content-action-group justify-content-end">
+                                <div class="content-action-group justify-content-end" data-action-synced="true">
                                     @if($canManageThisDocument)
-                                        <button type="button" class="content-action-btn icon-only edit" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa">
+                                        <button type="button" class="content-action-btn icon-only edit d-none" data-bs-toggle="modal" data-bs-target="#{{ $editId }}" title="Sửa" aria-label="Sửa" aria-hidden="true">
                                             <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                         </button>
                                     @endif
@@ -181,6 +175,9 @@
                                                 <i class="bi bi-eye"></i>Xem chi tiết / Tải về
                                             </button>
                                             @if($canManageThisDocument)
+                                                <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $editId }}">
+                                                    <i class="bi bi-pencil-square"></i>Sửa thông tin
+                                                </button>
                                                 <form method="POST" action="{{ route('documents.destroy', $document) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa tài liệu này? Hành động này không thể hoàn tác!')">
                                                     @csrf
                                                     @method('DELETE')
@@ -393,7 +390,7 @@
                 <div class="card">
                     <div class="card-header d-flex flex-column flex-md-row justify-content-between gap-2">
                         <div>
-                            <div class="fw-semibold">{{ $subjectName }}</div>
+                            <div class="fw-normal">{{ $subjectName }}</div>
                             <div class="text-muted small">{{ $subjectDocuments->count() }} tài liệu học tập</div>
                         </div>
                     </div>
@@ -408,7 +405,7 @@
                             <div class="list-group-item">
                                 <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
                                     <div>
-                                        <div class="fw-semibold">{{ $document->title }}</div>
+                                        <div class="fw-normal">{{ $document->title }}</div>
                                         <div class="text-muted small">
                                             {{ $document->category ?: 'Chưa phân nhóm' }}
                                             <span class="mx-1">•</span>

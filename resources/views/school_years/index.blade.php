@@ -50,23 +50,32 @@
                             </span>
                         </td>
                         <td class="text-end">
-                            <div class="content-action-group justify-content-end">
+                            <div class="content-action-group justify-content-end" data-action-synced="true">
                                 @if(! $year->isArchived())
-                                    <a href="{{ route('school-years.edit', $year) }}" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip">
+                                    <a href="{{ route('school-years.edit', $year) }}" class="content-action-btn icon-only edit d-none" title="Sửa" aria-label="Sửa" data-bs-toggle="tooltip" aria-hidden="true">
                                         <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
                                     </a>
+                                @else
+                                    <span class="text-sm font-normal text-gray-400 whitespace-nowrap">🔒 Đã khóa</span>
                                 @endif
 
                                 <div class="dropdown" data-school-year-dropdown>
                                     <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
                                         <i class="bi bi-three-dots-vertical"></i>
                                     </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
+                                    <ul class="dropdown-menu dropdown-menu-end content-action-menu">
                                         <li>
                                             <a class="dropdown-item" href="{{ route('school-years.detail', $year) }}">
                                                 <i class="bi bi-eye me-2"></i>Xem chi tiết
                                             </a>
                                         </li>
+                                        @if(! $year->isArchived())
+                                            <li>
+                                                <a class="dropdown-item" href="{{ route('school-years.edit', $year) }}">
+                                                    <i class="bi bi-pencil-square me-2"></i>Sửa thông tin
+                                                </a>
+                                            </li>
+                                        @endif
                                         @if(! $year->is_active && ! $year->isArchived())
                                             <li>
                                                 <button type="button" class="dropdown-item" data-activate-school-year data-action="{{ route('school-years.activate', $year) }}" data-year-name="{{ $year->name }}">

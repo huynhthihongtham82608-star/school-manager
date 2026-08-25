@@ -60,10 +60,10 @@
                     $loginLocked = (int) ($teacher->user?->login_status ?? 1) !== 1;
                 @endphp
                 <tr>
-                    <td class="fw-semibold">{{ $teacher->teacher_code }}</td>
+                    <td class="fw-normal">{{ $teacher->teacher_code }}</td>
                     <td>
-                        <div class="fw-semibold d-flex align-items-center gap-1.5 text-left">
-                            <span class="{{ $loginLocked ? 'text-red-600' : 'text-green-600' }} text-xs leading-none">{{ $loginLocked ? '🔴' : '🟢' }}</span>
+                        <div class="fw-normal d-flex align-items-center gap-1.5 text-left">
+                            <span class="{{ $loginLocked ? 'text-red-600' : 'text-green-600' }} text-base leading-none">{{ $loginLocked ? '🔴' : '🟢' }}</span>
                             <span>{{ $teacher->name }}</span>
                         </div>
                         <div class="text-muted small">{{ $teacher->phone ?: '-' }}</div>
@@ -81,25 +81,19 @@
                         @endforelse
                     </td>
                     <td><span class="badge {{ $teacher->workStatusBadgeClass() }}">{{ $teacher->workStatusLabel() }}</span></td>
-                    <td class="text-end">
-                        <div class="content-action-group justify-content-end">
-                            <button type="button" class="content-action-btn icon-only edit" title="Sửa" aria-label="Sửa" data-bs-toggle="modal" data-bs-target="#teacherEdit{{ $teacher->id }}">
-                                <i class="bi bi-pencil-square"></i><span class="visually-hidden">Sửa</span>
-                            </button>
+                    <td class="text-end action-column text-right">
+                        <div class="content-action-group justify-content-end ms-auto w-100" data-action-synced="true">
                             <div class="dropdown">
                                 <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="Thao tác" aria-label="Thao tác">
                                     <i class="bi bi-three-dots-vertical"></i>
                                 </button>
-                                <div class="dropdown-menu dropdown-menu-end">
+                                <div class="dropdown-menu dropdown-menu-end content-action-menu">
                                     <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#teacherDetail{{ $teacher->id }}">
                                         <i class="bi bi-eye me-2"></i>Xem chi tiết
                                     </button>
-                                    <form action="{{ route('teachers.reset-password', $teacher) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn đặt lại mật khẩu cho giáo viên này?');">
-                                        @csrf
-                                        <button type="submit" class="dropdown-item">
-                                            <i class="bi bi-key me-2"></i>Đặt lại mật khẩu
-                                        </button>
-                                    </form>
+                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#teacherEdit{{ $teacher->id }}">
+                                        <i class="bi bi-pencil-square me-2"></i>Sửa thông tin
+                                    </button>
                                     <form action="{{ route('teachers.toggle-login', $teacher) }}" method="POST" onsubmit="return confirm('{{ $loginLocked ? 'Bạn có chắc muốn mở khóa tài khoản đăng nhập giáo viên này?' : 'Bạn có chắc muốn khóa tài khoản đăng nhập giáo viên này?' }}');">
                                         @csrf
                                         @method('PATCH')
@@ -112,7 +106,7 @@
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="dropdown-item text-danger">
-                                            <i class="bi bi-trash me-2"></i>Xóa
+                                            <i class="bi bi-trash me-2"></i>Xóa bỏ
                                         </button>
                                     </form>
                                 </div>

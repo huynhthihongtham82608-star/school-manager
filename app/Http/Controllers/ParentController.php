@@ -158,6 +158,11 @@ class ParentController extends Controller
                 'string',
                 'max:50',
                 ...($parent ? [Rule::unique('parents', 'phone')->ignore($parent->id)] : []),
+                function (string $attribute, mixed $value, \Closure $fail) use ($parent) {
+                    if ($this->userPhoneConflictForParent((string) $value, $parent)) {
+                        $fail('Thông tin này đã tồn tại trong hệ thống, vui lòng kiểm tra lại!');
+                    }
+                },
             ],
             'address' => ['nullable', 'string', 'max:255'],
             'student_ids' => ['nullable', 'array'],
@@ -189,7 +194,10 @@ class ParentController extends Controller
             ]);
         }
 
-        $conflict = User::where('username', $parent->phone)
+        $conflict = User::where(function ($query) use ($parent) {
+                $query->where('username', $parent->phone)
+                    ->orWhere('phone', $parent->phone);
+            })
             ->where(function ($query) use ($parent) {
                 $query->where('role', '!=', 'parent')
                     ->orWhere(function ($parentQuery) use ($parent) {
@@ -212,6 +220,9 @@ class ParentController extends Controller
         ]);
 
         $user->username = $parent->phone;
+        $user->full_name = $parent->name;
+        $user->phone = $parent->phone;
+        $user->email = $parent->email;
         $user->role = 'parent';
         $user->parent_id = $parent->id;
 
@@ -224,6 +235,31 @@ class ParentController extends Controller
         $user->save();
 
         return $user;
+    }
+
+    private function userPhoneConflictForParent(string $phone, ?ParentProfile $parent = null): bool
+    {
+        $phone = trim($phone);
+
+        if ($phone === '') {
+            return false;
+        }
+
+        $effectiveParent = $parent ?: ParentProfile::where('phone', $phone)->first();
+
+        return User::where(function ($query) use ($phone) {
+                $query->where('username', $phone)
+                    ->orWhere('phone', $phone);
+            })
+            ->where(function ($query) use ($effectiveParent) {
+                $query->where('role', '!=', 'parent')
+                    ->orWhere(function ($parentQuery) use ($effectiveParent) {
+                        $parentQuery->where('role', 'parent')
+                            ->whereNotNull('parent_id')
+                            ->when($effectiveParent, fn ($inner) => $inner->where('parent_id', '!=', $effectiveParent->id));
+                    });
+            })
+            ->exists();
     }
 
     private function generateParentCode(): string
