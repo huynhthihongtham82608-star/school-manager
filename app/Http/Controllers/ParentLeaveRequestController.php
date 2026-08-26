@@ -68,7 +68,7 @@ class ParentLeaveRequestController extends Controller
         }
 
         $data = $request->validate([
-            'student_id' => ['required', 'exists:students,id'],
+            'student_id' => ['required', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
             'leave_date' => ['required', 'date'],
             'reason' => ['required', 'string', 'max:2000'],
         ], [], [
@@ -79,7 +79,7 @@ class ParentLeaveRequestController extends Controller
 
         $student = $user->parentProfile->students()
             ->with('classRoom')
-            ->where('students.id', $data['student_id'])
+            ->whereKey($data['student_id'])
             ->firstOrFail();
 
         $existingRequest = ParentLeaveRequest::where('student_id', $student->id)

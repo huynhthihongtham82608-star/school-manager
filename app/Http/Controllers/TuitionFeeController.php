@@ -52,7 +52,7 @@ class TuitionFeeController extends Controller
             ->when($selectedClassId !== 'all', fn ($query) => $query->where('class_id', $selectedClassId))
             ->when($selectedStatus !== 'all', fn ($query) => $query->where('status', $selectedStatus))
             ->whereHas('student')
-            ->orderByRaw("(select student_code from students where students.id = tuition_fees.student_id) asc")
+            ->orderByRaw("(select u.student_code from users u where u.id = tuition_fees.student_id and u.role_type = 'student' limit 1) asc")
             ->get();
 
         return view('tuition_fees.index', [
@@ -127,7 +127,7 @@ class TuitionFeeController extends Controller
                 ->where('class_id', $homeroomClass->id)
                 ->where('semester_id', $selectedSemesterId)
                 ->whereHas('student')
-                ->orderByRaw("(select student_code from students where students.id = tuition_fees.student_id) asc")
+                ->orderByRaw("(select u.student_code from users u where u.id = tuition_fees.student_id and u.role_type = 'student' limit 1) asc")
                 ->get()
             : collect();
 

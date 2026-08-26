@@ -184,8 +184,8 @@ class TeacherDepartmentController extends Controller
                 Rule::unique('teacher_departments', 'name')->ignore($department?->getKey()),
             ],
             'subject_ids' => ['required', 'array', 'min:1'],
-            'subject_ids.*' => ['required', 'distinct', 'exists:subjects,id'],
-            'leader_teacher_id' => ['nullable', 'exists:teachers,id'],
+            'subject_ids.*' => ['required', 'distinct', \Illuminate\Validation\Rule::exists('subjects', 'id')->where('subject_record_type', 'subject')],
+            'leader_teacher_id' => ['nullable', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'teacher')],
             'description' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in(array_keys(TeacherDepartment::STATUSES))],
         ], [

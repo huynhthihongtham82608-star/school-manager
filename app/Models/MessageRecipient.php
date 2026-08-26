@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\UsesUuid;
+use App\Models\Concerns\UsesConsolidatedTable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class MessageRecipient extends Model
 {
-    use HasFactory, UsesUuid;
+    use HasFactory, UsesUuid, UsesConsolidatedTable;
 
     protected $fillable = [
         'message_id',
@@ -25,6 +26,19 @@ class MessageRecipient extends Model
         'deleted_at' => 'datetime',
         'permanently_deleted_at' => 'datetime',
     ];
+
+    public function getTable()
+    {
+        return $this->usesConsolidatedTable('messages', 'message_recipients', 'message_record_type') ? 'messages' : parent::getTable();
+    }
+
+    protected static function booted(): void
+    {
+        if (static::shouldScopeConsolidatedTable('messages', 'message_recipients', 'message_record_type')) {
+            static::addGlobalScope('message_recipient_records', fn ($query) => $query->where('message_record_type', 'recipient'));
+            static::creating(fn (MessageRecipient $recipient) => $recipient->message_record_type ??= 'recipient');
+        }
+    }
 
     public function message()
     {

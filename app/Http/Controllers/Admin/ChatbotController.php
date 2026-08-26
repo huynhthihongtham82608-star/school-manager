@@ -17,13 +17,22 @@ class ChatbotController extends Controller
             return response()->json(['reply' => 'Nội dung tin nhắn không được để trống.']);
         }
 
+        $apiKey = trim((string) config('services.gemini.key'));
+        if ($apiKey === '') {
+            return response()->json(['reply' => 'Hệ thống chưa cấu hình GEMINI_API_KEY nên chatbot chưa thể phản hồi lúc này.']);
+        }
+
         try {
-            // SỬA ĐỔI: Sử dụng Endpoint v1 và mô hình gemini-1.5-flash chuẩn kết nối mã AQ
+            $endpoint = rtrim((string) config('services.gemini.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
+            $model = trim((string) config('services.gemini.model', 'gemini-1.5-flash'), '/');
+            $url = $endpoint . '/models/' . $model . ':generateContent?key=' . rawurlencode($apiKey);
+
             $response = Http::withoutVerifying()
                 ->withHeaders([
                     'Content-Type' => 'application/json',
                 ])
-                ->post('https://googleapis.com' . env('GEMINI_API_KEY'), [
+                ->timeout(35)
+                ->post($url, [
                     'contents' => [
                         [
                             'parts' => [

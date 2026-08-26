@@ -145,15 +145,15 @@
             $adminItem('bi-person-check', 'Điểm danh', route('attendance.index'), ['attendance.*', 'attendance*'], 'attendance.view'),
         ];
 
-        if ($currentUser->hasAnyPermission(['scores.view', 'scores.manage'])) {
-            $strictAcademicResultItems[] = $adminItem('bi-table', 'Điểm số', route('scores.index'), ['scores.index', 'scores.entry', 'scores.store', 'scores/report-card*', 'scores/cascade*', 'scores/admin-matrix*'], 'scores.view');
+        if ($currentUser->hasAnyPermission(['view_scores', 'input_scores', 'scores.view', 'scores.manage'])) {
+            $strictAcademicResultItems[] = $adminItem('bi-table', 'Điểm số', route('scores.index'), ['scores.index', 'scores.entry', 'scores.store', 'scores/report-card*', 'scores/cascade*', 'scores/admin-matrix*'], 'view_scores');
         }
 
         if ($currentUser->hasAnyPermission(['conduct.view', 'conduct.manage'])) {
             $strictAcademicResultItems[] = $adminItem('bi-star', 'Hạnh kiểm', route('conduct.index'), ['conduct.*', 'conduct*'], 'conduct.view');
         }
 
-        $strictAcademicResultItems[] = $adminItem('bi-award', 'Khen thưởng', route('rewards.index'), ['rewards.*', 'rewards*']);
+        $strictAcademicResultItems[] = $adminItem('bi-award', 'Khen thưởng', route('rewards.index'), ['rewards.*', 'rewards*'], 'view_rewards');
 
         $strictContentItems = [
             $adminItem('bi-globe2', 'Diện mạo trường', route('system.settings.edit'), ['system.settings.*', 'system/settings*'], 'system.settings'),
@@ -171,15 +171,15 @@
         ];
 
         $strictSystemRegulationItems = [
-            $adminItem('bi-sliders', 'Cấu hình đầu điểm', route('score-columns.index'), ['score-columns.*', 'score-columns*'], 'scores.manage'),
+            $adminItem('bi-sliders', 'Cấu hình đầu điểm', route('score-columns.index'), ['score-columns.*', 'score-columns*'], 'lock_score_window'),
             $adminItem('bi-graph-up-arrow', '⚖️ Mốc điểm học lực', route('system.academic-levels.index'), ['system.academic-levels.*', 'system/academic-levels*'], 'system.settings'),
             $adminItem('bi-award', '🏆 Định mức hạnh kiểm', route('system.conduct-levels.index'), ['system.conduct-levels.*', 'system/conduct-levels*'], 'system.settings'),
-            $adminItem('bi-receipt-cutoff', 'Cấu hình mức thu', route('system.tuition-levels.index'), ['system.tuition-levels.*', 'system/tuition-levels*'], 'system.settings'),
+            $adminItem('bi-receipt-cutoff', 'Cấu hình mức thu', route('system.tuition-levels.index'), ['system.tuition-levels.*', 'system/tuition-levels*'], 'setup_tuition_fees'),
             $adminItem('bi-calendar2-plus', 'Lịch dạy thay', route('substitute-teachings.index'), ['substitute-teachings.*', 'substitute-teachings*'], 'system.settings'),
         ];
 
         $strictSystemOperationItems = [
-            $adminItem('bi-cash-coin', 'Quản lý học phí', route('tuition-fees.index'), ['tuition-fees.*', 'tuition-fees*'], 'system.settings'),
+            $adminItem('bi-cash-coin', 'Quản lý học phí', route('tuition-fees.index'), ['tuition-fees.*', 'tuition-fees*'], 'view_tuition'),
             $adminItem('bi-database-down', 'Sao lưu & Khôi phục', route('system.backups.index'), ['system.backups.*', 'system/backups*'], 'backups.manage'),
             $adminItem('bi-shield-check', 'Nhật ký hoạt động', route('audit-logs.index'), ['audit-logs.*', 'audit-logs*'], 'audit_logs.view'),
             $adminItem('bi-shield-lock', 'Vai trò & Quyền', route('rbac-roles.index'), ['rbac-roles.*', 'rbac-roles*'], 'manage_roles'),
@@ -203,9 +203,9 @@
             ],
         ]);
         $addAdminGroup('users', 'bi-people', 'Người dùng', [
-            $adminItem('bi-person', 'Học sinh', route('students.index'), ['students.*', 'students*'], 'students.manage'),
-            $adminItem('bi-person-badge', 'Giáo viên', route('teachers.index'), ['teachers.*', 'teachers*'], 'teachers.manage'),
-            $adminItem('bi-people', 'Phụ huynh', route('parents.index'), ['parents.*', 'parents*'], 'parents.manage'),
+            $adminItem('bi-person', 'Học sinh', route('students.index'), ['students.*', 'students*'], 'view_users'),
+            $adminItem('bi-person-badge', 'Giáo viên', route('teachers.index'), ['teachers.*', 'teachers*'], 'view_users'),
+            $adminItem('bi-people', 'Phụ huynh', route('parents.index'), ['parents.*', 'parents*'], 'view_users'),
         ]);
 
         $strictReportItems = [];
@@ -743,7 +743,7 @@
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                             <li><a class="dropdown-item" href="{{ route('profile.show') }}"><i class="bi bi-person-circle me-2"></i>Thông tin cá nhân</a></li>
                             <li><a class="dropdown-item" href="{{ route('profile.change-password') }}"><i class="bi bi-key me-2"></i>Đổi mật khẩu</a></li>
-                            @if($currentUser->hasPermission('manage_admin_accounts'))
+                            @if($currentUser->hasAnyPermission(['view_users', 'manage_admin_accounts']))
                                 <li><a class="dropdown-item" href="{{ route('admin-users.index') }}"><i class="bi bi-person-gear me-2"></i>Quản lý Admin</a></li>
                             @endif
                             <li><hr class="dropdown-divider"></li>
@@ -825,7 +825,7 @@
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                         <li><a class="dropdown-item" href="{{ route('profile.show') }}"><i class="bi bi-person-circle me-2"></i>Thông tin cá nhân</a></li>
                         <li><a class="dropdown-item" href="{{ route('profile.change-password') }}"><i class="bi bi-key me-2"></i>Đổi mật khẩu</a></li>
-                        @if($currentUser->hasPermission('manage_admin_accounts'))
+                        @if($currentUser->hasAnyPermission(['view_users', 'manage_admin_accounts']))
                             <li><a class="dropdown-item" href="{{ route('admin-users.index') }}"><i class="bi bi-person-gear me-2"></i>Quản lý Admin</a></li>
                         @endif
                         <li><hr class="dropdown-divider"></li>

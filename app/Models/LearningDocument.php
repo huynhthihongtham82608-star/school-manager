@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class LearningDocument extends Model
 {
@@ -26,6 +27,22 @@ class LearningDocument extends Model
     protected $casts = [
         'is_published' => 'boolean',
     ];
+
+    public function getTable()
+    {
+        return Schema::hasColumn('school_posts', 'post_type') ? 'school_posts' : parent::getTable();
+    }
+
+    protected static function booted(): void
+    {
+        if (Schema::hasColumn('school_posts', 'post_type')) {
+            static::addGlobalScope('document_records', fn ($query) => $query->where('post_type', 'document'));
+            static::creating(function (LearningDocument $document): void {
+                $document->post_type ??= 'document';
+                $document->type ??= 'document';
+            });
+        }
+    }
 
     public function getDescriptionAttribute($value): ?string
     {

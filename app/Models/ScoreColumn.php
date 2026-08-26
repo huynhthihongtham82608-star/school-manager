@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\UsesUuid;
+use App\Models\Concerns\UsesConsolidatedTable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 class ScoreColumn extends Model
 {
-    use UsesUuid;
+    use UsesUuid, UsesConsolidatedTable;
 
     public const TYPE_REGULAR = 'regular';
     public const TYPE_MIDTERM = 'midterm';
@@ -41,6 +42,23 @@ class ScoreColumn extends Model
         'sort_order' => 'integer',
         'is_active' => 'boolean',
     ];
+
+    public function getTable()
+    {
+        return $this->usesConsolidatedTable('student_scores', 'score_columns', 'score_record_type') ? 'student_scores' : parent::getTable();
+    }
+
+    protected static function booted(): void
+    {
+        if (static::shouldScopeConsolidatedTable('student_scores', 'score_columns', 'score_record_type')) {
+            static::addGlobalScope('score_column_records', fn ($query) => $query->where('score_record_type', 'column'));
+            static::creating(function (ScoreColumn $column): void {
+                $column->score_record_type ??= 'column';
+                $column->score_type ??= $column->type;
+                $column->score_name ??= $column->name;
+            });
+        }
+    }
 
     public function schoolYear()
     {

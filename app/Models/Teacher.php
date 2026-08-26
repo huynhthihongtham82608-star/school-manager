@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\UsesUuid;
+use App\Models\Concerns\UsesConsolidatedTable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Teacher extends Model
 {
-    use HasFactory, UsesUuid;
+    use HasFactory, UsesUuid, UsesConsolidatedTable;
 
     public const STATUS_WORKING = 'working';
     public const STATUS_RESIGNED = 'resigned';
@@ -37,6 +38,26 @@ class Teacher extends Model
         'joined_at' => 'date',
         'is_homeroom' => 'boolean',
     ];
+
+    public function getTable()
+    {
+        return $this->usesConsolidatedTable('users', 'teachers', 'role_type') ? 'users' : parent::getTable();
+    }
+
+    protected static function booted(): void
+    {
+        if (static::shouldScopeConsolidatedTable('users', 'teachers', 'role_type')) {
+            static::addGlobalScope('teacher_records', fn ($query) => $query->where('role_type', 'teacher'));
+            static::creating(function (Teacher $teacher): void {
+                $teacher->role_type ??= 'teacher';
+                $teacher->role ??= 'teacher';
+                $teacher->full_name ??= $teacher->name;
+                $teacher->username ??= $teacher->teacher_code ?: $teacher->email;
+                $teacher->password_hash ??= '$2y$12$Z2FJ9wVbk03D58EQ38Fn6O9z3.nBTeoNRZoh9c6uPfYRJrL46Y0wW';
+                $teacher->teacher_id ??= $teacher->id;
+            });
+        }
+    }
 
     public static function genderLabels(): array
     {
@@ -106,6 +127,6 @@ class Teacher extends Model
 
     public function user()
     {
-        return $this->hasOne(User::class);
+        return $this->hasOne(User::class, 'teacher_id', 'id');
     }
 }

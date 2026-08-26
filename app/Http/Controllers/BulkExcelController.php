@@ -548,6 +548,10 @@ class BulkExcelController extends Controller
             $parentPhone = trim((string) $this->rowValue($row, ['sdt_phu_huynh', 'parent_phone']));
             $student = $code !== '' ? Student::where('student_code', $code)->first() : null;
 
+            if (! $student && $name !== '' && $dob) {
+                $student = $this->findImportedStudentByNaturalKey($name, $dob, $parentPhone, $class);
+            }
+
             if (! $student && $code === '' && $parentPhone === '' && $name !== '' && $dob) {
                 $sameIdentityDifferentClass = Student::where('name', $name)
                     ->whereDate('dob', $dob)
@@ -570,7 +574,15 @@ class BulkExcelController extends Controller
                     ->first();
             }
 
-            $student ??= new Student(['student_code' => $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date']))]);
+            $student ??= ($parentPhone !== '' && $name !== '' && $dob)
+                ? Student::updateOrCreate([
+                    'name' => $name,
+                    'dob' => $dob,
+                    'parent_phone' => $parentPhone,
+                ], [
+                    'student_code' => $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date'])),
+                ])
+                : new Student(['student_code' => $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date']))]);
             $preserveExistingParent = $code === '' && $parentPhone === '' && $student->exists;
             $studentData = [
                 'name' => $name,
@@ -597,6 +609,7 @@ class BulkExcelController extends Controller
             }
 
             $student->fill($studentData);
+            $student->student_code ??= $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date']));
             if (Schema::hasColumn('students', 'student_phone')) {
                 $student->setAttribute('student_phone', trim((string) $this->rowValue($row, ['sdt_hoc_sinh', 'student_phone', 'phone'])) ?: null);
             }
@@ -1950,19 +1963,48 @@ class BulkExcelController extends Controller
 
     private function nextStudentCode(mixed $date): string
     {
-        $year = $this->parseDate($date) ? Carbon::parse($this->parseDate($date))->format('Y') : now()->format('Y');
+        $parsedDate = $this->parseDate($date);
+        $year = $parsedDate ? Carbon::parse($parsedDate)->format('Y') : now()->format('Y');
         $prefix = 'HS' . $year;
         $max = Student::where('student_code', 'like', $prefix . '%')
             ->pluck('student_code')
-            ->map(fn ($code) => preg_match('/^' . $prefix . '(\d+)$/', (string) $code, $matches) ? (int) $matches[1] : 0)
+            ->map(fn ($code) => preg_match('/^' . preg_quote($prefix, '/') . '(\d{4})$/', (string) $code, $matches) ? (int) $matches[1] : 0)
             ->max() ?? 0;
 
         do {
             $max++;
+            if ($max > 9999) {
+                throw ValidationException::withMessages([
+                    'file' => 'Năm tuyển sinh ' . $year . ' đã đạt giới hạn HS' . $year . '9999.',
+                ]);
+            }
+
             $code = $prefix . str_pad((string) $max, 4, '0', STR_PAD_LEFT);
         } while (Student::where('student_code', $code)->exists() || User::where('username', $code)->exists());
 
         return $code;
+    }
+
+    private function findImportedStudentByNaturalKey(string $name, ?string $dob, string $parentPhone, SchoolClass $class): ?Student
+    {
+        $name = trim($name);
+        $parentPhone = trim($parentPhone);
+
+        if ($name === '' || ! $dob) {
+            return null;
+        }
+
+        if ($parentPhone !== '') {
+            return Student::where('name', $name)
+                ->whereDate('dob', $dob)
+                ->where('parent_phone', $parentPhone)
+                ->first();
+        }
+
+        return Student::where('name', $name)
+            ->whereDate('dob', $dob)
+            ->where('class_id', $class->id)
+            ->first();
     }
 
     private function nextTeacherCode(): string

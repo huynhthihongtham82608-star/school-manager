@@ -19,7 +19,7 @@ class RbacRoleController extends Controller
             'status' => $request->query('status', 'all'),
         ];
 
-        $roles = RbacRole::with(['permissions', 'users'])
+        $roles = RbacRole::query()
             ->when($filters['q'] !== '', function ($query) use ($filters) {
                 $keyword = $filters['q'];
                 $query->where(function ($inner) use ($keyword) {
@@ -55,7 +55,7 @@ class RbacRoleController extends Controller
                     'is_active' => (bool) ($data['is_active'] ?? true),
                 ]);
 
-                $role->permissions()->sync($data['permission_ids'] ?? []);
+                $role->syncPermissionIds($data['permission_ids'] ?? []);
 
                 AuditLogger::log('rbac_role_created', RbacRole::class, (string) $role->getKey(), 'Tạo vai trò ' . $role->name);
             });
@@ -85,7 +85,7 @@ class RbacRoleController extends Controller
                     'is_active' => (bool) ($data['is_active'] ?? true),
                 ]);
 
-                $rbacRole->permissions()->sync($data['permission_ids'] ?? []);
+                $rbacRole->syncPermissionIds($data['permission_ids'] ?? []);
 
                 AuditLogger::log('rbac_role_updated', RbacRole::class, (string) $rbacRole->getKey(), 'Cập nhật vai trò ' . $rbacRole->name);
             });
@@ -118,12 +118,12 @@ class RbacRoleController extends Controller
             return back()->withErrors(['error' => 'Vai trò hệ thống không được phép xóa.']);
         }
 
-        if ($rbacRole->users()->exists()) {
+        if ($rbacRole->assignedUsers()->isNotEmpty()) {
             return back()->withErrors(['error' => 'Không thể xóa vai trò đang được gán cho tài khoản quản trị.']);
         }
 
         DB::transaction(function () use ($rbacRole) {
-            $rbacRole->permissions()->detach();
+            $rbacRole->syncPermissionIds([]);
             $rbacRole->delete();
             AuditLogger::log('rbac_role_deleted', RbacRole::class, (string) $rbacRole->getKey(), 'Xóa vai trò ' . $rbacRole->name);
         });

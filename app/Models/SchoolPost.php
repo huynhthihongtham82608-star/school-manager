@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class SchoolPost extends Model
 {
@@ -27,6 +28,14 @@ class SchoolPost extends Model
         'published_at' => 'datetime',
         'is_published' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        if (Schema::hasColumn('school_posts', 'post_type')) {
+            static::addGlobalScope('post_records', fn ($query) => $query->where('post_type', 'post'));
+            static::creating(fn (SchoolPost $post) => $post->post_type ??= 'post');
+        }
+    }
 
     public function getContentAttribute($value): ?string
     {

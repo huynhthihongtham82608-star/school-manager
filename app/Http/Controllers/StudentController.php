@@ -120,7 +120,12 @@ class StudentController extends Controller
         $class = SchoolClass::with(['schoolYear', 'semester', 'students'])->findOrFail($validated['class_id']);
         $this->ensureClassCanReceiveStudent($class, (string) $class->school_year_id);
 
-        $rows = $this->readImportRows($request->file('file')->getRealPath(), $request->file('file')->getClientOriginalExtension());
+        $ignoredHeaders = [];
+        $rows = $this->readImportRows(
+            $request->file('file')->getRealPath(),
+            $request->file('file')->getClientOriginalExtension(),
+            $ignoredHeaders
+        );
 
         if ($rows === []) {
             return back()->withErrors(['file' => 'File import không có dữ liệu hợp lệ.']);
@@ -131,11 +136,8 @@ class StudentController extends Controller
             $name = trim((string) ($row['ho_ten'] ?? ''));
             $dob = $this->parseDateValue($row['ngay_sinh'] ?? null);
 
-            if ($phone === '' && $name !== '' && $dob) {
-                return ! Student::where('name', $name)
-                    ->whereDate('dob', $dob)
-                    ->where('class_id', $class->id)
-                    ->exists();
+            if ($name !== '' && $dob) {
+                return ! $this->findImportedStudentByNaturalKey($name, $dob, $phone, $class);
             }
 
             return true;
@@ -169,9 +171,9 @@ class StudentController extends Controller
                     ?: (int) $class->grade_level;
                 $status = $this->normalizeStudentStatus($row['trang_thai'] ?? null, $index + 2);
 
-                $matchedStudent = null;
+                $matchedStudent = $dob ? $this->findImportedStudentByNaturalKey($name, $dob, $phone, $class) : null;
 
-                if ($phone === '' && $dob) {
+                if (! $matchedStudent && $phone === '' && $dob) {
                     $sameIdentityDifferentClass = Student::where('name', $name)
                         ->whereDate('dob', $dob)
                         ->where('class_id', '!=', $class->id)
@@ -188,11 +190,6 @@ class StudentController extends Controller
                             'matched_class_id' => $sameIdentityDifferentClass->class_id,
                         ]);
                     }
-
-                    $matchedStudent = Student::where('name', $name)
-                        ->whereDate('dob', $dob)
-                        ->where('class_id', $class->id)
-                        ->first();
                 }
 
                 $studentData = [
@@ -214,15 +211,31 @@ class StudentController extends Controller
                     'status' => $status,
                 ];
 
+                if ($phone !== '') {
+                    $studentData['parent_phone'] = $phone;
+                }
+
                 if ($matchedStudent) {
                     $student = $matchedStudent;
+                    $oldClassId = (string) $student->class_id;
                     $student->fill($studentData)->save();
+                    if ($oldClassId !== (string) $student->class_id) {
+                        $this->recordClassHistory($student, $oldClassId, $student->class_id, $student->enrollment_date, 'Cập nhật lớp từ import học sinh');
+                    }
                     $updated++;
                 } else {
-                    $student = Student::create($studentData + [
+                    $createData = $studentData + [
                         'student_code' => $this->generateStudentCode($enrollmentDate),
                         'parent_phone' => $phone ?: null,
-                    ]);
+                    ];
+
+                    $student = $dob
+                        ? Student::updateOrCreate([
+                            'name' => $name,
+                            'dob' => $dob,
+                        ], $createData)
+                        : Student::create($createData);
+
                     $created++;
                 }
 
@@ -244,7 +257,7 @@ class StudentController extends Controller
 
         AuditLogger::log('students_imported', Student::class, null, 'Nhập dữ liệu ' . $created . ' học sinh, cập nhật ' . $updated . ' hồ sơ vào lớp ' . $class->name);
 
-        $message = 'Đã import ' . $created . ' học sinh mới, cập nhật ' . $updated . ' hồ sơ cũ.';
+        $message = '🟢 Đã xử lý xong danh sách: Cập nhật ' . $updated . ' học sinh cũ và loại bỏ hoàn toàn các trường dữ liệu không hợp lệ.';
 
         if ($duplicateWarnings !== []) {
             $message .= ' Có ' . count($duplicateWarnings) . ' dòng ⚠️ nghi vấn trùng, vui lòng kiểm tra log.';
@@ -768,6 +781,21 @@ class StudentController extends Controller
         }
     }
 
+    private function findImportedStudentByNaturalKey(string $name, ?string $dob, string $parentPhone, SchoolClass $class): ?Student
+    {
+        $name = trim($name);
+
+        if ($name === '' || ! $dob) {
+            return null;
+        }
+
+        return Student::where('name', $name)
+            ->whereDate('dob', $dob)
+            ->orderByRaw('class_id = ? desc', [$class->id])
+            ->orderBy('student_code')
+            ->first();
+    }
+
     private function generateStudentCode(string $enrollmentDate): string
     {
         $year = Carbon::parse($enrollmentDate)->format('Y');
@@ -784,6 +812,12 @@ class StudentController extends Controller
         $nextNumber = ($latestNumber ?: 0) + 1;
 
         do {
+            if ($nextNumber > 9999) {
+                throw ValidationException::withMessages([
+                    'student_code' => 'Năm tuyển sinh ' . $year . ' đã đạt giới hạn HS' . $year . '9999.',
+                ]);
+            }
+
             $code = $prefix . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
             $nextNumber++;
         } while (Student::where('student_code', $code)->exists() || User::where('username', $code)->exists());
@@ -827,7 +861,7 @@ class StudentController extends Controller
 
     private function deleteCheck(Student $student): array
     {
-        if (Schema::hasTable('score_headers') && $student->scoreHeaders()->exists()) {
+        if (Schema::hasTable('student_scores') && $student->scoreHeaders()->exists()) {
             return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đã phát sinh điểm. Hãy đổi trạng thái nếu học sinh không còn học.'];
         }
 
@@ -844,30 +878,36 @@ class StudentController extends Controller
 
     private function recordClassHistory(Student $student, ?string $fromClassId, ?string $toClassId, ?string $date, string $note): void
     {
-        if (! Schema::hasTable('student_transfers')) {
+        if (! Schema::hasTable('student_movements')) {
             return;
         }
 
-        DB::table('student_transfers')->insert([
+        DB::table('student_movements')->insert([
             'id' => (string) Str::uuid(),
+            'type' => 'transfer',
             'student_id' => $student->id,
+            'class_id' => $toClassId,
+            'academic_year_id' => $student->school_year_id,
             'from_class_id' => $fromClassId,
             'to_class_id' => $toClassId,
-            'transfer_date' => $date ?: now()->toDateString(),
+            'movement_date' => $date ?: now()->toDateString(),
+            'status' => 'active',
             'note' => $note,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 
-    private function readImportRows(string $path, string $extension): array
+    private function readImportRows(string $path, string $extension, array &$ignoredHeaders = []): array
     {
         $extension = Str::lower($extension);
 
         return $extension === 'xlsx'
-            ? $this->readXlsxRows($path)
-            : $this->readCsvRows($path);
+            ? $this->readXlsxRows($path, $ignoredHeaders)
+            : $this->readCsvRows($path, $ignoredHeaders);
     }
 
-    private function readCsvRows(string $path): array
+    private function readCsvRows(string $path, array &$ignoredHeaders = []): array
     {
         $handle = fopen($path, 'rb');
 
@@ -884,7 +924,9 @@ class StudentController extends Controller
 
         while (($data = fgetcsv($handle, 0, $delimiter)) !== false) {
             if ($headers === null) {
-                $headers = array_map(fn ($header) => $this->normalizeImportHeader((string) $header), $data);
+                $headers = array_map(function ($header) use (&$ignoredHeaders) {
+                    return $this->normalizeImportHeader((string) $header, $ignoredHeaders);
+                }, $data);
                 continue;
             }
 
@@ -906,7 +948,7 @@ class StudentController extends Controller
         return $rows;
     }
 
-    private function readXlsxRows(string $path): array
+    private function readXlsxRows(string $path, array &$ignoredHeaders = []): array
     {
         $zip = new ZipArchive();
 
@@ -966,7 +1008,9 @@ class StudentController extends Controller
             }
 
             if ($headers === null) {
-                $headers = array_map(fn ($header) => $this->normalizeImportHeader((string) $header), $normalizedValues);
+                $headers = array_map(function ($header) use (&$ignoredHeaders) {
+                    return $this->normalizeImportHeader((string) $header, $ignoredHeaders);
+                }, $normalizedValues);
                 continue;
             }
 
@@ -986,35 +1030,94 @@ class StudentController extends Controller
         return $rows;
     }
 
-    private function normalizeImportHeader(string $header): string
+    private function normalizeImportHeader(string $header, array &$ignoredHeaders = []): string
     {
-        $header = trim(Str::of($header)->replace("\xEF\xBB\xBF", '')->toString());
+        $originalHeader = trim(Str::of($header)->replace("\xEF\xBB\xBF", '')->toString());
+        $normalized = $this->normalizeImportKey($originalHeader);
+        $canonical = $this->strictStudentImportHeaderMap()[$normalized] ?? '';
+
+        if ($canonical === '' && $originalHeader !== '') {
+            $ignoredHeaders[] = $originalHeader;
+        }
+
+        return $canonical;
+    }
+
+    private function normalizeImportKey(string $header): string
+    {
         $header = Str::ascii($header);
         $header = Str::lower($header);
         $header = preg_replace('/[^a-z0-9]+/', '_', $header);
-        $header = trim((string) $header, '_');
 
-        return match ($header) {
-            'ho_ten', 'ten', 'name' => 'ho_ten',
-            'ngay_sinh', 'dob' => 'ngay_sinh',
-            'gioi_tinh', 'gender' => 'gioi_tinh',
-            'ngay_nhap_hoc', 'enrollment_date' => 'ngay_nhap_hoc',
-            'loai_nhap_hoc', 'admission_type' => 'loai_nhap_hoc',
-            'trang_thai', 'status' => 'trang_thai',
-            'truong_cu', 'previous_school' => 'truong_cu',
-            'khoi_hien_tai', 'transfer_grade_level' => 'khoi_hien_tai',
-            'lop_cu', 'previous_class' => 'lop_cu',
-            'sdt_phu_huynh', 'so_dien_thoai_phu_huynh', 'dien_thoai_phu_huynh', 'parent_phone' => 'sdt_phu_huynh',
-            'ho_ten_phu_huynh', 'ten_phu_huynh', 'parent_name' => 'ho_ten_phu_huynh',
-            'quan_he', 'relation', 'parent_relation' => 'quan_he',
-            'dia_chi_phu_huynh', 'parent_address' => 'dia_chi_phu_huynh',
-            'dia_chi', 'address' => 'dia_chi',
-            'noi_sinh', 'place_of_birth' => 'noi_sinh',
-            'dan_toc', 'ethnicity' => 'dan_toc',
-            'ton_giao', 'religion' => 'ton_giao',
-            'ghi_chu', 'note' => 'ghi_chu',
-            default => $header,
-        };
+        return trim((string) $header, '_');
+    }
+
+    private function strictStudentImportHeaderMap(): array
+    {
+        return [
+            'ma_hs' => 'ma_hs',
+            'ma_hoc_sinh' => 'ma_hs',
+            'mshs' => 'ma_hs',
+            'student_code' => 'ma_hs',
+            'ho_ten' => 'ho_ten',
+            'ho_va_ten' => 'ho_ten',
+            'ten' => 'ho_ten',
+            'name' => 'ho_ten',
+            'full_name' => 'ho_ten',
+            'ngay_sinh' => 'ngay_sinh',
+            'dob' => 'ngay_sinh',
+            'birth_date' => 'ngay_sinh',
+            'gioi_tinh' => 'gioi_tinh',
+            'gender' => 'gioi_tinh',
+            'sex' => 'gioi_tinh',
+            'sdt_hoc_sinh' => 'sdt_hoc_sinh',
+            'so_dien_thoai_hoc_sinh' => 'sdt_hoc_sinh',
+            'student_phone' => 'sdt_hoc_sinh',
+            'ho_ten_phu_huynh' => 'ho_ten_phu_huynh',
+            'ten_phu_huynh' => 'ho_ten_phu_huynh',
+            'parent_name' => 'ho_ten_phu_huynh',
+            'quan_he' => 'quan_he',
+            'relation' => 'quan_he',
+            'parent_relation' => 'quan_he',
+            'sdt_phu_huynh' => 'sdt_phu_huynh',
+            'so_dien_thoai_phu_huynh' => 'sdt_phu_huynh',
+            'dien_thoai_phu_huynh' => 'sdt_phu_huynh',
+            'parent_phone' => 'sdt_phu_huynh',
+            'dia_chi_phu_huynh' => 'dia_chi_phu_huynh',
+            'parent_address' => 'dia_chi_phu_huynh',
+            'dia_chi' => 'dia_chi',
+            'dia_chi_thuong_tru' => 'dia_chi',
+            'address' => 'dia_chi',
+            'noi_sinh' => 'noi_sinh',
+            'place_of_birth' => 'noi_sinh',
+            'que_quan' => 'que_quan',
+            'hometown' => 'que_quan',
+            'native_place' => 'que_quan',
+            'dan_toc' => 'dan_toc',
+            'ethnicity' => 'dan_toc',
+            'ton_giao' => 'ton_giao',
+            'religion' => 'ton_giao',
+            'ghi_chu' => 'ghi_chu',
+            'note' => 'ghi_chu',
+            'ngay_nhap_hoc' => 'ngay_nhap_hoc',
+            'enrollment_date' => 'ngay_nhap_hoc',
+            'loai_nhap_hoc' => 'loai_nhap_hoc',
+            'admission_type' => 'loai_nhap_hoc',
+            'trang_thai' => 'trang_thai',
+            'status' => 'trang_thai',
+            'truong_cu' => 'truong_cu',
+            'previous_school' => 'truong_cu',
+            'khoi_hien_tai' => 'khoi_hien_tai',
+            'transfer_grade_level' => 'khoi_hien_tai',
+            'lop_cu' => 'lop_cu',
+            'previous_class' => 'lop_cu',
+            'lop' => 'lop',
+            'class_id' => 'lop',
+            'nien_khoa' => 'nien_khoa',
+            'school_year_id' => 'nien_khoa',
+            'cohort' => 'nien_khoa',
+            'email' => 'email',
+        ];
     }
 
     private function normalizeGender(mixed $value, int $rowNumber): string

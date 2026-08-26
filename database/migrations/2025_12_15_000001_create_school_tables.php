@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('school_years')) {
         Schema::create('school_years', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique(); // e.g. 2024-2025
@@ -19,7 +20,9 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
+        }
 
+        if (! Schema::hasTable('teachers')) {
         Schema::create('teachers', function (Blueprint $table) {
             $table->id();
             $table->string('teacher_code')->unique();
@@ -30,7 +33,9 @@ return new class extends Migration
             $table->boolean('is_homeroom')->default(false);
             $table->timestamps();
         });
+        }
 
+        if (! Schema::hasTable('subjects')) {
         Schema::create('subjects', function (Blueprint $table) {
             $table->id();
             $table->string('code', 50)->unique();
@@ -41,7 +46,9 @@ return new class extends Migration
             $table->boolean('is_weighted')->default(false); // hệ số 2 môn
             $table->timestamps();
         });
+        }
 
+        if (! Schema::hasTable('classes')) {
         Schema::create('classes', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique(); // 10A1
@@ -51,7 +58,9 @@ return new class extends Migration
             $table->unsignedSmallInteger('capacity')->default(45);
             $table->timestamps();
         });
+        }
 
+        if (! Schema::hasTable('students')) {
         Schema::create('students', function (Blueprint $table) {
             $table->id();
             $table->string('student_code')->unique();
@@ -74,7 +83,9 @@ return new class extends Migration
             $table->enum('status', ['studying', 'inactive'])->default('studying');
             $table->timestamps();
         });
+        }
 
+        if (! Schema::hasTable('semesters')) {
         Schema::create('semesters', function (Blueprint $table) {
             $table->id();
             $table->string('name'); // HK1/HK2
@@ -83,7 +94,9 @@ return new class extends Migration
             $table->boolean('is_score_input_open')->default(true);
             $table->timestamps();
         });
+        }
 
+        if (! Schema::hasTable('teaching_assignments')) {
         Schema::create('teaching_assignments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('teacher_id')->constrained('teachers')->cascadeOnDelete();
@@ -99,7 +112,9 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['teacher_id', 'class_id', 'subject_id', 'school_year_id', 'semester_id', 'role', 'custom_role'], 'assignment_unique_with_role');
         });
+        }
 
+        if (! Schema::hasTable('score_headers')) {
         Schema::create('score_headers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('student_id')->constrained('students')->cascadeOnDelete();
@@ -110,7 +125,9 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['student_id', 'subject_id', 'semester_id', 'school_year_id'], 'student_subject_semester_unique');
         });
+        }
 
+        if (! Schema::hasTable('score_details')) {
         Schema::create('score_details', function (Blueprint $table) {
             $table->id();
             $table->foreignId('score_header_id')->constrained('score_headers')->cascadeOnDelete();
@@ -121,7 +138,9 @@ return new class extends Migration
             $table->unsignedTinyInteger('weight_group')->default(1); // HS1=1, HS2=2, HS3=3
             $table->timestamps();
         });
+        }
 
+        if (! Schema::hasTable('conducts')) {
         Schema::create('conducts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('student_id')->constrained('students')->cascadeOnDelete();
@@ -133,7 +152,9 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['student_id', 'semester_id', 'school_year_id'], 'student_semester_conduct_unique');
         });
+        }
 
+        if (! Schema::hasTable('grade_windows')) {
         Schema::create('grade_windows', function (Blueprint $table) {
             $table->id();
             $table->foreignId('class_id')->constrained('classes')->cascadeOnDelete();
@@ -144,6 +165,7 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['class_id', 'subject_id', 'semester_id', 'school_year_id'], 'grade_window_unique');
         });
+        }
     }
 
     /**

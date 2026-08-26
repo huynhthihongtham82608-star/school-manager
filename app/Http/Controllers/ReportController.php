@@ -169,7 +169,7 @@ class ReportController extends Controller
         $students = $this->filteredStudents($filters, $classes);
         $studentIds = $students->pluck('id');
 
-        $scoreHeaders = Schema::hasTable('score_headers')
+        $scoreHeaders = Schema::hasTable('student_scores')
             ? ScoreHeader::with(['student.classRoom', 'subject', 'semester', 'details'])
                 ->whereIn('student_id', $studentIds)
                 ->when($selectedYear?->id, fn ($query) => $query->where('school_year_id', $selectedYear->id))
@@ -530,7 +530,7 @@ class ReportController extends Controller
                 ->whereIn('class_id', $classes->pluck('id'))
                 ->when($filters['grade_level'], fn ($query) => $query->whereHas('classRoom', fn ($subQuery) => $subQuery->where('grade_level', $filters['grade_level'])))
                 ->get();
-            $headers = Schema::hasTable('score_headers')
+            $headers = Schema::hasTable('student_scores')
                 ? ScoreHeader::whereIn('student_id', $students->pluck('id'))
                     ->where('school_year_id', $year->id)
                     ->whereNotNull('average')
@@ -765,7 +765,7 @@ class ReportController extends Controller
                 continue;
             }
 
-            $hasScore = Schema::hasTable('score_headers')
+            $hasScore = Schema::hasTable('student_scores')
                 && ScoreHeader::where('subject_id', $assignment->subject_id)
                     ->when($schoolYearId, fn ($query) => $query->where('school_year_id', $schoolYearId))
                     ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))

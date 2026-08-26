@@ -244,7 +244,7 @@ class KhenThuongController extends Controller
     private function validatedData(Request $request): array
     {
         return $request->validate([
-            'student_id' => ['required', 'string', 'exists:students,id'],
+            'student_id' => ['required', 'string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
             'semester_id' => ['required', 'string', 'exists:semesters,id'],
             'reward_type' => ['required', 'string', Rule::in(array_keys(Reward::typeLabels()))],
             'detail' => ['nullable', 'string', 'max:2000'],

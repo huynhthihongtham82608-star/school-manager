@@ -269,7 +269,7 @@ class ChatbotApiController extends Controller
 
     private function scoreHeadersForStudent(Student $student): Collection
     {
-        if (Schema::hasTable('score_headers')) {
+        if (Schema::hasTable('student_scores')) {
             $query = ScoreHeader::with(['subject', 'semester'])
                 ->where('student_id', $student->id)
                 ->whereNotNull('average');
@@ -419,7 +419,7 @@ class ChatbotApiController extends Controller
 
     private function tuitionQrImageUrl(): string
     {
-        if (! Schema::hasTable('settings')) {
+        if (! Schema::hasColumn('system_settings', 'setting_record_type')) {
             return '';
         }
 

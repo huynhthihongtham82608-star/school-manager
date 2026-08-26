@@ -277,8 +277,8 @@ class TeachingAssignmentController extends Controller
         $rules = [
             'class_ids' => ['required', 'array', 'min:1'],
             'class_ids.*' => ['required', 'distinct', 'exists:classes,id'],
-            'teacher_id' => ['required', 'exists:teachers,id'],
-            'subject_id' => ['required', 'exists:subjects,id'],
+            'teacher_id' => ['required', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'teacher')],
+            'subject_id' => ['required', \Illuminate\Validation\Rule::exists('subjects', 'id')->where('subject_record_type', 'subject')],
             'role' => ['required', Rule::in(array_keys(TeachingAssignment::ROLES))],
             'custom_role' => ['nullable', 'string', 'max:255', 'required_if:role,' . TeachingAssignment::ROLE_OTHER],
             'weekly_periods' => ['nullable', 'integer', 'min:1', 'max:20'],
@@ -442,7 +442,7 @@ class TeachingAssignmentController extends Controller
 
     private function hasTimetableData(TeachingAssignment $assignment): bool
     {
-        if (! Schema::hasTable('timetables') || ! Schema::hasTable('timetable_entries')) {
+        if (! Schema::hasColumn('timetables', 'timetable_record_type')) {
             return false;
         }
 
@@ -459,7 +459,7 @@ class TeachingAssignmentController extends Controller
 
     private function hasScoreData(TeachingAssignment $assignment): bool
     {
-        if (! Schema::hasTable('score_headers')) {
+        if (! Schema::hasTable('student_scores')) {
             return false;
         }
 

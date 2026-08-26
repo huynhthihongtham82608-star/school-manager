@@ -133,8 +133,8 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
             Route::put('system/academic-levels', [SystemRegulationController::class, 'updateAcademicLevels'])->middleware('permission:system.settings')->name('system.academic-levels.update');
             Route::get('system/conduct-levels', [SystemRegulationController::class, 'conductLevels'])->middleware('permission:system.settings')->name('system.conduct-levels.index');
             Route::put('system/conduct-levels', [SystemRegulationController::class, 'updateConductLevels'])->middleware('permission:system.settings')->name('system.conduct-levels.update');
-            Route::get('system/tuition-levels', [SystemRegulationController::class, 'tuitionLevels'])->middleware('permission:system.settings')->name('system.tuition-levels.index');
-            Route::put('system/tuition-levels', [SystemRegulationController::class, 'updateTuitionLevels'])->middleware('permission:system.settings')->name('system.tuition-levels.update');
+            Route::get('system/tuition-levels', [SystemRegulationController::class, 'tuitionLevels'])->middleware('permission:setup_tuition_fees,system.settings')->name('system.tuition-levels.index');
+            Route::put('system/tuition-levels', [SystemRegulationController::class, 'updateTuitionLevels'])->middleware('permission:setup_tuition_fees,system.settings')->name('system.tuition-levels.update');
             Route::get('system/backups', [BackupController::class, 'index'])->middleware('permission:backups.manage')->name('system.backups.index');
             Route::post('system/backups', [BackupController::class, 'store'])->middleware('permission:backups.manage')->name('system.backups.store');
             Route::post('system/backups/restore/verify', [BackupController::class, 'verifyRestorePassword'])->middleware('permission:backups.manage')->name('system.backups.restore.verify');
@@ -144,7 +144,7 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
             Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('permission:audit_logs.view')->name('audit-logs.index');
             Route::resource('tuition-fees', TuitionFeeController::class)
                 ->only(['index', 'update'])
-                ->middleware('permission:system.settings');
+                ->middleware('permission:view_tuition,collect_tuition,system.settings');
             Route::post('substitute-teachings/recommendations', [SubstituteTeachingController::class, 'recommendations'])
                 ->middleware('permission:system.settings')
                 ->name('substitute-teachings.recommendations');
@@ -153,15 +153,15 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
                 ->middleware('permission:system.settings');
 
             Route::patch('admin-users/{admin_user}/toggle', [AdminUserController::class, 'toggle'])
-                ->middleware('permission:manage_admin_accounts')
+                ->middleware('permission:edit_users,manage_admin_accounts')
                 ->name('admin-users.toggle');
             Route::post('admin-users/{admin_user}/reset-password', [AdminUserController::class, 'resetPassword'])
-                ->middleware('permission:manage_admin_accounts')
+                ->middleware('permission:edit_users,manage_admin_accounts')
                 ->name('admin-users.reset-password');
             Route::resource('admin-users', AdminUserController::class)
                 ->parameters(['admin-users' => 'admin_user'])
                 ->except(['show', 'create', 'edit'])
-                ->middleware('permission:manage_admin_accounts');
+                ->middleware('permission:view_users,create_users,edit_users,delete_users,manage_admin_accounts');
 
             Route::patch('rbac-roles/{rbac_role}/toggle', [RbacRoleController::class, 'toggle'])
                 ->middleware('permission:manage_roles')

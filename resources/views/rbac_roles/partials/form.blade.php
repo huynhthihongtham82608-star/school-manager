@@ -32,14 +32,14 @@
         <div class="row g-3">
             @foreach($permissionGroups as $groupName => $permissions)
                 <div class="col-lg-6">
-                    <div class="border rounded-3 p-3 h-100">
-                        <div class="fw-semibold mb-2">{{ $groupName }}</div>
+                    <div class="rbac-permission-group-box h-100">
+                        <div class="rbac-permission-group-title">{{ $groupName }}</div>
                         <div class="row g-2">
                             @foreach($permissions as $permission)
                                 <div class="col-12">
-                                    <label class="form-check mb-0">
-                                        <input type="checkbox" name="permission_ids[]" value="{{ $permission->id }}" class="form-check-input" @checked(in_array((string) $permission->id, $selectedPermissionIds, true)) @disabled($locked)>
-                                        <span class="form-check-label">
+                                    <label class="form-check mb-0 rbac-permission-check">
+                                        <input type="checkbox" name="permission_ids[]" value="{{ $permission->id }}" class="form-check-input rbac-permission-checkbox" @checked(in_array((string) $permission->id, $selectedPermissionIds, true)) @disabled($locked)>
+                                        <span class="form-check-label rbac-permission-check-label">
                                             {{ $permission->name }}
                                             <span class="text-muted small d-block">{{ $permission->key }}</span>
                                         </span>

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class TeacherDepartment extends Model
 {
@@ -26,10 +27,25 @@ class TeacherDepartment extends Model
         'status',
     ];
 
+    protected static function booted(): void
+    {
+        if (Schema::hasColumn('teacher_departments', 'department_record_type')) {
+            static::addGlobalScope('department_records', fn ($query) => $query->where('department_record_type', 'department'));
+            static::creating(fn (TeacherDepartment $department) => $department->department_record_type ??= 'department');
+        }
+    }
+
     public function subjects()
     {
-        return $this->belongsToMany(Subject::class, 'teacher_department_subject', 'department_id', 'subject_id')
+        $table = Schema::hasColumn('teacher_departments', 'department_record_type')
+            && ! Schema::hasTable('teacher_department_subject') ? 'teacher_departments' : 'teacher_department_subject';
+
+        $relation = $this->belongsToMany(Subject::class, $table, 'department_id', 'subject_id')
             ->withTimestamps();
+
+        return $table === 'teacher_departments'
+            ? $relation->wherePivot('department_record_type', 'subject')->withPivotValue('department_record_type', 'subject')
+            : $relation;
     }
 
     public function leader()

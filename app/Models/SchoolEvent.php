@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class SchoolEvent extends Model
 {
@@ -26,6 +27,22 @@ class SchoolEvent extends Model
         'ends_at' => 'datetime',
         'is_published' => 'boolean',
     ];
+
+    public function getTable()
+    {
+        return Schema::hasColumn('school_posts', 'post_type') ? 'school_posts' : parent::getTable();
+    }
+
+    protected static function booted(): void
+    {
+        if (Schema::hasColumn('school_posts', 'post_type')) {
+            static::addGlobalScope('event_records', fn ($query) => $query->where('post_type', 'event'));
+            static::creating(function (SchoolEvent $event): void {
+                $event->post_type ??= 'event';
+                $event->type ??= 'event';
+            });
+        }
+    }
 
     public function getDescriptionAttribute($value): ?string
     {

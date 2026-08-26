@@ -7212,6 +7212,34 @@ body.role-menu-open .role-menu-overlay {
     text-decoration: none;
 }
 
+.message-table {
+    width: 100%;
+    table-layout: fixed;
+    font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 1rem;
+    font-weight: 400;
+    text-align: left;
+}
+
+.message-table th,
+.message-table td {
+    font-size: 1rem;
+    font-weight: 400;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.message-table th:last-child,
+.message-table td:last-child {
+    text-align: right;
+}
+
+.message-table td:last-child .content-action-group {
+    width: 100%;
+    justify-content: flex-end;
+    margin-left: auto;
+}
+
 .message-thread-modal .modal-dialog {
     max-width: min(860px, calc(100vw - 2rem));
 }
@@ -13914,8 +13942,153 @@ form.card > .mt-3 .btn-primary {
     background-color: var(--sm-primary);
 }
 
+.rbac-detail-dialog {
+    max-width: 72rem;
+}
+
+.rbac-detail-modal .modal-content {
+    text-align: left;
+}
+
+.rbac-detail-header h2 {
+    font-size: 1.35rem;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+.rbac-detail-header p,
+.rbac-detail-description,
+.rbac-permission-tag {
+    font-size: 1rem;
+    font-weight: 400;
+    text-align: left;
+}
+
+.rbac-detail-description {
+    width: 100%;
+    padding: 1rem;
+    border: 1px solid rgba(var(--sm-primary-rgb), .14);
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: #374151;
+    line-height: 1.6;
+}
+
+.rbac-detail-count {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: .3rem .7rem;
+    border: 1px solid rgba(var(--sm-primary-rgb), .18);
+    border-radius: 8px;
+    background: #FFF7ED;
+    color: var(--sm-primary-strong);
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+.rbac-permission-tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: .55rem;
+    width: 100%;
+    padding: 1rem;
+    border: 1px solid rgba(var(--sm-primary-rgb), .14);
+    border-radius: 8px;
+    background: #FFFFFF;
+}
+
+.rbac-permission-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    max-width: 100%;
+    padding: .48rem .7rem;
+    border: 1px solid rgba(var(--sm-primary-rgb), .18);
+    border-radius: 8px;
+    background: #FFF7ED;
+    color: #374151;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.rbac-permission-tag-name {
+    color: #1F2937;
+}
+
+.rbac-permission-tag-key {
+    color: var(--sm-primary-strong);
+    font-size: .9rem;
+}
+
+.rbac-permission-group-box {
+    padding: 1rem;
+    border: 1px solid rgba(var(--sm-primary-rgb), .14);
+    border-radius: 8px;
+    background: #FFFFFF;
+}
+
+.rbac-permission-group-title {
+    margin-bottom: .75rem;
+    color: #1F2937;
+    font-size: 1rem;
+    font-weight: 400;
+    text-align: left;
+}
+
+.rbac-permission-check {
+    display: flex;
+    align-items: flex-start;
+    gap: .65rem;
+    min-height: 3.15rem;
+    padding: .65rem .75rem;
+    border: 1px solid #F1F5F9;
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: #1F2937;
+    cursor: pointer;
+    transition: border-color .16s ease, background-color .16s ease, transform .16s ease;
+}
+
+.rbac-permission-check:hover {
+    border-color: rgba(var(--sm-primary-rgb), .22);
+    background: #FFF7ED;
+    transform: translateY(-1px);
+}
+
+.rbac-permission-checkbox {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin-top: .15rem;
+    border-color: #CBD5E1;
+    accent-color: var(--sm-primary);
+}
+
+.rbac-permission-checkbox:checked {
+    border-color: var(--sm-primary);
+    background-color: var(--sm-primary);
+}
+
+.rbac-permission-checkbox:checked + .rbac-permission-check-label {
+    color: var(--sm-primary-strong);
+}
+
+.rbac-permission-check-label {
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.35;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
 @media (max-width: 767.98px) {
     .rbac-matrix-dialog {
+        max-width: calc(100vw - 1rem);
+    }
+
+    .rbac-detail-dialog {
         max-width: calc(100vw - 1rem);
     }
 

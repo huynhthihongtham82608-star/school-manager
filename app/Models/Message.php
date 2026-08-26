@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class Message extends Model
 {
@@ -33,6 +34,14 @@ class Message extends Model
         'sender_deleted_at' => 'datetime',
         'sender_permanently_deleted_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        if (Schema::hasColumn('messages', 'message_record_type')) {
+            static::addGlobalScope('message_records', fn ($query) => $query->where('message_record_type', 'message'));
+            static::creating(fn (Message $message) => $message->message_record_type ??= 'message');
+        }
+    }
 
     public function sender()
     {

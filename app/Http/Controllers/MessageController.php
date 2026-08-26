@@ -39,11 +39,7 @@ class MessageController extends Controller
             ->when($filters['status'] === 'read', fn (Builder $query) => $query->where('is_read', true))
             ->when($filters['status'] === 'unread', fn (Builder $query) => $query->where('is_read', false))
             ->when($filters['attachment'] === '1', fn (Builder $query) => $query->whereHas('message.attachments'))
-            ->orderByDesc(
-                Message::select('created_at')
-                    ->whereColumn('messages.id', 'message_recipients.message_id')
-                    ->limit(1)
-            )
+            ->orderByDesc('created_at')
             ->paginate(15)
             ->withQueryString();
 
@@ -436,17 +432,16 @@ class MessageController extends Controller
 
     private function applyUserSearch(Builder $query, string $keyword): Builder
     {
-        return $query->where('username', 'like', "%{$keyword}%")
-            ->orWhereHas('teacher', fn (Builder $teacherQuery) => $teacherQuery
-                ->where('teacher_code', 'like', "%{$keyword}%")
-                ->orWhere('name', 'like', "%{$keyword}%"))
-            ->orWhereHas('student', fn (Builder $studentQuery) => $studentQuery
-                ->where('student_code', 'like', "%{$keyword}%")
-                ->orWhere('name', 'like', "%{$keyword}%"))
-            ->orWhereHas('parentProfile', fn (Builder $parentQuery) => $parentQuery
-                ->where('parent_code', 'like', "%{$keyword}%")
+        return $query->where(function (Builder $userQuery) use ($keyword) {
+            $userQuery->where('username', 'like', "%{$keyword}%")
+                ->orWhere('full_name', 'like', "%{$keyword}%")
                 ->orWhere('name', 'like', "%{$keyword}%")
-                ->orWhere('phone', 'like', "%{$keyword}%"));
+                ->orWhere('student_code', 'like', "%{$keyword}%")
+                ->orWhere('teacher_code', 'like', "%{$keyword}%")
+                ->orWhere('parent_code', 'like', "%{$keyword}%")
+                ->orWhere('phone', 'like', "%{$keyword}%")
+                ->orWhere('email', 'like', "%{$keyword}%");
+        });
     }
 
     private function targetTypes(User $user): array
@@ -477,15 +472,34 @@ class MessageController extends Controller
             ->with(['teacher', 'student.classRoom', 'parentProfile'])
             ->where('is_active', true)
             ->whereKeyNot($sender->id);
+        $studentScope = fn (Builder $query) => $query->where(fn (Builder $roleQuery) => $roleQuery
+            ->where('role_type', 'student')
+            ->orWhere('role', 'student'));
+        $teacherScope = fn (Builder $query) => $query->where(fn (Builder $roleQuery) => $roleQuery
+            ->where('role_type', 'teacher')
+            ->orWhereIn('role', ['teacher', 'homeroom']));
+        $parentScope = fn (Builder $query) => $query->where(fn (Builder $roleQuery) => $roleQuery
+            ->where('role_type', 'parent')
+            ->orWhere('role', 'parent'));
+        $gradeClassIds = in_array($targetType, [self::TARGET_GRADE, self::TARGET_CLASS], true)
+            ? SchoolClass::query()
+                ->when($targetType === self::TARGET_GRADE, fn (Builder $query) => $query->whereIn('grade_level', $data['grade_levels'] ?? []))
+                ->when($targetType === self::TARGET_CLASS, fn (Builder $query) => $query->whereIn('id', $data['class_ids'] ?? []))
+                ->pluck('id')
+                ->all()
+            : [];
 
         $recipients = match ($targetType) {
             self::TARGET_INDIVIDUAL => $this->resolveIndividualRecipients($sender, $data['recipient_user_ids'] ?? []),
-            self::TARGET_TEACHERS => $baseQuery->where('role', 'teacher')->get(),
-            self::TARGET_HOMEROOMS => $baseQuery->where('role', 'teacher')->whereHas('teacher', fn (Builder $query) => $query->where('is_homeroom', true))->get(),
-            self::TARGET_STUDENTS => $baseQuery->where('role', 'student')->get(),
-            self::TARGET_PARENTS => $baseQuery->where('role', 'parent')->get(),
-            self::TARGET_CLASS => $baseQuery->where('role', 'student')->whereHas('student', fn (Builder $query) => $query->whereIn('class_id', $data['class_ids'] ?? []))->get(),
-            self::TARGET_GRADE => $baseQuery->where('role', 'student')->whereHas('student.classRoom', fn (Builder $query) => $query->whereIn('grade_level', $data['grade_levels'] ?? []))->get(),
+            self::TARGET_TEACHERS => $teacherScope($baseQuery)->get(),
+            self::TARGET_HOMEROOMS => $teacherScope($baseQuery)->where(fn (Builder $query) => $query
+                ->where('is_homeroom', true)
+                ->orWhere('role', 'homeroom')
+                ->orWhere('role_type', 'homeroom'))->get(),
+            self::TARGET_STUDENTS => $studentScope($baseQuery)->get(),
+            self::TARGET_PARENTS => $parentScope($baseQuery)->get(),
+            self::TARGET_CLASS => $studentScope($baseQuery)->whereIn('class_id', $gradeClassIds)->get(),
+            self::TARGET_GRADE => $studentScope($baseQuery)->whereIn('class_id', $gradeClassIds)->get(),
             self::TARGET_SCHOOL => $baseQuery->get(),
             default => collect(),
         };
@@ -615,10 +629,14 @@ class MessageController extends Controller
 
             return $query
                 ->where(function (Builder $subQuery) use ($classIds) {
-                    $subQuery->whereIn('role', ['admin', 'staff', 'teacher'])
+                    $subQuery->whereIn('role', ['admin', 'staff', 'teacher', 'homeroom'])
+                        ->orWhere('role_type', 'teacher')
                         ->orWhere(function (Builder $studentQuery) use ($classIds) {
-                            $studentQuery->where('role', 'student')
-                                ->whereHas('student', fn (Builder $query) => $query->whereIn('class_id', $classIds));
+                            $studentQuery
+                                ->where(fn (Builder $roleQuery) => $roleQuery
+                                    ->where('role_type', 'student')
+                                    ->orWhere('role', 'student'))
+                                ->whereIn('class_id', $classIds);
                         });
                 })
                 ->get();
@@ -636,8 +654,10 @@ class MessageController extends Controller
                 ->values();
 
             return $query
-                ->where('role', 'teacher')
-                ->whereHas('teacher', fn (Builder $teacherQuery) => $teacherQuery->whereIn('id', $teacherIds))
+                ->where(fn (Builder $roleQuery) => $roleQuery
+                    ->where('role_type', 'teacher')
+                    ->orWhereIn('role', ['teacher', 'homeroom']))
+                ->whereIn('id', $teacherIds)
                 ->get();
         }
 
@@ -660,8 +680,10 @@ class MessageController extends Controller
                 : collect();
 
             return $query
-                ->where('role', 'teacher')
-                ->whereHas('teacher', fn (Builder $teacherQuery) => $teacherQuery->whereIn('id', $teacherIds))
+                ->where(fn (Builder $roleQuery) => $roleQuery
+                    ->where('role_type', 'teacher')
+                    ->orWhereIn('role', ['teacher', 'homeroom']))
+                ->whereIn('id', $teacherIds)
                 ->get();
         }
 
@@ -670,17 +692,17 @@ class MessageController extends Controller
 
     private function recipientLabel(User $user): string
     {
-        if ($user->teacher) {
-            return trim($user->teacher->teacher_code . ' - ' . $user->teacher->name);
+        if ($user->isTeacher()) {
+            return trim(($user->teacher_code ?: $user->username) . ' - ' . ($user->name ?: $user->full_name ?: $user->username));
         }
 
-        if ($user->student) {
-            $class = $user->student->classRoom?->name;
-            return trim($user->student->student_code . ' - ' . $user->student->name . ($class ? ' - ' . $class : ''));
+        if ($user->isStudent()) {
+            $class = $user->class_id ? SchoolClass::find($user->class_id)?->name : null;
+            return trim(($user->student_code ?: $user->username) . ' - ' . ($user->name ?: $user->full_name ?: $user->username) . ($class ? ' - ' . $class : ''));
         }
 
-        if ($user->parentProfile) {
-            return trim(($user->parentProfile->parent_code ?: $user->username) . ' - ' . $user->parentProfile->name);
+        if ($user->isParent()) {
+            return trim(($user->parent_code ?: $user->username) . ' - ' . ($user->name ?: $user->full_name ?: $user->username));
         }
 
         return trim($user->username . ' - ' . $user->display_name);

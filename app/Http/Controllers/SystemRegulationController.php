@@ -27,7 +27,7 @@ class SystemRegulationController extends Controller
     {
         return view('system.academic-levels', [
             'academicLevels' => $evaluationService->levels(),
-            'settingsTableReady' => Schema::hasTable('settings'),
+            'settingsTableReady' => Schema::hasColumn('system_settings', 'setting_record_type'),
         ]);
     }
 
@@ -59,7 +59,7 @@ class SystemRegulationController extends Controller
     {
         return view('system.conduct-levels', [
             'conductLevels' => $evaluationService->conductLevels(),
-            'settingsTableReady' => Schema::hasTable('settings'),
+            'settingsTableReady' => Schema::hasColumn('system_settings', 'setting_record_type'),
         ]);
     }
 
@@ -102,7 +102,7 @@ class SystemRegulationController extends Controller
         return view('system.tuition-levels', [
             'feeItems' => TuitionFee::configuredFeeItems(),
             'qrImageUrl' => $qrImage ? Storage::url($qrImage) : null,
-            'settingsTableReady' => Schema::hasTable('settings'),
+            'settingsTableReady' => Schema::hasColumn('system_settings', 'setting_record_type'),
         ]);
     }
 
@@ -202,7 +202,7 @@ class SystemRegulationController extends Controller
     private function ensureSettingsTable(): void
     {
         abort_unless(
-            Schema::hasTable('settings'),
+            Schema::hasColumn('system_settings', 'setting_record_type'),
             500,
             'Chưa có bảng settings. Vui lòng chạy migration trước khi lưu cấu hình.'
         );

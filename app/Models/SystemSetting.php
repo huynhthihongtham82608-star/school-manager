@@ -22,6 +22,14 @@ class SystemSetting extends Model
         'default_school_year_id',
     ];
 
+    protected static function booted(): void
+    {
+        if (Schema::hasColumn('system_settings', 'setting_record_type')) {
+            static::addGlobalScope('system_records', fn ($query) => $query->where('setting_record_type', 'system'));
+            static::creating(fn (SystemSetting $setting) => $setting->setting_record_type ??= 'system');
+        }
+    }
+
     public static function current(): self
     {
         if (! Schema::hasTable('system_settings')) {

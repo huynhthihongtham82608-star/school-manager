@@ -1,0 +1,10 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Keep direct requests to public assets and the front controller intact.
+    RewriteRule ^public(?:/|$) - [L]
+
+    # Serve the Laravel application from public/ when Apache points at htdocs.
+    RewriteRule ^$ public/index.php [L]
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

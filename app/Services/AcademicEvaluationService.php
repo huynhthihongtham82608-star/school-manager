@@ -222,7 +222,7 @@ class AcademicEvaluationService
         $defaultKeys = array_keys($defaults);
         $rows = collect();
 
-        if (Schema::hasTable('settings')) {
+        if (Schema::hasColumn('system_settings', 'setting_record_type')) {
             $rows = Setting::query()
                 ->where('group', 'evaluation_rules')
                 ->where('key', 'like', $prefix . '%')

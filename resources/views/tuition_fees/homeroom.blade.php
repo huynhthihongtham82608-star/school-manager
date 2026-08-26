@@ -15,7 +15,7 @@
         overflow: hidden;
         background: #fff;
         border: 1px solid #fed7aa;
-        border-radius: 12px;
+        border-radius: 8px;
         box-shadow: 0 1px 0 rgba(15, 23, 42, .03);
     }
 
@@ -25,14 +25,14 @@
         table-layout: fixed;
         border-collapse: collapse;
         color: #374151;
-        font-size: .875rem;
+        font-size: 1rem;
         font-weight: 400;
     }
 
     .tuition-homeroom-table th {
         padding: .85rem .75rem;
         color: #111827;
-        font-size: .875rem;
+        font-size: 1rem;
         font-weight: 500;
         background: rgba(255, 247, 237, .7);
         border-bottom: 1px solid rgba(254, 215, 170, .7);
@@ -42,7 +42,7 @@
         padding: .8rem .75rem;
         border-bottom: 1px solid #f3f4f6;
         vertical-align: middle;
-        font-size: .875rem;
+        font-size: 1rem;
         font-weight: 400;
     }
 
@@ -80,7 +80,7 @@
     .tuition-homeroom-filter {
         min-width: 170px;
         color: #374151;
-        font-size: .875rem;
+        font-size: 1rem;
         font-weight: 400;
         background: #f9fafb;
         border: 1px solid #fed7aa;

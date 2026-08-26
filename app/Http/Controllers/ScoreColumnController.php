@@ -197,7 +197,7 @@ class ScoreColumnController extends Controller
     {
         $data = $request->validate([
             'column_ids' => ['required', 'array', 'min:1'],
-            'column_ids.*' => ['required', 'string', 'uuid', 'distinct', 'exists:score_columns,id'],
+            'column_ids.*' => ['required', 'string', 'uuid', 'distinct', \Illuminate\Validation\Rule::exists('score_columns', 'id')],
             'status' => ['required', Rule::in(['open', 'locked'])],
         ]);
 

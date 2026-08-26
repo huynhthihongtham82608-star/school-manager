@@ -123,8 +123,8 @@ class LandingPageController extends Controller
     private function stats(): array
     {
         return [
-            'students' => Schema::hasTable('students') ? Student::count() : 0,
-            'teachers' => Schema::hasTable('teachers') ? Teacher::count() : 0,
+            'students' => Schema::hasColumn('users', 'role_type') ? Student::count() : 0,
+            'teachers' => Schema::hasColumn('users', 'role_type') ? Teacher::count() : 0,
             'classes' => Schema::hasTable('classes') ? SchoolClass::count() : 0,
             'documents' => Schema::hasTable('learning_documents')
                 ? LearningDocument::where('is_published', true)->get()->filter(fn (LearningDocument $document) => $document->isVisibleToRole(null))->count()

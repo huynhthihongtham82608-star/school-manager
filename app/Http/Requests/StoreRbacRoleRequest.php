@@ -19,7 +19,7 @@ class StoreRbacRoleRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'permission_ids' => ['nullable', 'array'],
-            'permission_ids.*' => ['string', 'exists:rbac_permissions,id'],
+            'permission_ids.*' => ['string', Rule::exists('rbac_permissions', 'id')],
             'is_active' => ['nullable', 'boolean'],
         ];
     }

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class Timetable extends Model
 {
@@ -22,6 +23,14 @@ class Timetable extends Model
         'week_start' => 'date',
         'week_end' => 'date',
     ];
+
+    protected static function booted(): void
+    {
+        if (Schema::hasColumn('timetables', 'timetable_record_type')) {
+            static::addGlobalScope('timetable_records', fn ($query) => $query->where('timetable_record_type', 'timetable'));
+            static::creating(fn (Timetable $timetable) => $timetable->timetable_record_type ??= 'timetable');
+        }
+    }
 
     public function schoolYear()
     {
@@ -43,4 +52,3 @@ class Timetable extends Model
         return $this->hasMany(TimetableEntry::class);
     }
 }
-

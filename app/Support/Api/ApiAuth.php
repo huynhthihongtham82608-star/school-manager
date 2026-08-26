@@ -51,7 +51,7 @@ class ApiAuth
 
     private static function permissionKeys(User $user): array
     {
-        if (! Schema::hasTable('rbac_permissions')) {
+        if (! Schema::hasTable('rbac_matrix') && ! Schema::hasTable('rbac_permissions')) {
             return [];
         }
 
@@ -59,19 +59,10 @@ class ApiAuth
             return RbacPermission::orderBy('key')->pluck('key')->all();
         }
 
-        if ($user->role !== 'staff' || ! Schema::hasTable('rbac_role_user')) {
+        if ($user->role !== 'staff') {
             return [];
         }
 
-        return $user->rbacRoles()
-            ->where('rbac_roles.is_active', true)
-            ->with('permissions')
-            ->get()
-            ->flatMap(fn ($role) => $role->permissions)
-            ->pluck('key')
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
+        return $user->permissionKeys();
     }
 }

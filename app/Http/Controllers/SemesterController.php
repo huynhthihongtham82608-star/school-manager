@@ -379,7 +379,7 @@ class SemesterController extends Controller
 
     private function archiveTimetableEntriesForSemester(Semester $semester): void
     {
-        if (! Schema::hasTable('timetables') || ! Schema::hasTable('timetable_entries')) {
+        if (! Schema::hasColumn('timetables', 'timetable_record_type')) {
             return;
         }
 

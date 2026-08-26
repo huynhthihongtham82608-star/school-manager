@@ -130,11 +130,11 @@ class DashboardController extends Controller
         }
 
         $data = $request->validate([
-            'student_id' => ['required', 'exists:students,id'],
+            'student_id' => ['required', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
         ]);
 
         $allowed = $user->parentProfile->students()
-            ->where('students.id', $data['student_id'])
+            ->whereKey($data['student_id'])
             ->exists();
 
         if (! $allowed) {

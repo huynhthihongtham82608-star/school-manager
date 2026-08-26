@@ -157,7 +157,9 @@ class ParentController extends Controller
                 'required',
                 'string',
                 'max:50',
-                ...($parent ? [Rule::unique('parents', 'phone')->ignore($parent->id)] : []),
+                Rule::unique('users', 'phone')
+                    ->where('role_type', 'parent')
+                    ->ignore($parent?->getKey()),
                 function (string $attribute, mixed $value, \Closure $fail) use ($parent) {
                     if ($this->userPhoneConflictForParent((string) $value, $parent)) {
                         $fail('Thông tin này đã tồn tại trong hệ thống, vui lòng kiểm tra lại!');
@@ -166,7 +168,7 @@ class ParentController extends Controller
             ],
             'address' => ['nullable', 'string', 'max:255'],
             'student_ids' => ['nullable', 'array'],
-            'student_ids.*' => ['exists:students,id'],
+            'student_ids.*' => [\Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
         ]);
     }
 

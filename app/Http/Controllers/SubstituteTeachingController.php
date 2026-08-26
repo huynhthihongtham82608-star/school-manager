@@ -187,8 +187,8 @@ class SubstituteTeachingController extends Controller
             'substitute_date' => ['nullable', 'date'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
-            'timetable_entry_id' => ['required', 'string', 'exists:timetable_entries,id'],
-            'substitute_teacher_id' => ['nullable', 'string', 'exists:teachers,id'],
+            'timetable_entry_id' => ['required', 'string', \Illuminate\Validation\Rule::exists('timetables', 'id')->where('timetable_record_type', 'entry')],
+            'substitute_teacher_id' => ['nullable', 'string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'teacher')],
             'ignore_substitute_id' => ['nullable', 'string'],
         ]);
 
@@ -215,8 +215,8 @@ class SubstituteTeachingController extends Controller
             'substitute_date' => ['nullable', 'date'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
-            'timetable_entry_id' => ['required', 'string', 'exists:timetable_entries,id'],
-            'substitute_teacher_id' => ['required', 'string', 'exists:teachers,id'],
+            'timetable_entry_id' => ['required', 'string', \Illuminate\Validation\Rule::exists('timetables', 'id')->where('timetable_record_type', 'entry')],
+            'substitute_teacher_id' => ['required', 'string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'teacher')],
             'status' => ['required', Rule::in(array_keys(SubstituteTeaching::statusLabels()))],
             'note' => ['nullable', 'string', 'max:1000'],
         ]);

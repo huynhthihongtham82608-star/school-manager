@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class Subject extends Model
 {
@@ -71,6 +72,14 @@ class Subject extends Model
         'credit' => 'integer',
     ];
 
+    protected static function booted(): void
+    {
+        if (Schema::hasColumn('subjects', 'subject_record_type')) {
+            static::addGlobalScope('subject_records', fn ($query) => $query->where('subject_record_type', 'subject'));
+            static::creating(fn (Subject $subject) => $subject->subject_record_type ??= 'subject');
+        }
+    }
+
     public function assignments()
     {
         return $this->hasMany(TeachingAssignment::class);
@@ -108,8 +117,15 @@ class Subject extends Model
 
     public function departments()
     {
-        return $this->belongsToMany(TeacherDepartment::class, 'teacher_department_subject', 'subject_id', 'department_id')
+        $table = \Illuminate\Support\Facades\Schema::hasColumn('teacher_departments', 'department_record_type')
+            && ! \Illuminate\Support\Facades\Schema::hasTable('teacher_department_subject') ? 'teacher_departments' : 'teacher_department_subject';
+
+        $relation = $this->belongsToMany(TeacherDepartment::class, $table, 'subject_id', 'department_id')
             ->withTimestamps();
+
+        return $table === 'teacher_departments'
+            ? $relation->wherePivot('department_record_type', 'subject')->withPivotValue('department_record_type', 'subject')
+            : $relation;
     }
 
     public function periodNormForGrade(int $gradeLevel): ?SubjectPeriodNorm

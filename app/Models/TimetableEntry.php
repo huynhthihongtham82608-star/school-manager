@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\UsesUuid;
+use App\Models\Concerns\UsesConsolidatedTable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class TimetableEntry extends Model
 {
-    use HasFactory, UsesUuid;
+    use HasFactory, UsesUuid, UsesConsolidatedTable;
 
     public $timestamps = false;
 
@@ -39,6 +40,19 @@ class TimetableEntry extends Model
     protected $casts = [
         'archived_at' => 'datetime',
     ];
+
+    public function getTable()
+    {
+        return $this->usesConsolidatedTable('timetables', 'timetable_entries', 'timetable_record_type') ? 'timetables' : parent::getTable();
+    }
+
+    protected static function booted(): void
+    {
+        if (static::shouldScopeConsolidatedTable('timetables', 'timetable_entries', 'timetable_record_type')) {
+            static::addGlobalScope('timetable_entry_records', fn ($query) => $query->where('timetable_record_type', 'entry'));
+            static::creating(fn (TimetableEntry $entry) => $entry->timetable_record_type ??= 'entry');
+        }
+    }
 
     public function timetable()
     {

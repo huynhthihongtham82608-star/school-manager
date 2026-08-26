@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\UsesUuid;
+use App\Models\Concerns\UsesConsolidatedTable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Student extends Model
 {
-    use HasFactory, UsesUuid;
+    use HasFactory, UsesUuid, UsesConsolidatedTable;
 
     public const STATUS_STUDYING = 'studying';
     public const STATUS_RESERVED = 'reserved';
@@ -48,6 +49,26 @@ class Student extends Model
         'dob' => 'date',
         'enrollment_date' => 'date',
     ];
+
+    public function getTable()
+    {
+        return $this->usesConsolidatedTable('users', 'students', 'role_type') ? 'users' : parent::getTable();
+    }
+
+    protected static function booted(): void
+    {
+        if (static::shouldScopeConsolidatedTable('users', 'students', 'role_type')) {
+            static::addGlobalScope('student_records', fn ($query) => $query->where('role_type', 'student'));
+            static::creating(function (Student $student): void {
+                $student->role_type ??= 'student';
+                $student->role ??= 'student';
+                $student->full_name ??= $student->name;
+                $student->username ??= $student->student_code ?: $student->email;
+                $student->password_hash ??= '$2y$12$Z2FJ9wVbk03D58EQ38Fn6O9z3.nBTeoNRZoh9c6uPfYRJrL46Y0wW';
+                $student->student_id ??= $student->id;
+            });
+        }
+    }
 
     public static function statuses(): array
     {
@@ -153,7 +174,7 @@ class Student extends Model
 
     public function user()
     {
-        return $this->hasOne(User::class);
+        return $this->hasOne(User::class, 'student_id', 'id');
     }
 
     public function parents()

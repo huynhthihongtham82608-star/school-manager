@@ -125,7 +125,7 @@ class TeacherPortalController extends Controller
             $completed = 0;
 
             foreach ($teacherAssignments as $assignment) {
-                $hasScore = Schema::hasTable('score_headers')
+                $hasScore = Schema::hasTable('student_scores')
                     && ScoreHeader::where('subject_id', $assignment->subject_id)
                         ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
                         ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))

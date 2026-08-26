@@ -286,7 +286,7 @@ class ConductController extends Controller
 
     private function conductSystemSuggestions($students, $attendanceSummaries, Semester $semester, array $evaluationRules)
     {
-        if ($students->isEmpty() || ! Schema::hasTable('score_headers')) {
+        if ($students->isEmpty() || ! Schema::hasTable('student_scores')) {
             return collect();
         }
 

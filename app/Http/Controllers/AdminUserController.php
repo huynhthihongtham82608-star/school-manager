@@ -22,21 +22,27 @@ class AdminUserController extends Controller
             'status' => $request->query('status', 'all'),
             'role_id' => $request->query('role_id', 'all'),
         ];
+        $matchingRoleIds = $filters['q'] !== ''
+            ? RbacRole::where('name', 'like', '%' . $filters['q'] . '%')->pluck('id')->map(fn ($id) => (string) $id)->all()
+            : [];
 
-        $users = User::with('rbacRoles.permissions')
+        $users = User::query()
             ->whereIn('role', ['admin', 'staff'])
-            ->when($filters['q'] !== '', function ($query) use ($filters) {
+            ->when($filters['q'] !== '', function ($query) use ($filters, $matchingRoleIds) {
                 $keyword = $filters['q'];
-                $query->where(function ($inner) use ($keyword) {
+                $query->where(function ($inner) use ($keyword, $matchingRoleIds) {
                     $inner->where('username', 'like', '%' . $keyword . '%')
                         ->orWhere('full_name', 'like', '%' . $keyword . '%')
                         ->orWhere('email', 'like', '%' . $keyword . '%')
-                        ->orWhere('phone', 'like', '%' . $keyword . '%')
-                        ->orWhereHas('rbacRoles', fn ($role) => $role->where('name', 'like', '%' . $keyword . '%'));
+                        ->orWhere('phone', 'like', '%' . $keyword . '%');
+
+                    foreach ($matchingRoleIds as $roleId) {
+                        $inner->orWhereRaw("JSON_CONTAINS(COALESCE(rbac_role_ids, '[]'), JSON_QUOTE(?))", [$roleId]);
+                    }
                 });
             })
             ->when($filters['status'] !== 'all', fn ($query) => $query->where('is_active', $filters['status'] === 'active'))
-            ->when($filters['role_id'] !== 'all', fn ($query) => $query->whereHas('rbacRoles', fn ($role) => $role->whereKey($filters['role_id'])))
+            ->when($filters['role_id'] !== 'all', fn ($query) => $query->whereRaw("JSON_CONTAINS(COALESCE(rbac_role_ids, '[]'), JSON_QUOTE(?))", [(string) $filters['role_id']]))
             ->orderByDesc('is_super_admin')
             ->orderBy('username')
             ->paginate(15)
@@ -71,7 +77,7 @@ class AdminUserController extends Controller
                     'is_super_admin' => false,
                 ]);
 
-                $user->rbacRoles()->sync($roleIds);
+                $user->syncRbacRoleIds($roleIds);
 
                 AuditLogger::log('admin_user_created', User::class, (string) $user->getKey(), 'Tạo tài khoản quản trị phụ ' . $user->username);
             });
@@ -110,7 +116,7 @@ class AdminUserController extends Controller
                 ]);
 
                 if (! $adminUser->isSuperAdmin()) {
-                    $adminUser->rbacRoles()->sync($roleIds);
+                    $adminUser->syncRbacRoleIds($roleIds);
                 }
 
                 AuditLogger::log('admin_user_updated', User::class, (string) $adminUser->getKey(), 'Cập nhật tài khoản quản trị ' . $adminUser->username);
@@ -176,7 +182,7 @@ class AdminUserController extends Controller
         }
 
         DB::transaction(function () use ($adminUser) {
-            $adminUser->rbacRoles()->detach();
+            $adminUser->syncRbacRoleIds([]);
             $adminUser->delete();
             AuditLogger::log('admin_user_deleted', User::class, (string) $adminUser->getKey(), 'Xóa tài khoản quản trị ' . $adminUser->username);
         });

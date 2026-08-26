@@ -9,7 +9,7 @@ class UpdateAdminUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->hasPermission('manage_admin_accounts');
+        return (bool) $this->user()?->hasAnyPermission(['edit_users', 'manage_admin_accounts']);
     }
 
     public function rules(): array

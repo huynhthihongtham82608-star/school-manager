@@ -243,7 +243,7 @@ class SchoolClassController extends Controller
         $data = $request->validate([
             'action' => ['required', Rule::in(['assign', 'unassign', 'transfer'])],
             'student_ids' => ['required', 'array', 'min:1'],
-            'student_ids.*' => ['required', 'string', 'exists:students,id'],
+            'student_ids.*' => ['required', 'string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
             'target_class_id' => ['nullable', 'string', 'exists:classes,id'],
         ]);
 
@@ -448,7 +448,7 @@ class SchoolClassController extends Controller
             'grade_level' => ['required', 'integer', Rule::in([10, 11, 12])],
             'cohort' => ['nullable', 'string', 'max:20'],
             'school_year_id' => ['required', 'exists:school_years,id'],
-            'homeroom_teacher_id' => ['nullable', 'exists:teachers,id'],
+            'homeroom_teacher_id' => ['nullable', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'teacher')],
             'capacity' => ['required', 'integer', 'min:1', 'max:45'],
         ]);
 
@@ -542,7 +542,7 @@ class SchoolClassController extends Controller
 
     private function hasScoreData(SchoolClass $class): bool
     {
-        if (! Schema::hasTable('score_headers')) {
+        if (! Schema::hasTable('student_scores')) {
             return false;
         }
 

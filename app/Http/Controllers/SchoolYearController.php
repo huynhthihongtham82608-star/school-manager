@@ -438,9 +438,9 @@ class SchoolYearController extends Controller
             'options' => ['nullable', 'array'],
             'options.*' => ['string', 'in:' . implode(',', array_keys(self::INITIALIZE_OPTIONS))],
             'promote_student_ids' => ['nullable', 'array'],
-            'promote_student_ids.*' => ['string', 'exists:students,id'],
+            'promote_student_ids.*' => ['string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
             'graduate_student_ids' => ['nullable', 'array'],
-            'graduate_student_ids.*' => ['string', 'exists:students,id'],
+            'graduate_student_ids.*' => ['string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
             'confirm_initialization' => ['nullable', 'boolean'],
         ]);
 
@@ -1006,7 +1006,7 @@ class SchoolYearController extends Controller
 
     private function archiveTimetableEntriesForSemester(Semester $semester, SchoolYear $schoolYear): void
     {
-        if (! Schema::hasTable('timetables') || ! Schema::hasTable('timetable_entries')) {
+        if (! Schema::hasColumn('timetables', 'timetable_record_type')) {
             return;
         }
 
@@ -1064,7 +1064,7 @@ class SchoolYearController extends Controller
 
     private function archiveTimetableEntriesWithoutSemesterForSchoolYear(SchoolYear $schoolYear): void
     {
-        if (! Schema::hasTable('timetables') || ! Schema::hasTable('timetable_entries')) {
+        if (! Schema::hasColumn('timetables', 'timetable_record_type')) {
             return;
         }
 
@@ -1211,7 +1211,7 @@ class SchoolYearController extends Controller
         $classIds = $this->idsFor(SchoolClass::class, 'school_year_id', $id);
         $semesterIds = $this->idsFor(Semester::class, 'school_year_id', $id);
 
-        if (Schema::hasTable('grade_windows')) {
+        if (Schema::hasTable('student_scores')) {
             GradeWindow::where('school_year_id', $id)->delete();
         }
 
@@ -1229,7 +1229,7 @@ class SchoolYearController extends Controller
 
     private function restorePromotedStudents(SchoolYear $targetYear, ?SchoolYear $sourceYear): void
     {
-        if (! $sourceYear || ! Schema::hasTable('classes') || ! Schema::hasTable('students')) {
+        if (! $sourceYear || ! Schema::hasTable('classes') || ! Schema::hasColumn('users', 'role_type')) {
             return;
         }
 
@@ -1265,7 +1265,7 @@ class SchoolYearController extends Controller
 
     private function deleteRemainingStudentsForYear(string $schoolYearId, $classIds): void
     {
-        if (! Schema::hasTable('students')) {
+        if (! Schema::hasColumn('users', 'role_type')) {
             return;
         }
 

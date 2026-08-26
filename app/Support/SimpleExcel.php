@@ -8,13 +8,21 @@ use ZipArchive;
 
 class SimpleExcel
 {
-    public static function readRows(UploadedFile $file): array
+    public static function readRows(UploadedFile $file, ?array $allowedHeaders = null): array
     {
         $extension = Str::lower($file->getClientOriginalExtension());
+        $allowedHeaders = $allowedHeaders === null
+            ? null
+            : collect($allowedHeaders)
+                ->map(fn ($header) => self::normalizeHeader((string) $header))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
 
         return $extension === 'xlsx'
-            ? self::readXlsxRows($file->getRealPath())
-            : self::readCsvRows($file->getRealPath());
+            ? self::readXlsxRows($file->getRealPath(), $allowedHeaders)
+            : self::readCsvRows($file->getRealPath(), $allowedHeaders);
     }
 
     public static function downloadXlsx(string $filename, array $headers, array $rows)
@@ -57,7 +65,7 @@ class SimpleExcel
         return trim((string) $header, '_');
     }
 
-    private static function readCsvRows(string $path): array
+    private static function readCsvRows(string $path, ?array $allowedHeaders = null): array
     {
         $handle = fopen($path, 'rb');
         if (! $handle) {
@@ -69,7 +77,11 @@ class SimpleExcel
 
         while (($data = fgetcsv($handle)) !== false) {
             if ($headers === []) {
-                $headers = array_map(fn ($value) => self::normalizeHeader((string) $value), $data);
+                $headers = array_map(function ($value) use ($allowedHeaders) {
+                    $header = self::normalizeHeader((string) $value);
+
+                    return $allowedHeaders === null || in_array($header, $allowedHeaders, true) ? $header : '';
+                }, $data);
                 continue;
             }
 
@@ -90,7 +102,7 @@ class SimpleExcel
         return $rows;
     }
 
-    private static function readXlsxRows(string $path): array
+    private static function readXlsxRows(string $path, ?array $allowedHeaders = null): array
     {
         $zip = new ZipArchive();
         if ($zip->open($path) !== true) {
@@ -150,7 +162,11 @@ class SimpleExcel
             return [];
         }
 
-        $headers = array_map(fn ($value) => self::normalizeHeader((string) $value), array_values($rawRows[0]));
+        $headers = array_map(function ($value) use ($allowedHeaders) {
+            $header = self::normalizeHeader((string) $value);
+
+            return $allowedHeaders === null || in_array($header, $allowedHeaders, true) ? $header : '';
+        }, array_values($rawRows[0]));
         $rows = [];
 
         foreach (array_slice($rawRows, 1) as $rawRow) {

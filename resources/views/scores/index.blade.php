@@ -904,14 +904,14 @@
             : 'Giáo viên bộ môn nhập điểm theo các cột điểm do Admin cấu hình.'"
     >
         <x-bulk-excel-actions module="scores" :context="$scoreBulkContext" :allow-import="! $isScoreAdmin" />
-        @if(auth()->user()->hasPermission('scores.manage'))
+        @if(auth()->user()->hasAnyPermission(['input_scores', 'lock_score_window', 'scores.manage']))
             <button type="button" class="score-config-shortcut-btn" data-bs-toggle="modal" data-bs-target="#scoreColumnConfigModal">
                 ⚙️ Quản lý cấu hình cột điểm
             </button>
         @endif
     </x-page-header>
 
-    @if(auth()->user()->hasPermission('scores.manage') && $scoreColumnConfig)
+    @if(auth()->user()->hasAnyPermission(['input_scores', 'lock_score_window', 'scores.manage']) && $scoreColumnConfig)
         <x-score-column-config-modal id="scoreColumnConfigModal" :config="$scoreColumnConfig" />
     @endif
 
