@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Conduct;
 use App\Models\Reward;
 use App\Models\SchoolClass;
 use App\Models\ScoreHeader;
 use App\Models\Semester;
 use App\Models\Student;
-use App\Models\Conduct;
 use App\Services\AcademicEvaluationService;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -85,20 +86,44 @@ class KhenThuongController extends Controller
         $this->authorizeAccess();
         $this->denyHistoricalWrite();
 
-        $data = $this->validatedData($request);
-        $student = Student::with('classRoom')->findOrFail($data['student_id']);
-        $this->authorizeStudent($student);
+        $data = $this->validatedData($request, true);
+        $students = Student::with('classRoom')
+            ->whereIn('id', $data['student_ids'])
+            ->orderBy('student_code')
+            ->get();
 
-        $reward = Reward::create($data + [
-            'class_id' => $student->class_id,
-            'school_year_id' => $student->school_year_id,
-            'created_by' => Auth::id(),
-            'updated_by' => Auth::id(),
-        ]);
+        if ($students->count() !== count($data['student_ids'])) {
+            throw ValidationException::withMessages([
+                'student_ids' => 'Danh sách học sinh khen thưởng không hợp lệ.',
+            ]);
+        }
 
-        AuditLogger::log('reward_created', Reward::class, (string) $reward->getKey(), 'Tạo quyết định khen thưởng cho ' . $student->name);
+        $createdRewards = DB::transaction(function () use ($data, $students) {
+            return $students->map(function (Student $student) use ($data) {
+                $this->authorizeStudent($student);
 
-        return back()->with('success', 'Đã lưu quyết định khen thưởng.');
+                return Reward::create([
+                    'student_id' => $student->id,
+                    'class_id' => $student->class_id,
+                    'semester_id' => $data['semester_id'],
+                    'school_year_id' => $student->school_year_id,
+                    'reward_type' => $data['reward_type'],
+                    'detail' => $data['detail'] ?? null,
+                    'decision_number' => $data['decision_number'] ?? null,
+                    'created_by' => Auth::id(),
+                    'updated_by' => Auth::id(),
+                ]);
+            });
+        });
+
+        AuditLogger::log(
+            'reward_created',
+            Reward::class,
+            null,
+            'Tạo ' . $createdRewards->count() . ' dòng khen thưởng cùng số quyết định ' . ($data['decision_number'] ?: 'không ghi số')
+        );
+
+        return back()->with('success', 'Đã lưu quyết định khen thưởng cho ' . $createdRewards->count() . ' học sinh.');
     }
 
     public function update(Request $request, Reward $reward)
@@ -241,15 +266,52 @@ class KhenThuongController extends Controller
         ]);
     }
 
-    private function validatedData(Request $request): array
+    private function validatedData(Request $request, bool $bulkStudents = false): array
     {
-        return $request->validate([
-            'student_id' => ['required', 'string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
+        $rules = [
             'semester_id' => ['required', 'string', 'exists:semesters,id'],
             'reward_type' => ['required', 'string', Rule::in(array_keys(Reward::typeLabels()))],
             'detail' => ['nullable', 'string', 'max:2000'],
             'decision_number' => ['nullable', 'string', 'max:255'],
-        ]);
+        ];
+
+        if ($bulkStudents) {
+            $rules['student_ids'] = ['required', 'array', 'min:1'];
+            $rules['student_ids.*'] = ['required', 'string', Rule::exists('users', 'id')->where('role_type', 'student')];
+        } else {
+            $rules['student_id'] = ['nullable', 'string', Rule::exists('users', 'id')->where('role_type', 'student')];
+            $rules['student_ids'] = ['nullable', 'array', 'min:1'];
+            $rules['student_ids.*'] = ['nullable', 'string', Rule::exists('users', 'id')->where('role_type', 'student')];
+        }
+
+        $data = $request->validate($rules);
+
+        if ($bulkStudents) {
+            $data['student_ids'] = collect($data['student_ids'])
+                ->map(fn ($id) => (string) $id)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            return $data;
+        }
+
+        $selectedStudentIds = collect($data['student_ids'] ?? [])
+            ->map(fn ($id) => (string) $id)
+            ->filter()
+            ->values();
+        $data['student_id'] = (string) ($data['student_id'] ?? $selectedStudentIds->first() ?? '');
+
+        if ($data['student_id'] === '') {
+            throw ValidationException::withMessages([
+                'student_ids' => 'Vui lòng chọn học sinh.',
+            ]);
+        }
+
+        unset($data['student_ids']);
+
+        return $data;
     }
 
     private function authorizeAccess(): void

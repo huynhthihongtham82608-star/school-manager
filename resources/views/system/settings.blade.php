@@ -20,6 +20,13 @@
 @endphp
 
 <style>
+    #school-appearance-form,
+    #school-appearance-form * {
+        font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 400;
+        text-align: left;
+    }
+
     .appearance-card {
         background: #fff;
         border: 1px solid #fed7aa;
@@ -27,6 +34,8 @@
         box-shadow: 0 1px 0 rgba(0, 0, 0, .03);
         color: #374151;
         font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 1rem;
+        font-weight: 400;
         text-align: left;
     }
 
@@ -75,7 +84,7 @@
 
     .appearance-card-subtitle {
         color: rgba(194, 65, 12, .72);
-        font-size: .875rem;
+        font-size: 1rem;
         font-weight: 400;
         margin: .25rem 0 0;
         text-align: left;
@@ -83,7 +92,7 @@
 
     .appearance-field label {
         color: #374151;
-        font-size: .875rem;
+        font-size: 1rem;
         font-weight: 400;
         margin-bottom: .35rem;
         text-align: left;
@@ -91,7 +100,7 @@
 
     .appearance-field .form-control {
         color: #374151;
-        font-size: .875rem;
+        font-size: 1rem;
         font-weight: 400;
         text-align: left;
         border-color: #e5e7eb;
@@ -111,7 +120,7 @@
         justify-content: center;
         overflow: hidden;
         color: #9ca3af;
-        font-size: .875rem;
+        font-size: 1rem;
         font-weight: 400;
         text-align: left;
         background: rgba(255, 247, 237, .42);
@@ -137,6 +146,70 @@
         display: block;
     }
 
+    .appearance-header-actions {
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        gap: .75rem !important;
+        margin: 0 0 1rem auto !important;
+        padding: 0 !important;
+        text-align: right !important;
+    }
+
+    .appearance-action-button {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: .45rem !important;
+        min-height: 42px !important;
+        padding: .62rem 1.1rem !important;
+        border-radius: 14px !important;
+        border: 1px solid transparent !important;
+        font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+        font-size: .95rem !important;
+        font-weight: 400 !important;
+        line-height: 1.25 !important;
+        text-align: center !important;
+        text-decoration: none !important;
+        cursor: pointer !important;
+        transition: transform .16s ease, box-shadow .16s ease, filter .16s ease !important;
+        white-space: nowrap !important;
+    }
+
+    .appearance-action-button:hover,
+    .appearance-action-button:focus {
+        text-decoration: none !important;
+        transform: translateY(-1px);
+        filter: saturate(1.08);
+    }
+
+    .appearance-action-home {
+        color: #075985 !important;
+        background: linear-gradient(135deg, #e0f2fe 0%, #cffafe 54%, #f0fdfa 100%) !important;
+        border-color: #67e8f9 !important;
+        box-shadow: 0 10px 22px rgba(14, 165, 233, .16) !important;
+    }
+
+    .appearance-action-home:hover,
+    .appearance-action-home:focus {
+        color: #0c4a6e !important;
+        background: linear-gradient(135deg, #bae6fd 0%, #a5f3fc 54%, #ccfbf1 100%) !important;
+    }
+
+    .appearance-action-save {
+        color: #fff !important;
+        background: linear-gradient(135deg, #f97316 0%, #fb7185 56%, #ec4899 100%) !important;
+        border-color: rgba(255, 255, 255, .18) !important;
+        box-shadow: 0 12px 26px rgba(249, 115, 22, .28) !important;
+    }
+
+    .appearance-action-save:hover,
+    .appearance-action-save:focus {
+        color: #fff !important;
+        background: linear-gradient(135deg, #ea580c 0%, #f43f5e 56%, #db2777 100%) !important;
+    }
+
     @media (max-width: 991.98px) {
         #school-appearance-layout {
             flex-direction: column !important;
@@ -160,13 +233,25 @@
     subtitle="Quản lý định danh, liên hệ, logo, banner và nội dung giới thiệu hiển thị xuyên suốt hệ thống."
 />
 
+<div class="appearance-header-actions">
+    <a href="{{ url('/') }}" target="_blank" rel="noopener"
+       class="appearance-action-button appearance-action-home"
+       style="text-decoration: none !important;">
+        👁️ Xem Trang chủ
+    </a>
+    <button type="submit" form="school-appearance-form"
+            class="appearance-action-button appearance-action-save">
+        💾 Lưu thay đổi diện mạo
+    </button>
+</div>
+
 @unless($homePageTablesReady)
     <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm font-normal rounded-xl px-4 py-3 mb-6 text-left">
-        Chưa có bảng home_page_contents. Vui lòng chạy migration trước khi lưu banner và giới thiệu.
+        Chưa có bảng system_settings hoặc thiếu cột setting_record_type. Vui lòng chạy migration trước khi lưu banner và giới thiệu.
     </div>
 @endunless
 
-<form id="school-appearance-form" method="POST" action="{{ route('system.settings.update') }}" enctype="multipart/form-data" class="w-full font-sans text-left text-gray-700 font-normal">
+<form id="school-appearance-form" method="POST" action="{{ route('system.settings.update') }}" enctype="multipart/form-data" class="w-full font-sans text-left text-gray-700 font-normal text-base">
     @csrf
     @method('PUT')
 
@@ -327,9 +412,6 @@
                 </div>
             </section>
 
-            <button type="submit" class="w-full bg-orange-600 text-white hover:bg-orange-700 py-2.5 rounded-lg text-sm font-normal cursor-pointer transition-all">
-                <i class="bi bi-save me-2"></i>Lưu thay đổi diện mạo
-            </button>
         </aside>
     </div>
 </form>

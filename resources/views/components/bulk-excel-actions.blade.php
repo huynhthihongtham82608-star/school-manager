@@ -49,34 +49,34 @@
     <div class="bulk-excel-modal bulk-excel-export-modal">
         <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
             <div>
-                <h5 class="bulk-excel-title">ðŸ‘ï¸ XEM TRÆ¯á»šC Báº¢N IN VÃ€ FILE XUáº¤T BÃO CÃO</h5>
-                <div class="bulk-excel-note">MÃ´ phá»ng cáº¥u trÃºc cÃ¡c trÆ°á»ng dá»¯ liá»‡u vÃ  Ä‘á»‹nh dáº¡ng file bÃ¡o cÃ¡o sáº½ táº£i vá» theo bá»™ lá»c hiá»‡n táº¡i.</div>
+                <h5 class="bulk-excel-title">👁️ XEM TRƯỚC BẢN IN VÀ FILE XUẤT BÁO CÁO</h5>
+                <div class="bulk-excel-note">Mô phỏng cấu trúc các trường dữ liệu và định dạng file báo cáo sẽ tải về theo bộ lọc hiện tại.</div>
             </div>
-            <button type="button" class="btn-close" data-bulk-export-cancel aria-label="ÄÃ³ng"></button>
+            <button type="button" class="btn-close" data-bulk-export-cancel aria-label="Đóng"></button>
         </div>
 
         <div class="bulk-excel-alert d-none" data-bulk-export-alert></div>
 
-        <div class="bulk-excel-section-label">Äá»‹nh dáº¡ng file</div>
+        <div class="bulk-excel-section-label">Định dạng file</div>
         <div class="bulk-export-format-group" data-bulk-export-format>
             <label class="bulk-export-radio">
                 <input type="radio" name="{{ $exportModalId }}_format" value="xlsx" checked>
-                <span>Xuáº¥t file Excel (.xlsx)</span>
+                <span>Xuất file Excel (.xlsx)</span>
             </label>
             <label class="bulk-export-radio">
                 <input type="radio" name="{{ $exportModalId }}_format" value="pdf">
-                <span>Xuáº¥t file PDF bÃ¡o cÃ¡o (.pdf)</span>
+                <span>Xuất file PDF báo cáo (.pdf)</span>
             </label>
         </div>
 
-        <div class="bulk-excel-section-label mt-3">Cá»™t thÃ´ng tin</div>
+        <div class="bulk-excel-section-label mt-3">Cột thông tin</div>
         <div class="bulk-export-checkbox-grid" data-bulk-export-fields>
-            <span class="bulk-excel-note">Äang táº£i danh sÃ¡ch trÆ°á»ng dá»¯ liá»‡u...</span>
+            <span class="bulk-excel-note">Đang tải danh sách trường dữ liệu...</span>
         </div>
 
         <div class="d-flex align-items-center justify-content-end gap-2 mt-4">
-            <button type="button" class="btn btn-secondary bulk-excel-cancel" data-bulk-export-cancel>Há»§y bá»</button>
-            <button type="button" class="btn bulk-excel-confirm" data-bulk-export-download>ðŸš€ XÃ¡c nháº­n OK - Táº£i xuá»‘ng file ngay</button>
+            <button type="button" class="btn btn-secondary bulk-excel-cancel" data-bulk-export-cancel>Hủy bỏ</button>
+            <button type="button" class="btn bulk-excel-confirm" data-bulk-export-download>🚀 Xác nhận OK - Tải xuống file ngay</button>
         </div>
     </div>
 </div>
@@ -85,10 +85,10 @@
     <div class="bulk-excel-modal">
         <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
             <div>
-                <h5 class="bulk-excel-title">ðŸ“‹ KIá»‚M TRA Dá»® LIá»†U FILE NHáº¬P HÃ€NG LOáº T</h5>
-                <div class="bulk-excel-note">Vui lÃ²ng rÃ  soÃ¡t láº¡i thÃ´ng tin trÆ°á»›c khi xÃ¡c nháº­n náº¡p chÃ­nh thá»©c vÃ o CÆ¡ sá»Ÿ dá»¯ liá»‡u.</div>
+                <h5 class="bulk-excel-title">📋 KIỂM TRA DỮ LIỆU FILE NHẬP HÀNG LOẠT</h5>
+                <div class="bulk-excel-note">Vui lòng rà soát lại thông tin trước khi xác nhận nạp chính thức vào Cơ sở dữ liệu.</div>
             </div>
-            <button type="button" class="btn-close" data-bulk-excel-cancel aria-label="ÄÃ³ng"></button>
+            <button type="button" class="btn-close" data-bulk-excel-cancel aria-label="Đóng"></button>
         </div>
         <div class="bulk-excel-alert d-none" data-bulk-excel-alert></div>
         <div class="table-responsive bulk-excel-table-wrap">
@@ -98,10 +98,10 @@
             </table>
         </div>
         <div class="d-flex align-items-center justify-content-between gap-3 mt-3">
-            <span class="bulk-excel-count" data-bulk-excel-count>ChÆ°a cÃ³ dá»¯ liá»‡u xem trÆ°á»›c.</span>
+            <span class="bulk-excel-count" data-bulk-excel-count>Chưa có dữ liệu xem trước.</span>
             <div class="d-flex align-items-center justify-content-end gap-2">
-                <button type="button" class="btn btn-secondary bulk-excel-cancel" data-bulk-excel-cancel>Há»§y bá» tiáº¿n trÃ¬nh</button>
-                <button type="button" class="btn bulk-excel-confirm" data-bulk-excel-confirm disabled>ðŸ”“ XÃ¡c nháº­n OK - Náº¡p vÃ o há»‡ thá»‘ng</button>
+                <button type="button" class="btn btn-secondary bulk-excel-cancel" data-bulk-excel-cancel>Hủy bỏ tiến trình</button>
+                <button type="button" class="btn bulk-excel-confirm" data-bulk-excel-confirm disabled>🔒 Tiến hành nạp vào hệ thống</button>
             </div>
         </div>
     </div>
@@ -272,10 +272,28 @@
             white-space: nowrap;
         }
 
+        .bulk-excel-cell-value {
+            min-height: 1.5rem;
+            white-space: nowrap;
+        }
+
         .bulk-excel-table th {
             color: #111827;
             font-weight: 500;
             background: #fff7ed;
+        }
+
+        .bulk-excel-select-cell {
+            width: 3rem;
+            min-width: 3rem;
+            text-align: left;
+        }
+
+        .bulk-excel-row-check {
+            width: 1rem;
+            height: 1rem;
+            accent-color: #ea580c;
+            cursor: pointer;
         }
 
         .bulk-excel-cell-error {
@@ -284,11 +302,18 @@
         }
 
         .bulk-excel-error-text {
-            display: block;
+            display: inline-flex;
+            align-items: center;
             margin-top: .22rem;
             color: #b91c1c;
             font-size: .72rem;
             font-weight: 400;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        .text-red-650 {
+            color: #b91c1c !important;
         }
 
         .bulk-excel-confirm {
@@ -327,20 +352,20 @@
             display: inline-flex;
             align-items: center;
             gap: .625rem;
-            max-width: min(24rem, calc(100vw - 2rem));
+            max-width: min(34rem, calc(100vw - 2rem));
             padding: 1rem;
-            border: 1px solid #fed7aa;
-            border-radius: 12px;
-            color: #9a3412;
-            background: #fff7ed !important;
-            background-color: #fff7ed !important;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            color: #166534;
+            background: #f0fdf4 !important;
+            background-color: #f0fdf4 !important;
             background-image: none !important;
             backdrop-filter: none !important;
             -webkit-backdrop-filter: none !important;
             opacity: 1 !important;
             isolation: isolate;
             box-shadow: 0 16px 34px rgba(15, 23, 42, .18);
-            font-size: .92rem;
+            font-size: 1rem;
             font-weight: 400;
             text-align: left;
             transform: translateX(-50%);
@@ -353,6 +378,19 @@
             }
             window.__bulkExcelBound = true;
 
+            const ensureUtf8Meta = () => {
+                if (document.querySelector('meta[charset]')) {
+                    document.querySelector('meta[charset]').setAttribute('charset', 'utf-8');
+                    return;
+                }
+
+                const meta = document.createElement('meta');
+                meta.setAttribute('charset', 'utf-8');
+                document.head.prepend(meta);
+            };
+
+            ensureUtf8Meta();
+
             const token = document.querySelector('meta[name="csrf-token"]')?.content
                 || document.querySelector('input[name="_token"]')?.value
                 || '';
@@ -361,9 +399,12 @@
                 const element = document.createElement('div');
                 element.className = 'bulk-excel-toast';
                 const icon = document.createElement('span');
-                icon.textContent = '🟠';
+                icon.textContent = '🟢';
+                icon.className = 'shrink-0';
                 const text = document.createElement('span');
                 text.textContent = message;
+                text.style.fontWeight = '400';
+                text.style.textAlign = 'left';
                 element.append(icon, text);
                 document.body.appendChild(element);
                 setTimeout(() => element.remove(), 2600);
@@ -443,7 +484,7 @@
                 setExportAlert(modal, '');
 
                 if (! fields.length) {
-                    wrap.innerHTML = '<span class="bulk-excel-note">KhÃ´ng cÃ³ trÆ°á»ng dá»¯ liá»‡u phÃ¹ há»£p Ä‘á»ƒ xuáº¥t.</span>';
+                    wrap.innerHTML = '<span class="bulk-excel-note">Không có trường dữ liệu phù hợp để xuất.</span>';
                     return;
                 }
 
@@ -475,9 +516,20 @@
                 modal.dataset.token = payload.token || '';
                 head.innerHTML = '';
                 body.innerHTML = '';
-                setAlert(modal, payload.error_count > 0 ? `PhÃ¡t hiá»‡n ${payload.error_count} Ã´ lá»—i dá»¯ liá»‡u.` : '');
+                const warningRows = payload.warning_row_count ?? payload.error_count ?? 0;
+                setAlert(modal, warningRows > 0 ? `Phát hiện ${warningRows} dòng dữ liệu cần lưu ý.` : '');
 
                 const headerRow = document.createElement('tr');
+                const selectHeader = document.createElement('th');
+                selectHeader.className = 'bulk-excel-select-cell';
+                const selectAll = document.createElement('input');
+                selectAll.type = 'checkbox';
+                selectAll.className = 'bulk-excel-row-check';
+                selectAll.checked = true;
+                selectAll.setAttribute('data-bulk-row-select-all', '');
+                selectAll.setAttribute('aria-label', 'Chọn tất cả dòng import');
+                selectHeader.appendChild(selectAll);
+                headerRow.appendChild(selectHeader);
                 (payload.headers || []).forEach((header) => {
                     const th = document.createElement('th');
                     th.textContent = header.label;
@@ -487,17 +539,33 @@
 
                 (payload.rows || []).forEach((row) => {
                     const tr = document.createElement('tr');
+                    const rowHasError = (row.cells || []).some((cell) => Boolean(cell.error));
+                    tr.dataset.hasError = rowHasError ? '1' : '0';
+
+                    const selectCell = document.createElement('td');
+                    selectCell.className = 'bulk-excel-select-cell';
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'bulk-excel-row-check';
+                    checkbox.checked = true;
+                    checkbox.value = String(row.position ?? 0);
+                    checkbox.setAttribute('data-bulk-row-select', '');
+                    checkbox.setAttribute('aria-label', `Chọn dòng ${row.index || ''}`);
+                    selectCell.appendChild(checkbox);
+                    tr.appendChild(selectCell);
+
                     (row.cells || []).forEach((cell) => {
                         const td = document.createElement('td');
                         if (cell.error) {
                             td.className = 'bulk-excel-cell-error';
                         }
                         const value = document.createElement('div');
-                        value.textContent = cell.value || 'â€”';
+                        value.className = 'bulk-excel-cell-value';
+                        value.textContent = cell.value || '—';
                         td.appendChild(value);
                         if (cell.error) {
                             const error = document.createElement('span');
-                            error.className = 'bulk-excel-error-text';
+                            error.className = 'bulk-excel-error-text text-red-650 bg-red-50 text-xs font-normal px-2 py-0.5 rounded';
                             error.textContent = cell.error;
                             td.appendChild(error);
                         }
@@ -506,10 +574,27 @@
                     body.appendChild(tr);
                 });
 
-                count.textContent = `Hiá»ƒn thá»‹ ${payload.rows?.length || 0} dÃ²ng Ä‘á»c tá»« file.`;
-                confirm.disabled = ! payload.valid;
+                count.textContent = `Hiển thị ${payload.rows?.length || 0} dòng đọc từ file.`;
+                syncPreviewSelectionState(modal);
                 modal.classList.add('active');
                 modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const syncPreviewSelectionState = (modal) => {
+                const confirm = modal.querySelector('[data-bulk-excel-confirm]');
+                const selectAll = modal.querySelector('[data-bulk-row-select-all]');
+                const checkboxes = [...modal.querySelectorAll('[data-bulk-row-select]')];
+                const selected = checkboxes.filter((checkbox) => checkbox.checked);
+                const selectedHasError = selected.some((checkbox) => checkbox.closest('tr')?.dataset.hasError === '1');
+
+                if (selectAll) {
+                    selectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+                    selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+                }
+
+                if (confirm) {
+                    confirm.disabled = selected.length === 0 || selectedHasError;
+                }
             };
 
             document.addEventListener('change', async (event) => {
@@ -533,7 +618,7 @@
                     });
                     const payload = await response.json().catch(() => ({}));
                     if (! response.ok) {
-                        throw new Error(payload.message || 'KhÃ´ng thá»ƒ Ä‘á»c file Excel.');
+                        throw new Error(payload.message || 'Không thể đọc file Excel.');
                     }
                     renderPreview(root, payload);
                 } catch (error) {
@@ -560,6 +645,16 @@
                     return;
                 }
 
+                const selectAll = event.target.closest('[data-bulk-row-select-all]');
+                if (selectAll) {
+                    const modal = selectAll.closest('[data-bulk-excel-modal]');
+                    modal.querySelectorAll('[data-bulk-row-select]').forEach((checkbox) => {
+                        checkbox.checked = selectAll.checked;
+                    });
+                    syncPreviewSelectionState(modal);
+                    return;
+                }
+
                 const exportButton = event.target.closest('[data-bulk-excel-export]');
                 if (exportButton) {
                     const root = exportButton.closest('[data-bulk-excel-root]');
@@ -569,7 +664,7 @@
                     params.forEach((value, key) => fieldsUrl.searchParams.set(key, value));
                     modal.classList.add('active');
                     modal.setAttribute('aria-hidden', 'false');
-                    modal.querySelector('[data-bulk-export-fields]').innerHTML = '<span class="bulk-excel-note">Äang táº£i danh sÃ¡ch trÆ°á»ng dá»¯ liá»‡u...</span>';
+                    modal.querySelector('[data-bulk-export-fields]').innerHTML = '<span class="bulk-excel-note">Đang tải danh sách trường dữ liệu...</span>';
 
                     try {
                         const response = await fetch(fieldsUrl.toString(), {
@@ -577,7 +672,7 @@
                         });
                         const payload = await response.json().catch(() => ({}));
                         if (! response.ok) {
-                            throw new Error(payload.message || 'KhÃ´ng thá»ƒ táº£i danh sÃ¡ch trÆ°á»ng xuáº¥t.');
+                            throw new Error(payload.message || 'Không thể tải danh sách trường xuất.');
                         }
                         renderExportFields(root, payload.fields || [], params.toString());
                     } catch (error) {
@@ -594,7 +689,7 @@
                     const format = modal.querySelector('[data-bulk-export-format] input:checked')?.value || 'xlsx';
                     const checked = [...modal.querySelectorAll('[data-bulk-export-fields] input[type="checkbox"]:checked')];
                     if (! checked.length) {
-                        setExportAlert(modal, 'Vui lÃ²ng chá»n Ã­t nháº¥t má»™t cá»™t thÃ´ng tin Ä‘á»ƒ xuáº¥t file.');
+                        setExportAlert(modal, 'Vui lòng chọn ít nhất một cột thông tin để xuất file.');
                         return;
                     }
 
@@ -620,6 +715,9 @@
                 const root = document.querySelector(`[data-bulk-excel-root][data-modal-id="${modal.id}"]`);
                 const formData = contextFormData(root);
                 formData.append('token', modal.dataset.token || '');
+                modal.querySelectorAll('[data-bulk-row-select]:checked').forEach((checkbox) => {
+                    formData.append('selected_rows[]', checkbox.value);
+                });
                 confirm.disabled = true;
 
                 try {
@@ -633,9 +731,9 @@
                     });
                     const payload = await response.json().catch(() => ({}));
                     if (! response.ok) {
-                        throw new Error(payload.message || 'KhÃ´ng thá»ƒ náº¡p dá»¯ liá»‡u.');
+                        throw new Error(payload.message || 'Không thể nạp dữ liệu.');
                     }
-                    toast(payload.message || 'ÄÃ£ náº¡p dá»¯ liá»‡u Excel.');
+                    toast(payload.message || 'Đã nạp dữ liệu Excel.');
                     modal.classList.remove('active');
                     setTimeout(() => {
                         window.location.href = payload.redirect || window.location.href;
@@ -644,6 +742,15 @@
                     setAlert(modal, error.message);
                     confirm.disabled = false;
                 }
+            });
+
+            document.addEventListener('change', (event) => {
+                const rowCheckbox = event.target.closest('[data-bulk-row-select]');
+                if (! rowCheckbox) {
+                    return;
+                }
+
+                syncPreviewSelectionState(rowCheckbox.closest('[data-bulk-excel-modal]'));
             });
         })();
     </script>

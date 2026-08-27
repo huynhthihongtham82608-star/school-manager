@@ -49,7 +49,7 @@ class BulkExcelController extends Controller
             'attendance' => $this->attendanceTemplate($request),
         };
 
-        return SimpleExcel::downloadXlsx($filename, $headers, $rows);
+        return SimpleExcel::downloadXlsx($this->filenameWithExtension($filename, 'xlsx'), $headers, $rows);
     }
 
     public function export(Request $request, string $module)
@@ -92,7 +92,13 @@ class BulkExcelController extends Controller
             'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120'],
         ]);
 
-        $rows = SimpleExcel::readRows($validated['file']);
+        $rows = SimpleExcel::readRows(
+            $validated['file'],
+            $module === 'students' ? $this->studentImportWhitelist() : null
+        );
+        if ($module === 'students') {
+            $rows = $this->filterStudentRowsByWhitelist($rows);
+        }
         if ($rows === []) {
             return response()->json([
                 'message' => 'File Excel không có dữ liệu hợp lệ.',
@@ -117,6 +123,7 @@ class BulkExcelController extends Controller
             'rows' => $result['rows'],
             'valid' => $result['valid'],
             'error_count' => $result['error_count'],
+            'warning_row_count' => $result['warning_row_count'],
         ]);
     }
 
@@ -131,7 +138,15 @@ class BulkExcelController extends Controller
         }
 
         $this->authorizeCommit($module, $draft['context'] ?? []);
-        $result = $this->validateRows($module, $draft['rows'] ?? [], $draft['context'] ?? []);
+        $draftRows = $this->selectedDraftRows($draft['rows'] ?? [], $request->input('selected_rows'));
+        if ($draftRows === []) {
+            return response()->json(['message' => 'Vui lòng chọn ít nhất một dòng dữ liệu để nạp.'], 422);
+        }
+
+        $commitRows = $module === 'students'
+            ? $this->filterStudentRowsByWhitelist($draftRows)
+            : $draftRows;
+        $result = $this->validateRows($module, $commitRows, $draft['context'] ?? []);
 
         if (! $result['valid']) {
             return response()->json([
@@ -140,23 +155,28 @@ class BulkExcelController extends Controller
                 'rows' => $result['rows'],
                 'valid' => false,
                 'error_count' => $result['error_count'],
+                'warning_row_count' => $result['warning_row_count'],
             ], 422);
         }
 
-        $affected = DB::transaction(fn () => match ($module) {
-            'students' => $this->commitStudents($draft['rows'], $draft['context']),
-            'teachers' => $this->commitTeachers($draft['rows']),
-            'parents' => $this->commitParents($draft['rows']),
-            'scores' => $this->commitScores($draft['rows'], $draft['context']),
-            'conduct' => $this->commitConduct($draft['rows'], $draft['context']),
-            'attendance' => $this->commitAttendance($draft['rows'], $draft['context']),
+        $commitResult = DB::transaction(fn () => match ($module) {
+            'students' => $this->commitStudents($commitRows, $draft['context']),
+            'teachers' => $this->commitTeachers($commitRows),
+            'parents' => $this->commitParents($commitRows),
+            'scores' => $this->commitScores($commitRows, $draft['context']),
+            'conduct' => $this->commitConduct($commitRows, $draft['context']),
+            'attendance' => $this->commitAttendance($commitRows, $draft['context']),
         });
+        $affected = is_array($commitResult) ? (int) ($commitResult['affected'] ?? 0) : (int) $commitResult;
+        $updatedStudents = is_array($commitResult) ? (int) ($commitResult['updated'] ?? 0) : 0;
 
         session()->forget('bulk_excel.' . $token);
         AuditLogger::log('bulk_excel_imported', null, null, 'Nạp Excel phân hệ ' . $module . ': ' . $affected . ' dòng');
 
         return response()->json([
-            'message' => 'Đã nạp thành công ' . $affected . ' dòng dữ liệu.',
+            'message' => $module === 'students'
+                ? '🟢 Đã xử lý xong danh sách: Cập nhật ' . $updatedStudents . ' học sinh cũ và loại bỏ hoàn toàn các trường dữ liệu không hợp lệ.'
+                : 'Đã nạp thành công ' . $affected . ' dòng dữ liệu.',
             'affected' => $affected,
             'redirect' => $this->moduleRedirect($module, $draft['context'] ?? []),
         ]);
@@ -350,19 +370,26 @@ class BulkExcelController extends Controller
     {
         $previewRows = [];
         $errorCount = 0;
+        $warningRowCount = 0;
 
         foreach ($rows as $rowIndex => $row) {
             $cells = [];
+            $rowHasError = false;
             foreach ($headers as $header) {
                 $key = $header['key'];
                 $value = trim((string) $this->rowValue($row, array_merge([$key], $header['aliases'] ?? [])));
                 $error = $validator($key, $value, $row, $rowIndex);
                 if ($error) {
                     $errorCount++;
+                    $rowHasError = true;
+                    $error = 'Lỗi dữ liệu';
                 }
                 $cells[] = ['key' => $key, 'value' => $value, 'error' => $error];
             }
-            $previewRows[] = ['index' => $rowIndex + 2, 'cells' => $cells];
+            if ($rowHasError) {
+                $warningRowCount++;
+            }
+            $previewRows[] = ['index' => $rowIndex + 2, 'position' => $rowIndex, 'cells' => $cells];
         }
 
         return [
@@ -370,6 +397,7 @@ class BulkExcelController extends Controller
             'rows' => $previewRows,
             'valid' => $errorCount === 0,
             'error_count' => $errorCount,
+            'warning_row_count' => $warningRowCount,
         ];
     }
 
@@ -396,6 +424,32 @@ class BulkExcelController extends Controller
 
             return null;
         });
+    }
+
+    private function selectedDraftRows(array $rows, mixed $selectedRows): array
+    {
+        if (! is_array($selectedRows)) {
+            return array_values($rows);
+        }
+
+        $selectedIndexes = collect($selectedRows)
+            ->map(fn ($index) => filter_var($index, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]))
+            ->filter(fn ($index) => $index !== false)
+            ->map(fn ($index) => (int) $index)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($selectedIndexes === []) {
+            return [];
+        }
+
+        $allowed = array_flip($selectedIndexes);
+
+        return collect($rows)
+            ->filter(fn ($row, $index) => array_key_exists((int) $index, $allowed))
+            ->values()
+            ->all();
     }
 
     private function validateTeacherRows(array $rows): array
@@ -533,9 +587,90 @@ class BulkExcelController extends Controller
         return $this->buildPreview($headers, $rows, fn () => 'Lỗi dữ liệu');
     }
 
-    private function commitStudents(array $rows, array $context): int
+    private function studentImportWhitelist(): array
+    {
+        return [
+            'Mã học sinh',
+            'Mã HS',
+            'MSHS',
+            'student_code',
+            'Họ và tên',
+            'Họ tên',
+            'name',
+            'full_name',
+            'Ngày sinh',
+            'dob',
+            'birth_date',
+            'Giới tính',
+            'gender',
+            'Số điện thoại học sinh',
+            'SĐT học sinh',
+            'student_phone',
+            'Họ tên phụ huynh',
+            'parent_name',
+            'Quan hệ',
+            'parent_relation',
+            'Số điện thoại Phụ huynh',
+            'SĐT phụ huynh',
+            'parent_phone',
+            'Địa chỉ phụ huynh',
+            'parent_address',
+            'Địa chỉ',
+            'Địa chỉ thường trú',
+            'address',
+            'Nơi sinh',
+            'place_of_birth',
+            'Quê quán',
+            'hometown',
+            'native_place',
+            'Dân tộc',
+            'ethnicity',
+            'Tôn giáo',
+            'religion',
+            'Email',
+            'Ngày nhập học',
+            'enrollment_date',
+            'Loại nhập học',
+            'admission_type',
+            'Trạng thái',
+            'status',
+            'Trường cũ',
+            'previous_school',
+            'Khối hiện tại',
+            'transfer_grade_level',
+            'Lớp cũ',
+            'previous_class',
+            'Lớp',
+            'class_id',
+            'Niên khóa',
+            'school_year_id',
+            'Ghi chú',
+            'note',
+        ];
+    }
+
+    private function filterStudentRowsByWhitelist(array $rows): array
+    {
+        $allowed = collect($this->studentImportWhitelist())
+            ->map(fn ($header) => SimpleExcel::normalizeHeader((string) $header))
+            ->filter()
+            ->unique()
+            ->flip()
+            ->all();
+
+        return collect($rows)
+            ->map(fn (array $row) => array_intersect_key($row, $allowed))
+            ->filter(fn (array $row) => array_filter($row, fn ($value) => trim((string) $value) !== '') !== [])
+            ->values()
+            ->all();
+    }
+
+    private function commitStudents(array $rows, array $context): array
     {
         $affected = 0;
+        $created = 0;
+        $updated = 0;
+
         foreach ($rows as $row) {
             $class = $this->resolveClass((string) $this->rowValue($row, ['lop', 'class_id']), $context['class_id'] ?? null);
             if (! $class) {
@@ -574,15 +709,8 @@ class BulkExcelController extends Controller
                     ->first();
             }
 
-            $student ??= ($parentPhone !== '' && $name !== '' && $dob)
-                ? Student::updateOrCreate([
-                    'name' => $name,
-                    'dob' => $dob,
-                    'parent_phone' => $parentPhone,
-                ], [
-                    'student_code' => $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date'])),
-                ])
-                : new Student(['student_code' => $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date']))]);
+            $studentWasExisting = (bool) $student?->exists;
+            $student ??= new Student(['student_code' => $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date']))]);
             $preserveExistingParent = $code === '' && $parentPhone === '' && $student->exists;
             $studentData = [
                 'name' => $name,
@@ -608,15 +736,16 @@ class BulkExcelController extends Controller
                 $studentData['parent_phone'] = $parentPhone ?: null;
             }
 
-            $student->fill($studentData);
+            $student->fill($this->studentImportDataForSave($student, $studentData, $studentWasExisting));
             $student->student_code ??= $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date']));
-            if (Schema::hasColumn('students', 'student_phone')) {
+            $studentTable = $student->getTable();
+            if (Schema::hasColumn($studentTable, 'student_phone')) {
                 $student->setAttribute('student_phone', trim((string) $this->rowValue($row, ['sdt_hoc_sinh', 'student_phone', 'phone'])) ?: null);
             }
-            if (Schema::hasColumn('students', 'hometown')) {
+            if (Schema::hasColumn($studentTable, 'hometown')) {
                 $student->setAttribute('hometown', trim((string) $this->rowValue($row, ['que_quan', 'hometown'])) ?: null);
             }
-            if (Schema::hasColumn('students', 'native_place')) {
+            if (Schema::hasColumn($studentTable, 'native_place')) {
                 $student->setAttribute('native_place', trim((string) $this->rowValue($row, ['que_quan', 'native_place'])) ?: null);
             }
             $student->save();
@@ -628,9 +757,14 @@ class BulkExcelController extends Controller
             $this->syncImportedParentForStudent($student, $row);
             $this->ensureStudentUser($student);
             $affected++;
+            $studentWasExisting ? $updated++ : $created++;
         }
 
-        return $affected;
+        return [
+            'affected' => $affected,
+            'created' => $created,
+            'updated' => $updated,
+        ];
     }
 
     private function commitTeachers(array $rows): int
@@ -661,6 +795,28 @@ class BulkExcelController extends Controller
         }
 
         return $affected;
+    }
+
+    private function studentImportDataForSave(Student $student, array $studentData, bool $studentWasExisting): array
+    {
+        if (! $studentWasExisting) {
+            return $studentData;
+        }
+
+        return collect($studentData)
+            ->filter(function ($value, string $key) use ($student) {
+                if ($value === null || trim((string) $value) === '') {
+                    return false;
+                }
+
+                $current = $student->getAttribute($key);
+                if ($current instanceof \DateTimeInterface) {
+                    $current = $current->format('Y-m-d');
+                }
+
+                return trim((string) $current) !== trim((string) $value);
+            })
+            ->all();
     }
 
     private function commitParents(array $rows): int
@@ -1988,22 +2144,15 @@ class BulkExcelController extends Controller
     private function findImportedStudentByNaturalKey(string $name, ?string $dob, string $parentPhone, SchoolClass $class): ?Student
     {
         $name = trim($name);
-        $parentPhone = trim($parentPhone);
 
         if ($name === '' || ! $dob) {
             return null;
         }
 
-        if ($parentPhone !== '') {
-            return Student::where('name', $name)
-                ->whereDate('dob', $dob)
-                ->where('parent_phone', $parentPhone)
-                ->first();
-        }
-
         return Student::where('name', $name)
             ->whereDate('dob', $dob)
-            ->where('class_id', $class->id)
+            ->orderByRaw('class_id = ? desc', [$class->id])
+            ->orderBy('student_code')
             ->first();
     }
 

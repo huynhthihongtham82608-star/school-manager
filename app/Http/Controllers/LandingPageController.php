@@ -11,6 +11,8 @@ use App\Models\Student;
 use App\Models\SystemSetting;
 use App\Models\Teacher;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class LandingPageController extends Controller
 {
@@ -25,6 +27,8 @@ class LandingPageController extends Controller
             'image_url' => null,
             'extra' => ['subtitle' => 'Chào mừng đến với cổng thông tin nhà trường'],
         ];
+
+        $bannerImageSrc = $this->bannerImageUrl($banner['image_url'] ?? null) ?? $this->defaultBannerImage();
 
         $about = $contents['about'] ?? [
             'title' => 'Giới thiệu trường học',
@@ -47,12 +51,69 @@ class LandingPageController extends Controller
         $documents = $this->documents(4);
         $stats = $this->stats();
 
-        return view('home', compact('settings', 'banner', 'about', 'contact', 'news', 'announcements', 'events', 'documents', 'stats'));
+        return view('home', compact('settings', 'banner', 'bannerImageSrc', 'about', 'contact', 'news', 'announcements', 'events', 'documents', 'stats'));
+    }
+
+    private function bannerImageUrl(?string $path): ?string
+    {
+        if (! filled($path)) {
+            return null;
+        }
+
+        $path = str_replace('\\', '/', trim($path));
+
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            return $path;
+        }
+
+        $relativePath = ltrim($path, '/');
+        $relativePath = Str::after($relativePath, 'storage/');
+
+        if (Storage::disk('public')->exists($relativePath)) {
+            return asset('storage/' . $relativePath);
+        }
+
+        return file_exists(public_path(ltrim($path, '/'))) ? asset(ltrim($path, '/')) : null;
+    }
+
+    private function defaultBannerImage(): string
+    {
+        $svg = <<<'SVG'
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-label="Banner truong hoc mac dinh">
+  <defs>
+    <linearGradient id="banner" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff7ed"/>
+      <stop offset="48%" stop-color="#fed7aa"/>
+      <stop offset="100%" stop-color="#fb7185"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="68%" cy="24%" r="58%">
+      <stop offset="0%" stop-color="#fef3c7" stop-opacity=".95"/>
+      <stop offset="100%" stop-color="#fef3c7" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="760" rx="44" fill="url(#banner)"/>
+  <rect width="1200" height="760" rx="44" fill="url(#glow)"/>
+  <g fill="none" stroke="#c2410c" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity=".78">
+    <path d="M350 422h500"/>
+    <path d="M392 422V302l208-96 208 96v120"/>
+    <path d="M468 422V328h264v94"/>
+    <path d="M545 422v-52h110v52"/>
+    <path d="M600 206v-58"/>
+    <path d="M600 148h118"/>
+  </g>
+  <g fill="#7c2d12" font-family="Inter, Arial, sans-serif" text-anchor="middle">
+    <text x="600" y="520" font-size="54" font-weight="600">Cong thong tin nha truong</text>
+    <text x="600" y="578" font-size="28" font-weight="400">Quan ly hoc vu hien dai, an toan va ket noi</text>
+  </g>
+</svg>
+SVG;
+
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
     }
 
     private function homeContents(): array
     {
-        if (! Schema::hasTable('home_page_contents')) {
+        if (! Schema::hasTable('system_settings') || ! Schema::hasColumn('system_settings', 'setting_record_type')) {
             return [];
         }
 

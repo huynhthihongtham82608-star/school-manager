@@ -22,7 +22,8 @@ class SystemSettingController extends Controller
         $schoolYears = Schema::hasTable('school_years')
             ? SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->get()
             : collect();
-        $homePageTablesReady = Schema::hasTable('home_page_contents');
+        $homePageTablesReady = Schema::hasTable('system_settings')
+            && Schema::hasColumn('system_settings', 'setting_record_type');
         $homePageContents = $homePageTablesReady
             ? HomePageContent::query()->whereIn('key', ['banner', 'about'])->get()->keyBy('key')
             : collect();
@@ -52,7 +53,7 @@ class SystemSettingController extends Controller
             'banner_welcome' => ['nullable', 'string', 'max:500'],
             'banner_description' => ['nullable', 'string'],
             'banner_image_url' => ['nullable', 'string', 'max:1000'],
-            'banner_image_file' => ['nullable', 'image', 'max:20480'],
+            'banner_image_file' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:20480'],
             'intro_title' => ['nullable', 'string', 'max:255'],
             'intro_content' => ['nullable', 'string'],
         ]);
@@ -94,33 +95,31 @@ class SystemSettingController extends Controller
                 }
             }
 
-            if (Schema::hasTable('home_page_contents')) {
-                $currentBanner = HomePageContent::where('key', 'banner')->first();
-                $bannerImageUrl = $this->storeBannerImage(
-                    $request,
-                    $data['banner_image_url'] ?? $currentBanner?->image_url
-                );
+            $currentBanner = HomePageContent::where('key', 'banner')->first();
+            $bannerImageUrl = $this->storeBannerImage(
+                $request,
+                $data['banner_image_url'] ?? $currentBanner?->image_url
+            );
 
-                HomePageContent::updateOrCreate(
-                    ['key' => 'banner'],
-                    [
-                        'key' => 'banner',
-                        'title' => $data['banner_title'] ?? null,
-                        'content' => $data['banner_description'] ?? null,
-                        'image_url' => $bannerImageUrl,
-                        'extra' => ['subtitle' => $data['banner_welcome'] ?? null],
-                    ]
-                );
+            HomePageContent::updateOrCreate(
+                ['key' => 'banner'],
+                [
+                    'key' => 'banner',
+                    'title' => $data['banner_title'] ?? null,
+                    'content' => $data['banner_description'] ?? null,
+                    'image_url' => $bannerImageUrl,
+                    'extra' => ['subtitle' => $data['banner_welcome'] ?? null],
+                ]
+            );
 
-                HomePageContent::updateOrCreate(
-                    ['key' => 'about'],
-                    [
-                        'key' => 'about',
-                        'title' => $data['intro_title'] ?? null,
-                        'content' => $data['intro_content'] ?? null,
-                    ]
-                );
-            }
+            HomePageContent::updateOrCreate(
+                ['key' => 'about'],
+                [
+                    'key' => 'about',
+                    'title' => $data['intro_title'] ?? null,
+                    'content' => $data['intro_content'] ?? null,
+                ]
+            );
         });
 
         AuditLogger::log(

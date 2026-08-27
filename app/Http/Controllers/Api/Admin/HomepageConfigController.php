@@ -17,9 +17,9 @@ class HomepageConfigController extends Controller
 {
     public function show(): JsonResponse
     {
-        if (! Schema::hasTable('home_page_contents')) {
+        if (! Schema::hasTable('system_settings') || ! Schema::hasColumn('system_settings', 'setting_record_type')) {
             return response()->json([
-                'message' => 'Chưa có bảng home_page_contents.',
+                'message' => 'Chưa có bảng system_settings hoặc thiếu cột setting_record_type.',
                 'data' => $this->emptyPayload(),
             ], 503);
         }
@@ -31,9 +31,9 @@ class HomepageConfigController extends Controller
 
     public function update(Request $request): JsonResponse
     {
-        if (! Schema::hasTable('home_page_contents')) {
+        if (! Schema::hasTable('system_settings') || ! Schema::hasColumn('system_settings', 'setting_record_type')) {
             return response()->json([
-                'message' => 'Chưa có bảng home_page_contents. Vui lòng chạy migration trước.',
+                'message' => 'Chưa có bảng system_settings hoặc thiếu cột setting_record_type. Vui lòng chạy migration trước.',
             ], 503);
         }
 
@@ -42,7 +42,7 @@ class HomepageConfigController extends Controller
             'banner_welcome' => ['nullable', 'string', 'max:500'],
             'banner_description' => ['nullable', 'string'],
             'banner_image_url' => ['nullable', 'string', 'max:1000'],
-            'banner_image_file' => ['nullable', 'image', 'max:20480'],
+            'banner_image_file' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:20480'],
             'intro_title' => ['nullable', 'string', 'max:255'],
             'intro_content' => ['nullable', 'string'],
         ]);

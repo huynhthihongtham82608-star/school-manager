@@ -18,7 +18,8 @@ class AdminHomePageController extends Controller
 {
     public function index()
     {
-        $tablesReady = Schema::hasTable('home_page_contents');
+        $tablesReady = Schema::hasTable('system_settings')
+            && Schema::hasColumn('system_settings', 'setting_record_type');
 
         $contents = $tablesReady
             ? HomePageContent::query()->get()->keyBy('key')
@@ -29,8 +30,8 @@ class AdminHomePageController extends Controller
 
     public function saveContent(Request $request)
     {
-        if (! Schema::hasTable('home_page_contents')) {
-            return back()->with('error', 'Chưa có bảng home_page_contents. Vui lòng chạy migration trước.');
+        if (! Schema::hasTable('system_settings') || ! Schema::hasColumn('system_settings', 'setting_record_type')) {
+            return back()->with('error', 'Chưa có bảng system_settings hoặc thiếu cột setting_record_type. Vui lòng chạy migration trước.');
         }
 
         $data = $request->validate([
@@ -38,7 +39,7 @@ class AdminHomePageController extends Controller
             'banner_subtitle' => ['nullable', 'string', 'max:500'],
             'banner_content' => ['nullable', 'string'],
             'banner_image_url' => ['nullable', 'string', 'max:1000'],
-            'banner_image_file' => ['nullable', 'image', 'max:20480'],
+            'banner_image_file' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:20480'],
             'about_title' => ['nullable', 'string', 'max:255'],
             'about_content' => ['nullable', 'string'],
         ]);

@@ -21,7 +21,7 @@
 </x-page-header>
 
 @unless($tablesReady)
-    <div class="alert alert-warning">Chưa có bảng home_page_contents. Vui lòng import SQL tạo bảng trước khi lưu nội dung.</div>
+    <div class="alert alert-warning">Chưa có bảng system_settings hoặc thiếu cột setting_record_type. Vui lòng chạy migration trước khi lưu nội dung trang chủ.</div>
 @endunless
 
 <form

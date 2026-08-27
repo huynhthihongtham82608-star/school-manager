@@ -2,10 +2,169 @@
 @section('title', 'Vai trò & quyền')
 
 @section('content')
+<style>
+    .rbac-role-table th,
+    .rbac-role-table td {
+        color: #1f2937;
+        font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 1rem;
+        font-weight: 400;
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    .rbac-role-table th {
+        color: #111827;
+        font-weight: 500;
+        background: #fff7ed;
+    }
+
+    .rbac-type-badge,
+    .rbac-status-badge {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        border-radius: 6px;
+        padding: .25rem .55rem;
+        font-size: .875rem;
+        font-weight: 400;
+        line-height: 1.25;
+        text-align: left;
+    }
+
+    .rbac-type-badge.system,
+    .rbac-status-badge.active {
+        color: #166534;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+    }
+
+    .rbac-type-badge.custom,
+    .rbac-status-badge.inactive {
+        color: #c2410c;
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+    }
+
+    .rbac-detail-dialog {
+        width: min(1240px, calc(100vw - 2rem));
+        max-width: none;
+    }
+
+    .rbac-detail-modal .modal-content {
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        box-shadow: 0 24px 70px rgba(15, 23, 42, .22);
+        font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-align: left;
+    }
+
+    .rbac-detail-body {
+        padding: 1.25rem 1.5rem 1.5rem;
+        text-align: left;
+    }
+
+    .rbac-detail-two-column {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+        gap: 1.5rem;
+        align-items: start;
+        font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 400;
+        text-align: left;
+    }
+
+    .rbac-detail-column {
+        min-width: 0;
+        text-align: left;
+    }
+
+    .rbac-detail-title {
+        margin: 0 0 1rem;
+        color: #111827;
+        font-size: 1.125rem;
+        font-weight: 400;
+        line-height: 1.4;
+        text-align: left;
+    }
+
+    .rbac-permission-heading {
+        margin: 0 0 1rem;
+        color: #111827;
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.4;
+        text-align: left;
+    }
+
+    .rbac-detail-stack {
+        display: grid;
+        gap: 1rem;
+        text-align: left;
+    }
+
+    .rbac-detail-row {
+        display: grid;
+        gap: .2rem;
+        text-align: left;
+    }
+
+    .rbac-detail-label {
+        color: #ea580c;
+        font-size: .75rem;
+        font-weight: 400;
+        line-height: 1.35;
+        text-align: left;
+    }
+
+    .rbac-detail-description {
+        color: #1f2937;
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.6;
+        text-align: left;
+        overflow-wrap: anywhere;
+    }
+
+    .rbac-permission-tag-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: .5rem;
+        text-align: left;
+    }
+
+    .rbac-permission-tag {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        max-width: 100%;
+        font-weight: 400;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .rbac-permission-tag-key {
+        color: #c2410c;
+        font-size: .78rem;
+        font-weight: 400;
+        line-height: 1.25;
+        margin-top: .2rem;
+    }
+
+    @media (max-width: 768px) {
+        .rbac-detail-two-column {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
 <x-page-header
     class="rbac-page-header"
-    title="Phân quyền & Vai trò hệ thống"
-    subtitle="Thiết lập ma trận đặc quyền bảo mật chi tiết (Xem, Thêm, Sửa, Xóa) cho từng nhóm tài khoản trong nhà trường."
+    title="Phân quyền & vai trò hệ thống"
+    subtitle="Thiết lập ma trận quyền bảo mật cho từng nhóm tài khoản trong nhà trường."
 >
     <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRoleModal">
@@ -116,51 +275,70 @@
 </div>
 
 @foreach($roles as $role)
-    <div class="modal fade content-modal system-detail-modal rbac-detail-modal" id="roleDetail{{ $role->id }}" tabindex="-1" aria-hidden="true">
+    @php
+        $roleDescription = $role->description ?: match ($role->key) {
+            'admin', 'staff' => 'Cán bộ quản trị - Tài khoản dành cho nhân viên văn phòng, văn thư, kế toán của nhà trường.',
+            'teacher', 'homeroom' => 'Giáo viên - Tài khoản phục vụ giảng dạy, chủ nhiệm và theo dõi học sinh.',
+            'student' => 'Học sinh - Tài khoản truy cập thông tin học tập cá nhân.',
+            'parent' => 'Phụ huynh - Tài khoản theo dõi học tập, học phí và trao đổi với nhà trường.',
+            default => 'Vai trò nghiệp vụ tùy chỉnh trong hệ thống quản lý nhà trường.',
+        };
+    @endphp
+
+    <div class="modal fade content-modal rbac-detail-modal" id="roleDetail{{ $role->id }}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered rbac-detail-dialog">
             <div class="modal-content">
                 <div class="modal-header border-0 pb-0">
                     <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
-                <div class="modal-body pt-0">
-                    <div class="system-modal-profile-header rbac-detail-header">
-                        <div class="min-w-0">
-                            <h2>{{ $role->name }}</h2>
-                            <p>
-                                Mã hệ thống: <strong>{{ $role->key }}</strong>
-                                <span>•</span>
-                                {{ $role->is_system ? 'Vai trò hệ thống' : 'Vai trò tùy chỉnh' }}
-                            </p>
-                        </div>
-                        <span class="rbac-status-badge {{ $role->is_active ? 'active' : 'inactive' }} ms-auto">
-                            {{ $role->is_active ? 'Đang sử dụng' : 'Đã tắt' }}
-                        </span>
+                <div class="modal-body rbac-detail-body">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-6 text-left font-sans font-normal rbac-detail-two-column">
+                        <section class="rbac-detail-column md:col-span-2">
+                            <h2 class="rbac-detail-title">{{ $role->name }}</h2>
+                            <div class="rbac-detail-stack">
+                                <div class="rbac-detail-row mb-4">
+                                    <span class="rbac-detail-label text-xs text-orange-600 block mb-1">Tên</span>
+                                    <p class="rbac-detail-description text-base text-gray-950 mb-0">{{ $role->name }}</p>
+                                </div>
+                                <div class="rbac-detail-row mb-4">
+                                    <span class="rbac-detail-label text-xs text-orange-600 block mb-1">Mã</span>
+                                    <p class="rbac-detail-description text-base text-gray-950 mb-0">{{ $role->key }}</p>
+                                </div>
+                                <div class="rbac-detail-row mb-4">
+                                    <span class="rbac-detail-label text-xs text-orange-600 block mb-1">Trạng thái</span>
+                                    <span class="rbac-status-badge {{ $role->is_active ? 'active' : 'inactive' }}">
+                                        {{ $role->is_active ? 'Đang sử dụng' : 'Đã tắt' }}
+                                    </span>
+                                </div>
+                                <div class="rbac-detail-row mb-4">
+                                    <span class="rbac-detail-label text-xs text-orange-600 block mb-1">Loại</span>
+                                    <span class="rbac-type-badge {{ $role->is_system ? 'system' : 'custom' }}">
+                                        {{ $role->is_system ? 'Vai trò hệ thống' : 'Vai trò tùy chỉnh' }}
+                                    </span>
+                                </div>
+                                <div class="rbac-detail-row mb-4">
+                                    <span class="rbac-detail-label text-xs text-orange-600 block mb-1">Mô tả nghiệp vụ</span>
+                                    <p class="rbac-detail-description text-base text-gray-950 mb-0">{{ $roleDescription }}</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="rbac-detail-column md:col-span-3">
+                            <div class="rbac-permission-heading">Quyền hạn ({{ $role->permissions->count() }} quyền)</div>
+                            <div class="rbac-permission-tag-grid">
+                                @forelse($role->permissions->sortBy([['group', 'asc'], ['name', 'asc']]) as $permission)
+                                    <span class="rbac-permission-tag inline-flex flex-col bg-orange-50/60 border border-orange-100 px-3 py-2 rounded-lg text-sm text-orange-950 font-normal m-1 transition-all text-left">
+                                        <span>{{ $permission->name }}</span>
+                                        <span class="rbac-permission-tag-key">{{ $permission->key }}</span>
+                                    </span>
+                                @empty
+                                    <span class="rbac-permission-tag inline-flex flex-col bg-orange-50/60 border border-orange-100 px-3 py-2 rounded-lg text-sm text-orange-950 font-normal m-1 transition-all text-left">
+                                        Chưa gán quyền
+                                    </span>
+                                @endforelse
+                            </div>
+                        </section>
                     </div>
-
-                    <section class="system-modal-section rbac-detail-section mt-4">
-                        <h3 class="system-section-title">Mô tả vai trò</h3>
-                        <div class="rbac-detail-description">
-                            {{ $role->description ?: 'Vai trò này chưa có mô tả nghiệp vụ. Hệ thống vẫn hiển thị đầy đủ danh sách quyền đang được gán ở bên dưới.' }}
-                        </div>
-                    </section>
-
-                    <section class="system-modal-section rbac-detail-section mt-4">
-                        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
-                            <h3 class="system-section-title">Danh sách quyền hạn</h3>
-                            <span class="rbac-detail-count">{{ $role->permissions->count() }} quyền</span>
-                        </div>
-
-                        <div class="rbac-permission-tag-list">
-                            @forelse($role->permissions->sortBy([['group', 'asc'], ['name', 'asc']]) as $permission)
-                                <span class="rbac-permission-tag">
-                                    <span class="rbac-permission-tag-name">{{ $permission->name }}</span>
-                                    <span class="rbac-permission-tag-key">{{ $permission->key }}</span>
-                                </span>
-                            @empty
-                                <div class="empty-state">Vai trò này chưa được gán quyền.</div>
-                            @endforelse
-                        </div>
-                    </section>
                 </div>
                 <div class="modal-footer border-0 pt-0">
                     <button type="button" class="btn system-modal-close-btn" data-bs-dismiss="modal">Đóng cửa sổ</button>

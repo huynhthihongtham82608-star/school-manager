@@ -58,7 +58,7 @@
                 top: 1.5rem;
                 left: 50%;
                 z-index: 9999;
-                width: min(24rem, calc(100vw - 2rem));
+                width: min(34rem, calc(100vw - 2rem));
                 display: flex;
                 flex-direction: column;
                 align-items: center;
@@ -132,15 +132,15 @@
          data-floating-flash-stack>
         @foreach($flashMessages as $flash)
             @php($style = $toastStyles[$flash['type']] ?? $toastStyles['info'])
-            <div class="floating-flash-toast max-w-sm rounded-xl px-4 py-3 shadow-md flex items-center gap-2.5 duration-300 {{ $style['toast'] }}"
+            <div class="floating-flash-toast max-w-lg rounded-xl px-4 py-3 shadow-md flex items-center gap-2.5 duration-300 {{ $style['toast'] }}"
                  style="opacity:1 !important; background-image:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important;"
                  role="alert"
                  data-toast-tone="{{ $flash['type'] }}"
                  data-floating-flash-toast>
-                <span class="shrink-0 text-sm leading-none">{{ $style['icon'] }}</span>
+                <span class="shrink-0 text-base leading-none">{{ $style['icon'] }}</span>
                 <div class="min-w-0 flex-1 text-left">
-                    <div class="text-sm font-medium leading-5 text-left">{{ $flash['title'] }}</div>
-                    <div class="mt-0.5 text-sm font-normal leading-5 text-left">{{ $flash['message'] }}</div>
+                    <div class="text-base font-normal leading-6 text-left">{{ $flash['title'] }}</div>
+                    <div class="mt-0.5 text-base font-normal leading-6 text-left">{{ $flash['message'] }}</div>
                 </div>
             </div>
         @endforeach

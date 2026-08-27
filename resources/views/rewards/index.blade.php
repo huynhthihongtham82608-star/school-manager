@@ -44,7 +44,7 @@
         padding: .875rem;
         background: #fff;
         border: 1px solid #fed7aa;
-        border-radius: 12px;
+        border-radius: 8px;
         box-shadow: 0 1px 0 rgba(0, 0, 0, .03);
         text-align: left;
     }
@@ -99,7 +99,7 @@
     .reward-modal-field .form-control,
     .reward-modal-field .form-select {
         color: #374151;
-        font-size: .875rem;
+        font-size: 1rem;
         font-weight: 400;
         border-color: #e5e7eb;
         border-radius: 8px;
@@ -134,13 +134,43 @@
 
     #reward-modal > div {
         width: 100% !important;
-        max-width: 28rem !important;
+        max-width: 34rem !important;
         background: #fff !important;
         border: 1px solid #fed7aa !important;
-        border-radius: 12px !important;
+        border-radius: 8px !important;
         padding: 1.5rem !important;
         box-shadow: 0 24px 70px rgba(15, 23, 42, .22) !important;
         text-align: left !important;
+    }
+
+    .reward-student-multiple {
+        min-height: 2.75rem;
+        max-height: 2.75rem;
+        padding: .5rem .65rem;
+        overflow-y: auto;
+    }
+
+    .reward-student-multiple.is-expanded {
+        min-height: 9.5rem;
+        max-height: 12rem;
+    }
+
+    .reward-student-multiple option {
+        padding: .35rem .45rem;
+        font-size: 1rem;
+        font-weight: 400;
+    }
+
+    .reward-student-search {
+        width: 100%;
+        margin-bottom: .45rem;
+        color: #374151;
+        font-size: 1rem;
+        font-weight: 400;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: .5rem .65rem;
+        text-align: left;
     }
 </style>
 
@@ -200,10 +230,10 @@
                 <tr>
                     <th style="width: 6%;">STT</th>
                     <th style="width: 12%;">Mã HS</th>
-                    <th style="width: 20%;">Họ và Tên</th>
+                    <th style="width: 20%;">Họ và tên</th>
                     <th style="width: 10%;">Lớp</th>
-                    <th style="width: 18%;">Hình thức Khen thưởng</th>
-                    <th style="width: 22%;">Số Quyết định / Chi tiết</th>
+                    <th style="width: 18%;">Hình thức khen thưởng</th>
+                    <th style="width: 22%;">Số quyết định / Chi tiết</th>
                     <th style="width: 12%;">Hành động</th>
                 </tr>
             </thead>
@@ -284,10 +314,10 @@
 
                 <div class="reward-modal-field text-left">
                     <label for="reward-student" class="form-label">Học sinh</label>
-                    <select id="reward-student" name="student_id" class="form-select" required>
-                        <option value="">Chọn học sinh</option>
+                    <input id="reward-student-search" type="search" class="reward-student-search" placeholder="Gõ tên học sinh hoặc lớp, ví dụ: 10A1, An">
+                    <select id="reward-student" name="student_ids[]" multiple size="1" class="select2 form-select reward-student-multiple" required>
                         @foreach($students as $student)
-                            <option value="{{ $student->id }}" data-class-id="{{ $student->class_id }}">
+                            <option value="{{ $student->id }}" data-class-id="{{ $student->class_id }}" data-search="{{ \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii($student->student_code . ' ' . $student->name . ' ' . ($student->classRoom?->name ?? ''))) }}">
                                 {{ $student->student_code }} - {{ $student->name }}{{ $student->classRoom ? ' - Lớp ' . $student->classRoom->name : '' }}
                             </option>
                         @endforeach
@@ -320,7 +350,7 @@
                 </div>
 
                 <div class="reward-modal-field text-left">
-                    <label for="reward-decision-number" class="form-label">Số Quyết định ký duyệt của Hiệu trưởng</label>
+                    <label for="reward-decision-number" class="form-label">Số quyết định ký duyệt của Hiệu trưởng</label>
                     <input id="reward-decision-number" type="text" name="decision_number" class="form-control" placeholder="VD: QĐ-2026/KT-01">
                 </div>
 
@@ -341,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const methodInput = document.getElementById('reward-method');
     const title = document.getElementById('reward-modal-title');
     const studentInput = document.getElementById('reward-student');
+    const studentSearch = document.getElementById('reward-student-search');
     const semesterInput = document.getElementById('reward-semester');
     const typeInput = document.getElementById('reward-type');
     const detailInput = document.getElementById('reward-detail');
@@ -354,6 +385,40 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!modal || !form) {
         return;
     }
+
+    const setSelectedStudents = (ids) => {
+        const selectedIds = new Set(ids.map((id) => String(id)));
+        [...studentInput.options].forEach((option) => {
+            option.selected = selectedIds.has(option.value);
+        });
+        studentInput.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const expandStudentSelect = () => {
+        studentInput.size = Math.min(Math.max(studentInput.options.length, 4), 8);
+        studentInput.classList.add('is-expanded');
+    };
+
+    const collapseStudentSelect = () => {
+        studentInput.size = 1;
+        studentInput.classList.remove('is-expanded');
+    };
+
+    const filterStudentOptions = () => {
+        const keyword = (studentSearch?.value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
+
+        [...studentInput.options].forEach((option) => {
+            const haystack = `${option.dataset.search || ''} ${option.textContent || ''}`
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+            option.hidden = keyword !== '' && ! haystack.includes(keyword);
+        });
+    };
 
     const openModal = () => {
         modal.classList.remove('d-none');
@@ -380,7 +445,9 @@ document.addEventListener('DOMContentLoaded', () => {
             title.textContent = 'Thêm quyết định khen thưởng';
             form.action = storeAction;
             methodInput.disabled = true;
-            studentInput.value = '';
+            studentSearch.value = '';
+            filterStudentOptions();
+            setSelectedStudents([]);
             semesterInput.value = selectedSemesterId;
             typeInput.value = 'outstanding';
             detailInput.value = '';
@@ -394,7 +461,9 @@ document.addEventListener('DOMContentLoaded', () => {
             title.textContent = 'Cập nhật quyết định khen thưởng';
             form.action = button.dataset.action;
             methodInput.disabled = false;
-            studentInput.value = button.dataset.studentId || '';
+            studentSearch.value = '';
+            filterStudentOptions();
+            setSelectedStudents([button.dataset.studentId || '']);
             semesterInput.value = button.dataset.semesterId || selectedSemesterId;
             typeInput.value = button.dataset.rewardType || 'outstanding';
             detailInput.value = button.dataset.detail || '';
@@ -446,6 +515,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 button.textContent = originalText;
             }
         });
+    });
+
+    studentSearch?.addEventListener('focus', expandStudentSelect);
+    studentSearch?.addEventListener('input', () => {
+        filterStudentOptions();
+        expandStudentSelect();
+    });
+    studentInput?.addEventListener('focus', expandStudentSelect);
+    studentInput?.addEventListener('blur', () => {
+        window.setTimeout(() => {
+            if (document.activeElement !== studentSearch) {
+                collapseStudentSelect();
+            }
+        }, 140);
+    });
+    studentSearch?.addEventListener('blur', () => {
+        window.setTimeout(() => {
+            if (document.activeElement !== studentInput) {
+                collapseStudentSelect();
+            }
+        }, 140);
     });
 });
 </script>

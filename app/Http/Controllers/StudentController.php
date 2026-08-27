@@ -218,7 +218,7 @@ class StudentController extends Controller
                 if ($matchedStudent) {
                     $student = $matchedStudent;
                     $oldClassId = (string) $student->class_id;
-                    $student->fill($studentData)->save();
+                    $student->fill($this->studentImportDataForSave($student, $studentData, true))->save();
                     if ($oldClassId !== (string) $student->class_id) {
                         $this->recordClassHistory($student, $oldClassId, $student->class_id, $student->enrollment_date, 'Cập nhật lớp từ import học sinh');
                     }
@@ -230,13 +230,22 @@ class StudentController extends Controller
                     ];
 
                     $student = $dob
-                        ? Student::updateOrCreate([
+                        ? Student::firstOrNew([
                             'name' => $name,
                             'dob' => $dob,
-                        ], $createData)
-                        : Student::create($createData);
+                        ])
+                        : new Student();
 
-                    $created++;
+                    $studentWasExisting = $student->exists;
+                    if (! $studentWasExisting) {
+                        $student->student_code = $createData['student_code'];
+                    }
+                    $student->fill($this->studentImportDataForSave($student, $studentWasExisting ? $studentData : $createData, $studentWasExisting))->save();
+                    if ($studentWasExisting) {
+                        $matchedStudent = $student;
+                    }
+
+                    $studentWasExisting ? $updated++ : $created++;
                 }
 
                 $this->createStudentUser($student);
@@ -905,6 +914,28 @@ class StudentController extends Controller
         return $extension === 'xlsx'
             ? $this->readXlsxRows($path, $ignoredHeaders)
             : $this->readCsvRows($path, $ignoredHeaders);
+    }
+
+    private function studentImportDataForSave(Student $student, array $studentData, bool $studentWasExisting): array
+    {
+        if (! $studentWasExisting) {
+            return $studentData;
+        }
+
+        return collect($studentData)
+            ->filter(function ($value, string $key) use ($student) {
+                if ($value === null || trim((string) $value) === '') {
+                    return false;
+                }
+
+                $current = $student->getAttribute($key);
+                if ($current instanceof \DateTimeInterface) {
+                    $current = $current->format('Y-m-d');
+                }
+
+                return trim((string) $current) !== trim((string) $value);
+            })
+            ->all();
     }
 
     private function readCsvRows(string $path, array &$ignoredHeaders = []): array
