@@ -4,7 +4,8 @@ use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\ChatbotApiController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/chatbot/query', [ChatbotApiController::class, 'handleQuery']);
+Route::get('/chatbot/history', [ChatbotApiController::class, 'history'])->middleware('auth:sanctum');
+Route::post('/chatbot/query', [ChatbotApiController::class, 'handleQuery'])->middleware('auth:sanctum');
 
 Route::prefix('v1')
     ->as('api.v1.')

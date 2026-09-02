@@ -123,7 +123,16 @@ class User extends Authenticatable
         if ($this->parentProfile) {
             return $this->parentProfile->name;
         }
-        return $this->username;
+
+        if (trim((string) $this->username) !== '') {
+            return $this->username;
+        }
+
+        if (trim((string) $this->email) !== '') {
+            return $this->email;
+        }
+
+        return 'Người dùng';
     }
 
     public function isAdmin(): bool

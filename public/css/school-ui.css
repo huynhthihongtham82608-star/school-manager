@@ -5433,10 +5433,16 @@ body.admin-sidebar-collapsed .admin-sidebar-collapse i {
     align-items: stretch;
     justify-content: center;
     gap: .32rem;
+    flex: 0 0 170px !important;
+    min-width: 170px !important;
+    max-width: 170px !important;
+    overflow: visible !important;
 }
 
 .admin-period-form {
     min-height: 0;
+    width: 170px !important;
+    max-width: 170px !important;
     padding: .24rem .5rem;
     border: 1px solid rgba(var(--sm-primary-rgb), .16);
     border-radius: var(--sm-radius-sm);
@@ -5460,16 +5466,20 @@ body.admin-sidebar-collapsed .admin-sidebar-collapse i {
 
 .admin-period-select {
     min-height: 24px;
-    width: 114px;
-    padding: .08rem 1.1rem .08rem .34rem;
+    width: 146px !important;
+    min-width: 146px !important;
+    max-width: none !important;
+    box-sizing: border-box;
+    padding: .08rem 1.65rem .08rem .5rem;
     color: var(--sm-primary-strong);
     border: 0;
     border-radius: 8px;
     background-color: transparent;
     font-size: .78rem;
-    font-weight: 700;
+    font-weight: 400;
     line-height: 1.15;
     white-space: nowrap;
+    overflow: visible !important;
     outline: none;
     cursor: pointer;
 }
@@ -12260,9 +12270,32 @@ form.card > .mt-3 .btn-primary {
     display: inline-flex;
     align-items: center;
     gap: .75rem;
+    min-width: 0;
+    max-width: 100%;
     color: var(--sm-ink);
     text-decoration: none;
     font-weight: 700;
+}
+
+.landing-brand .brand-mark {
+    width: 52px;
+    height: 52px;
+    flex: 0 0 52px;
+    border-radius: 16px;
+    padding: .28rem;
+    background: #FFFFFF !important;
+    border: 1px solid rgba(var(--sm-primary-rgb), .18);
+    box-shadow: 0 12px 28px rgba(var(--sm-primary-rgb), .16) !important;
+}
+
+.landing-brand img.brand-mark {
+    display: block;
+    object-fit: contain;
+}
+
+.landing-brand > span:not(.brand-mark) {
+    min-width: 0;
+    line-height: 1.25;
 }
 
 .landing-hero {
@@ -13064,6 +13097,10 @@ form.card > .mt-3 .btn-primary {
 
     .admin-period-meta {
         justify-content: flex-start;
+        flex: 0 0 170px !important;
+        min-width: 170px !important;
+        max-width: 170px !important;
+        overflow: visible !important;
     }
 
     .school-heading {
@@ -13202,6 +13239,30 @@ form.card > .mt-3 .btn-primary {
 
     .landing-hero h1 {
         font-size: 2.2rem;
+    }
+
+    .landing-header .container {
+        align-items: center;
+    }
+
+    .landing-brand {
+        gap: .55rem;
+    }
+
+    .landing-brand .brand-mark {
+        width: 44px;
+        height: 44px;
+        flex-basis: 44px;
+        border-radius: 13px;
+    }
+
+    .landing-brand > span:not(.brand-mark) {
+        display: -webkit-box;
+        overflow: hidden;
+        font-size: .92rem;
+        line-height: 1.25;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
     }
 
     .hero-panel,

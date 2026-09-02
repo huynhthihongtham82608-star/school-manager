@@ -280,6 +280,7 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         ->name('reports.class-summary');
 
     // Đăng ký cổng nhận tin nhắn của bong bóng chat lề phải
+    Route::get('/chatbot/history', 'App\Http\Controllers\Admin\ChatbotController@history')->name('chatbot.history');
     Route::post('/chatbot/send', 'App\Http\Controllers\Admin\ChatbotController@handleChat')->name('chatbot.send');
 
 });

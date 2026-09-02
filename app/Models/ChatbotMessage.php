@@ -15,10 +15,22 @@ class ChatbotMessage extends Model
         'user_id',
         'question',
         'answer',
+        'intent',
+        'entities',
+        'tool_name',
+        'tool_args',
+        'tool_result_summary',
+        'model',
+        'latency_ms',
+        'error',
         'created_at',
     ];
 
     protected $casts = [
+        'entities' => 'array',
+        'tool_args' => 'array',
+        'tool_result_summary' => 'array',
+        'latency_ms' => 'integer',
         'created_at' => 'datetime',
     ];
 

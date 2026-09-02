@@ -37,8 +37,17 @@ return [
 
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
+        'model' => env('GEMINI_MODEL', 'gemini-flash-lite-latest'),
+        'model_primary' => env('GEMINI_MODEL_PRIMARY', env('GEMINI_MODEL', 'gemini-flash-lite-latest')),
+        'model_fallback' => env('GEMINI_MODEL_FALLBACK', 'gemini-3.7-flash'),
         'endpoint' => env('GEMINI_ENDPOINT', 'https://generativelanguage.googleapis.com/v1beta'),
+        'connect_timeout' => env('GEMINI_CONNECT_TIMEOUT', 10),
+        'timeout' => env('GEMINI_TIMEOUT', 30),
+        'ca_bundle' => env('GEMINI_CA_BUNDLE'),
+    ],
+
+    'chatbot' => [
+        'avatar_path' => env('CHATBOT_AVATAR_PATH', 'images/chatbot-avatar.png'),
     ],
 
 ];

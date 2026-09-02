@@ -19,7 +19,7 @@
         <div class="container d-flex align-items-center justify-content-between gap-3">
             <a href="{{ route('home') }}" class="landing-brand">
                 @if($settings->logoUrl())
-                    <img src="{{ $settings->logoUrl() }}" alt="{{ $settings->school_name }}" class="brand-mark object-fit-cover">
+                    <img src="{{ $settings->logoUrl() }}" alt="{{ $settings->school_name }}" class="brand-mark landing-brand-logo object-fit-contain">
                 @else
                     <span class="brand-mark">{{ $settings->short_name ?: 'TH' }}</span>
                 @endif
