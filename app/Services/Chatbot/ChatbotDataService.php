@@ -43,7 +43,7 @@ class ChatbotDataService
         }
 
         $mode = (string) ($arguments['mode'] ?? 'all');
-        $class = $this->resolveClass($arguments);
+        $class = $this->resolveClassForUser($user, $arguments);
 
         if ($class) {
             if (! $this->scope->canAccessClass($user, $class->id)) {
@@ -811,9 +811,18 @@ class ChatbotDataService
 
     private function resolveClassForUser(User $user, array $arguments): ?object
     {
-        $class = $this->resolveClass($arguments);
-        if ($class) {
-            return $class;
+        if ($this->scope->isAdminLike($user)) {
+            return $this->resolveClass($arguments);
+        }
+
+        if ($this->hasClassIdentifier($arguments)) {
+            $scopedClass = $this->resolveClass($arguments, $this->scope->classIdsInScope($user));
+
+            if ($scopedClass) {
+                return $scopedClass;
+            }
+
+            return $this->resolveClass($arguments);
         }
 
         if ($user->isStudent()) {
@@ -829,7 +838,7 @@ class ChatbotDataService
         return null;
     }
 
-    private function resolveClass(array $arguments): ?object
+    private function resolveClass(array $arguments, ?Collection $allowedClassIds = null): ?object
     {
         if (! Schema::hasTable('classes')) {
             return null;
@@ -839,7 +848,13 @@ class ChatbotDataService
         $className = trim((string) ($arguments['class_name'] ?? $arguments['class'] ?? ''));
 
         if ($classId !== '') {
-            return DB::table('classes')->where('id', $classId)->first();
+            $query = DB::table('classes')->where('id', $classId);
+
+            if ($allowedClassIds !== null) {
+                $query->whereIn('id', $allowedClassIds->map(fn ($id) => (string) $id)->all());
+            }
+
+            return $query->first();
         }
 
         if ($className === '') {
@@ -850,6 +865,7 @@ class ChatbotDataService
         $code = $this->scope->normalizeCode($className);
 
         return DB::table('classes')
+            ->when($allowedClassIds !== null, fn ($query) => $query->whereIn('id', $allowedClassIds->map(fn ($id) => (string) $id)->all()))
             ->get(['id', 'name', 'grade_level', 'homeroom_teacher_id'])
             ->first(function ($class) use ($normalized, $code) {
                 $className = $this->scope->normalize((string) $class->name);
@@ -860,6 +876,12 @@ class ChatbotDataService
                     || ($normalized !== '' && str_contains($className, $normalized))
                     || ($code !== '' && str_contains($classCode, $code));
             });
+    }
+
+    private function hasClassIdentifier(array $arguments): bool
+    {
+        return trim((string) ($arguments['class_id'] ?? '')) !== ''
+            || trim((string) ($arguments['class_name'] ?? $arguments['class'] ?? '')) !== '';
     }
 
     private function resolveSubject(array $arguments): ?object
