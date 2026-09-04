@@ -30,6 +30,7 @@ class AuthController extends ApiController
 
         $user = User::where('username', $credentials['username'])
             ->where('is_active', true)
+            ->where('login_status', true)
             ->first();
 
         if (! $user || ! Hash::check($credentials['password'], $user->getAuthPassword())) {
@@ -67,7 +68,7 @@ class AuthController extends ApiController
     {
         $user = $request->user();
 
-        if (! $user->is_active) {
+        if (! $user->is_active || ! $user->login_status) {
             $user->currentAccessToken()?->delete();
 
             return $this->error(

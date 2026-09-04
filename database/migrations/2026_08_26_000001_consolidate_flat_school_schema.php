@@ -303,6 +303,7 @@ return new class extends Migration
             'score_headers' => ['student_id', 'subject_id', 'semester_id', 'school_year_id'],
             'score_details' => ['score_header_id'],
             'students' => ['class_id', 'school_year_id'],
+            'student_class_assignments' => ['student_id', 'class_id', 'academic_year_id'],
             'timetables' => ['school_year_id', 'semester_id', 'class_id'],
             'timetable_entries' => ['timetable_id', 'assignment_id', 'subject_id', 'teacher_id', 'room_id'],
             'parent_leave_requests' => ['parent_id', 'student_id', 'class_id', 'reviewed_by'],

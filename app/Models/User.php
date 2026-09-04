@@ -14,6 +14,8 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, UsesUuid;
 
+    protected $authPasswordName = 'password_hash';
+
     protected $fillable = [
         'username',
         'full_name',
