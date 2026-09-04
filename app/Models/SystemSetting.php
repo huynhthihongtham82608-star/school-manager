@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 class SystemSetting extends Model
 {
@@ -32,11 +33,15 @@ class SystemSetting extends Model
 
     public static function current(): self
     {
-        if (! Schema::hasTable('system_settings')) {
+        try {
+            if (! Schema::hasTable('system_settings')) {
+                return new self(static::defaults());
+            }
+
+            return static::query()->first() ?: new self(static::defaults());
+        } catch (Throwable) {
             return new self(static::defaults());
         }
-
-        return static::query()->first() ?: new self(static::defaults());
     }
 
     public static function defaults(): array

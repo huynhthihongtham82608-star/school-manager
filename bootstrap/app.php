@@ -14,6 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
     // ĐÃ SỬA: Bọc lót cả 2 phom đường dẫn để mở khóa cổng bảo mật tuyệt đối
     $middleware->validateCsrfTokens(except: [
+        'login',
+        '/login',
         'chatbot/send',
         '/chatbot/send',
     ]);
@@ -32,6 +34,26 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (\Illuminate\Session\TokenMismatchException $exception, \Illuminate\Http\Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Phiên làm việc đã hết hạn, vui lòng tải lại trang.',
+                ], 419);
+            }
+
+            if ($request->is('login') || $request->is('*/login')) {
+                return redirect()
+                    ->route('login')
+                    ->withErrors(['username' => 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.'])
+                    ->withInput($request->except('password'));
+            }
+
+            return redirect()
+                ->back()
+                ->withErrors(['csrf' => 'Phiên làm việc đã hết hạn, vui lòng tải lại trang.']);
+        });
+
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $exception, \Illuminate\Http\Request $request) {
             if ($request->is('api/*')) {
                 return \App\Support\Api\ApiResponse::error('Bạn cần đăng nhập để truy cập tài nguyên này', 401);
@@ -68,4 +90,3 @@ return Application::configure(basePath: dirname(__DIR__))
             return null;
         });
     })->create();
-
