@@ -37,8 +37,8 @@ class DashboardController extends Controller
             'subjects' => Subject::count(),
             'assignments' => TeachingAssignment::count(),
             'announcements' => Schema::hasTable('school_posts') ? SchoolPost::where('type', SchoolPost::TYPE_ANNOUNCEMENT)->count() : 0,
-            'events' => Schema::hasTable('school_events') ? SchoolEvent::count() : 0,
-            'documents' => Schema::hasTable('learning_documents') ? LearningDocument::count() : 0,
+            'events' => $this->schoolEventsAvailable() ? SchoolEvent::count() : 0,
+            'documents' => $this->learningDocumentsAvailable() ? LearningDocument::count() : 0,
             'attendance' => Schema::hasTable('attendance_records') ? AttendanceRecord::count() : 0,
         ];
 
@@ -271,7 +271,7 @@ class DashboardController extends Controller
                 ->values()
             : collect();
 
-        $events = Schema::hasTable('school_events')
+        $events = $this->schoolEventsAvailable()
             ? SchoolEvent::query()
                 ->where('is_published', true)
                 ->where(fn ($query) => $query
@@ -329,7 +329,7 @@ class DashboardController extends Controller
                 ->values()
             : collect();
 
-        $events = Schema::hasTable('school_events')
+        $events = $this->schoolEventsAvailable()
             ? SchoolEvent::query()
                 ->where('is_published', true)
                 ->where(fn ($query) => $query
@@ -415,7 +415,7 @@ class DashboardController extends Controller
             [
                 'label' => 'Sự kiện sắp diễn ra',
                 'icon' => 'bi-calendar-event',
-                'value' => Schema::hasTable('school_events')
+                'value' => $this->schoolEventsAvailable()
                     ? SchoolEvent::where('is_published', true)->where('starts_at', '>=', now())->count()
                     : 0,
             ],
@@ -433,7 +433,7 @@ class DashboardController extends Controller
             [
                 'label' => 'Tài liệu học tập',
                 'icon' => 'bi-journal-bookmark',
-                'value' => Schema::hasTable('learning_documents') ? LearningDocument::count() : 0,
+                'value' => $this->learningDocumentsAvailable() ? LearningDocument::count() : 0,
             ],
         ];
 
@@ -460,7 +460,7 @@ class DashboardController extends Controller
             ? SchoolPost::where('type', SchoolPost::TYPE_ANNOUNCEMENT)->where('is_published', false)->count()
             : 0;
 
-        $draftEvents = Schema::hasTable('school_events')
+        $draftEvents = $this->schoolEventsAvailable()
             ? SchoolEvent::where('is_published', false)->count()
             : 0;
 
@@ -496,6 +496,18 @@ class DashboardController extends Controller
         ];
 
         return compact('studentsByGrade', 'attendanceByStatus', 'scoreLevels', 'quickInfo', 'tasks');
+    }
+
+    private function schoolEventsAvailable(): bool
+    {
+        return Schema::hasTable('school_events')
+            || (Schema::hasTable('school_posts') && Schema::hasColumn('school_posts', 'post_type'));
+    }
+
+    private function learningDocumentsAvailable(): bool
+    {
+        return Schema::hasTable('learning_documents')
+            || (Schema::hasTable('school_posts') && Schema::hasColumn('school_posts', 'post_type'));
     }
 
     private function scoreLevelStats(?string $schoolYearId = null)

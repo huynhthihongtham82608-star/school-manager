@@ -131,16 +131,10 @@ class StudentController extends Controller
             return back()->withErrors(['file' => 'File import không có dữ liệu hợp lệ.']);
         }
 
-        $newRowCount = collect($rows)->filter(function (array $row) use ($class) {
-            $phone = trim((string) ($row['sdt_phu_huynh'] ?? ''));
-            $name = trim((string) ($row['ho_ten'] ?? ''));
-            $dob = $this->parseDateValue($row['ngay_sinh'] ?? null);
+        $newRowCount = collect($rows)->filter(function (array $row) {
+            $studentCode = trim((string) ($row['ma_hs'] ?? ''));
 
-            if ($name !== '' && $dob) {
-                return ! $this->findImportedStudentByNaturalKey($name, $dob, $phone, $class);
-            }
-
-            return true;
+            return ! $this->findImportedStudentByStableKey($studentCode);
         })->count();
 
         if ($class->currentStudentCount() + $newRowCount > $class->maxCapacity()) {
@@ -157,6 +151,7 @@ class StudentController extends Controller
             foreach ($rows as $index => $row) {
                 $name = trim((string) ($row['ho_ten'] ?? ''));
                 $phone = trim((string) ($row['sdt_phu_huynh'] ?? ''));
+                $studentCode = trim((string) ($row['ma_hs'] ?? ''));
 
                 if ($name === '') {
                     throw ValidationException::withMessages([
@@ -171,7 +166,7 @@ class StudentController extends Controller
                     ?: (int) $class->grade_level;
                 $status = $this->normalizeStudentStatus($row['trang_thai'] ?? null, $index + 2);
 
-                $matchedStudent = $dob ? $this->findImportedStudentByNaturalKey($name, $dob, $phone, $class) : null;
+                $matchedStudent = $this->findImportedStudentByStableKey($studentCode);
 
                 if (! $matchedStudent && $phone === '' && $dob) {
                     $sameIdentityDifferentClass = Student::where('name', $name)
@@ -225,27 +220,20 @@ class StudentController extends Controller
                     $updated++;
                 } else {
                     $createData = $studentData + [
-                        'student_code' => $this->generateStudentCode($enrollmentDate),
+                        'student_code' => $studentCode !== '' ? $studentCode : $this->generateStudentCode($enrollmentDate),
                         'parent_phone' => $phone ?: null,
                     ];
 
-                    $student = $dob
-                        ? Student::firstOrNew([
-                            'name' => $name,
-                            'dob' => $dob,
-                        ])
-                        : new Student();
-
-                    $studentWasExisting = $student->exists;
-                    if (! $studentWasExisting) {
-                        $student->student_code = $createData['student_code'];
-                    }
-                    $student->fill($this->studentImportDataForSave($student, $studentWasExisting ? $studentData : $createData, $studentWasExisting))->save();
-                    if ($studentWasExisting) {
-                        $matchedStudent = $student;
+                    if ($studentCode !== '' && Student::where('student_code', $studentCode)->exists()) {
+                        throw ValidationException::withMessages([
+                            'file' => 'Dòng ' . ($index + 2) . ': Mã học sinh đã tồn tại nhưng không xác định được hồ sơ cần cập nhật.',
+                        ]);
                     }
 
-                    $studentWasExisting ? $updated++ : $created++;
+                    $student = new Student();
+                    $student->student_code = $createData['student_code'];
+                    $student->fill($this->studentImportDataForSave($student, $createData, false))->save();
+                    $created++;
                 }
 
                 $this->createStudentUser($student);
@@ -645,8 +633,8 @@ class StudentController extends Controller
             'address' => $parent->address ?: ($parentData['address'] ?? null),
         ])->save();
 
-        $parent->students()->syncWithoutDetaching([
-            $student->id => ['relation' => $parentData['relation'] ?? ParentProfile::RELATION_GUARDIAN],
+        $student->parents()->sync([
+            $parent->id => ['relation' => $parentData['relation'] ?? ParentProfile::RELATION_GUARDIAN],
         ]);
 
         $this->ensureParentUser($parent);
@@ -790,19 +778,15 @@ class StudentController extends Controller
         }
     }
 
-    private function findImportedStudentByNaturalKey(string $name, ?string $dob, string $parentPhone, SchoolClass $class): ?Student
+    private function findImportedStudentByStableKey(string $studentCode): ?Student
     {
-        $name = trim($name);
+        $studentCode = trim($studentCode);
 
-        if ($name === '' || ! $dob) {
+        if ($studentCode === '') {
             return null;
         }
 
-        return Student::where('name', $name)
-            ->whereDate('dob', $dob)
-            ->orderByRaw('class_id = ? desc', [$class->id])
-            ->orderBy('student_code')
-            ->first();
+        return Student::where('student_code', $studentCode)->first();
     }
 
     private function generateStudentCode(string $enrollmentDate): string
@@ -840,7 +824,7 @@ class StudentController extends Controller
 
         $user->fill([
             'full_name' => $student->name,
-            'phone' => $student->parent_phone,
+            'phone' => null,
             'role' => 'student',
             'student_id' => $student->id,
             'is_active' => $student->status === Student::STATUS_STUDYING,
@@ -882,7 +866,38 @@ class StudentController extends Controller
             return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đã phát sinh hạnh kiểm. Hãy đổi trạng thái nếu học sinh không còn học.'];
         }
 
+        if ($this->tableHasRows('parent_student', 'student_id', (string) $student->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đang liên kết phụ huynh. Hãy gỡ liên kết hoặc đổi trạng thái học sinh.'];
+        }
+
+        if ($this->tableHasRows('student_movements', 'student_id', (string) $student->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đã có lịch sử lớp học. Hãy đổi trạng thái nếu học sinh không còn học.'];
+        }
+
+        if ($this->tableHasRows('tuition_fees', 'student_id', (string) $student->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đã phát sinh học phí. Hãy đổi trạng thái nếu học sinh không còn học.'];
+        }
+
+        if ($this->tableHasRows('parent_leave_requests', 'student_id', (string) $student->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đã phát sinh đơn xin nghỉ. Hãy đổi trạng thái nếu học sinh không còn học.'];
+        }
+
+        if ($this->tableHasRows('rewards', 'student_id', (string) $student->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đã phát sinh khen thưởng. Hãy đổi trạng thái nếu học sinh không còn học.'];
+        }
+
+        if ($this->tableHasRows('messages', 'student_id', (string) $student->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đã phát sinh dữ liệu trao đổi. Hãy đổi trạng thái nếu học sinh không còn học.'];
+        }
+
         return ['allowed' => true, 'message' => null];
+    }
+
+    private function tableHasRows(string $table, string $column, string $value): bool
+    {
+        return Schema::hasTable($table)
+            && Schema::hasColumn($table, $column)
+            && DB::table($table)->where($column, $value)->exists();
     }
 
     private function recordClassHistory(Student $student, ?string $fromClassId, ?string $toClassId, ?string $date, string $note): void

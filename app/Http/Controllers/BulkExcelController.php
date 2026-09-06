@@ -681,16 +681,11 @@ class BulkExcelController extends Controller
             $name = trim((string) $this->rowValue($row, ['ho_ten', 'ho_va_ten', 'name']));
             $dob = $this->parseDate($this->rowValue($row, ['ngay_sinh', 'dob']));
             $parentPhone = trim((string) $this->rowValue($row, ['sdt_phu_huynh', 'parent_phone']));
-            $student = $code !== '' ? Student::where('student_code', $code)->first() : null;
+            $student = $this->findImportedStudentByStableKey($code);
 
-            if (! $student && $name !== '' && $dob) {
-                $student = $this->findImportedStudentByNaturalKey($name, $dob, $parentPhone, $class);
-            }
-
-            if (! $student && $code === '' && $parentPhone === '' && $name !== '' && $dob) {
+            if (! $student && $code === '' && $name !== '' && $dob) {
                 $sameIdentityDifferentClass = Student::where('name', $name)
                     ->whereDate('dob', $dob)
-                    ->where('class_id', '!=', $class->id)
                     ->first();
 
                 if ($sameIdentityDifferentClass) {
@@ -702,14 +697,10 @@ class BulkExcelController extends Controller
                         'matched_class_id' => $sameIdentityDifferentClass->class_id,
                     ]);
                 }
-
-                $student = Student::where('name', $name)
-                    ->whereDate('dob', $dob)
-                    ->where('class_id', $class->id)
-                    ->first();
             }
 
             $studentWasExisting = (bool) $student?->exists;
+            $oldClassId = $student?->class_id ? (string) $student->class_id : null;
             $student ??= new Student(['student_code' => $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date']))]);
             $preserveExistingParent = $code === '' && $parentPhone === '' && $student->exists;
             $studentData = [
@@ -750,9 +741,22 @@ class BulkExcelController extends Controller
             }
             $student->save();
 
+            if ($oldClassId && $oldClassId !== (string) $class->id) {
+                StudentClassAssignment::where('student_id', $student->id)
+                    ->where('academic_year_id', $class->school_year_id)
+                    ->where('status', StudentClassAssignment::STATUS_ACTIVE)
+                    ->update(['status' => StudentClassAssignment::STATUS_INACTIVE]);
+
+                $this->recordStudentTransfer($student, $oldClassId, (string) $class->id, (string) $class->school_year_id);
+            }
+
             StudentClassAssignment::updateOrCreate(
-                ['student_id' => $student->id, 'academic_year_id' => $class->school_year_id],
-                ['class_id' => $class->id, 'status' => StudentClassAssignment::STATUS_ACTIVE]
+                [
+                    'student_id' => $student->id,
+                    'class_id' => $class->id,
+                    'academic_year_id' => $class->school_year_id,
+                ],
+                ['status' => StudentClassAssignment::STATUS_ACTIVE]
             );
             $this->syncImportedParentForStudent($student, $row);
             $this->ensureStudentUser($student);
@@ -2141,19 +2145,15 @@ class BulkExcelController extends Controller
         return $code;
     }
 
-    private function findImportedStudentByNaturalKey(string $name, ?string $dob, string $parentPhone, SchoolClass $class): ?Student
+    private function findImportedStudentByStableKey(string $studentCode): ?Student
     {
-        $name = trim($name);
+        $studentCode = trim($studentCode);
 
-        if ($name === '' || ! $dob) {
+        if ($studentCode === '') {
             return null;
         }
 
-        return Student::where('name', $name)
-            ->whereDate('dob', $dob)
-            ->orderByRaw('class_id = ? desc', [$class->id])
-            ->orderBy('student_code')
-            ->first();
+        return Student::where('student_code', $studentCode)->first();
     }
 
     private function nextTeacherCode(): string
@@ -2201,8 +2201,8 @@ class BulkExcelController extends Controller
             'address' => trim((string) $this->rowValue($row, ['dia_chi_phu_huynh', 'parent_address', 'dia_chi'], $parent->address)) ?: $parent->address,
         ])->save();
 
-        $parent->students()->syncWithoutDetaching([
-            $student->id => ['relation' => ParentProfile::RELATION_GUARDIAN],
+        $student->parents()->sync([
+            $parent->id => ['relation' => ParentProfile::RELATION_GUARDIAN],
         ]);
         $this->ensureParentUser($parent);
     }
@@ -2227,8 +2227,47 @@ class BulkExcelController extends Controller
         }
 
         if ($studentIds !== []) {
+            DB::table('parent_student')
+                ->whereIn('student_id', array_keys($studentIds))
+                ->where('parent_id', '!=', $parent->id)
+                ->delete();
+
             $parent->students()->syncWithoutDetaching($studentIds);
         }
+    }
+
+    private function recordStudentTransfer(Student $student, string $fromClassId, string $toClassId, string $schoolYearId): void
+    {
+        if (! Schema::hasTable('student_movements')) {
+            return;
+        }
+
+        $alreadyRecorded = DB::table('student_movements')
+            ->where('type', 'transfer')
+            ->where('student_id', $student->id)
+            ->where('from_class_id', $fromClassId)
+            ->where('to_class_id', $toClassId)
+            ->whereDate('movement_date', now()->toDateString())
+            ->exists();
+
+        if ($alreadyRecorded) {
+            return;
+        }
+
+        DB::table('student_movements')->insert([
+            'id' => (string) Str::uuid(),
+            'type' => 'transfer',
+            'student_id' => $student->id,
+            'class_id' => $toClassId,
+            'academic_year_id' => $schoolYearId,
+            'from_class_id' => $fromClassId,
+            'to_class_id' => $toClassId,
+            'movement_date' => now()->toDateString(),
+            'status' => 'active',
+            'note' => 'Cập nhật lớp từ nạp Excel',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function parentPhoneConflicts(string $phone, string $parentCode = ''): bool
@@ -2263,7 +2302,7 @@ class BulkExcelController extends Controller
         $user->fill([
             'full_name' => $student->name,
             'email' => $student->email,
-            'phone' => $student->parent_phone,
+            'phone' => null,
             'role' => 'student',
             'student_id' => $student->id,
             'is_active' => $student->status === Student::STATUS_STUDYING,

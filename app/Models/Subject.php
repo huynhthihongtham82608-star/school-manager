@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class Subject extends Model
@@ -297,8 +298,13 @@ class Subject extends Model
         return $this->assignments()->exists()
             || $this->timetableEntries()->exists()
             || $this->scoreHeaders()->exists()
+            || $this->scoreColumns()->exists()
             || $this->primaryTeachers()->exists()
-            || $this->departments()->exists();
+            || $this->departments()->exists()
+            || $this->tableHasRows('student_scores', 'subject_id')
+            || $this->tableHasRows('exam_schedules', 'subject_id')
+            || $this->tableHasRows('grade_windows', 'subject_id')
+            || $this->tableHasRows('school_posts', 'subject_id');
     }
 
     public function canEditCode(): bool
@@ -324,5 +330,12 @@ class Subject extends Model
             ->max() ?? 0;
 
         return self::CODE_PREFIX . str_pad((string) ($maxNumber + 1), 3, '0', STR_PAD_LEFT);
+    }
+
+    private function tableHasRows(string $table, string $column): bool
+    {
+        return Schema::hasTable($table)
+            && Schema::hasColumn($table, $column)
+            && DB::table($table)->where($column, $this->getKey())->exists();
     }
 }

@@ -16,6 +16,7 @@ use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -383,20 +384,24 @@ class SchoolClassController extends Controller
                     ->first();
 
                 if ($assignment) {
-                    $assignment->update(['class_id' => $targetClass->id]);
-                } else {
-                    StudentClassAssignment::create([
+                    $assignment->update(['status' => StudentClassAssignment::STATUS_INACTIVE]);
+                }
+
+                StudentClassAssignment::updateOrCreate(
+                    [
                         'student_id' => $student->id,
                         'class_id' => $targetClass->id,
-                        'academic_year_id' => $class->school_year_id,
-                        'status' => StudentClassAssignment::STATUS_ACTIVE,
-                    ]);
-                }
+                        'academic_year_id' => $targetClass->school_year_id,
+                    ],
+                    ['status' => StudentClassAssignment::STATUS_ACTIVE]
+                );
 
                 $student->update([
                     'class_id' => $targetClass->id,
                     'school_year_id' => $targetClass->school_year_id,
                 ]);
+
+                $this->recordStudentTransfer($student, (string) $class->getKey(), (string) $targetClass->getKey(), (string) $targetClass->school_year_id);
             }
         });
 
@@ -537,6 +542,40 @@ class SchoolClassController extends Controller
             return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có thời khóa biểu.'];
         }
 
+        if ($this->hasTimetableEntriesForClass((string) $class->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có tiết học trong thời khóa biểu.'];
+        }
+
+        if ($this->tableHasRows('teaching_assignments', 'class_id', (string) $class->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có phân công giảng dạy.'];
+        }
+
+        if ($this->tableHasRows('exam_schedules', 'class_id', (string) $class->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có lịch kiểm tra.'];
+        }
+
+        if ($this->tableHasRows('student_movements', 'class_id', (string) $class->getKey())
+            || $this->tableHasRows('student_movements', 'from_class_id', (string) $class->getKey())
+            || $this->tableHasRows('student_movements', 'to_class_id', (string) $class->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có lịch sử phân lớp/chuyển lớp.'];
+        }
+
+        if ($this->tableHasRows('substitute_teachings', 'class_id', (string) $class->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có lịch dạy thay.'];
+        }
+
+        if ($this->tableHasRows('tuition_fees', 'class_id', (string) $class->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có dữ liệu học phí.'];
+        }
+
+        if ($this->tableHasRows('parent_leave_requests', 'class_id', (string) $class->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có đơn xin nghỉ.'];
+        }
+
+        if ($this->tableHasRows('rewards', 'class_id', (string) $class->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có khen thưởng.'];
+        }
+
         return ['allowed' => true, 'message' => null];
     }
 
@@ -562,6 +601,59 @@ class SchoolClassController extends Controller
         return Schema::hasTable($instance->getTable())
             && Schema::hasColumn($instance->getTable(), $column)
             && $model::where($column, $value)->exists();
+    }
+
+    private function tableHasRows(string $table, string $column, string $value): bool
+    {
+        return Schema::hasTable($table)
+            && Schema::hasColumn($table, $column)
+            && DB::table($table)->where($column, $value)->exists();
+    }
+
+    private function hasTimetableEntriesForClass(string $classId): bool
+    {
+        return Schema::hasTable('timetables')
+            && Schema::hasTable('timetable_entries')
+            && Schema::hasColumn('timetables', 'class_id')
+            && Schema::hasColumn('timetable_entries', 'timetable_id')
+            && DB::table('timetable_entries')
+                ->join('timetables', 'timetables.id', '=', 'timetable_entries.timetable_id')
+                ->where('timetables.class_id', $classId)
+                ->exists();
+    }
+
+    private function recordStudentTransfer(Student $student, string $fromClassId, string $toClassId, string $schoolYearId): void
+    {
+        if (! Schema::hasTable('student_movements')) {
+            return;
+        }
+
+        $alreadyRecorded = DB::table('student_movements')
+            ->where('type', 'transfer')
+            ->where('student_id', $student->id)
+            ->where('from_class_id', $fromClassId)
+            ->where('to_class_id', $toClassId)
+            ->whereDate('movement_date', now()->toDateString())
+            ->exists();
+
+        if ($alreadyRecorded) {
+            return;
+        }
+
+        DB::table('student_movements')->insert([
+            'id' => (string) Str::uuid(),
+            'type' => 'transfer',
+            'student_id' => $student->id,
+            'class_id' => $toClassId,
+            'academic_year_id' => $schoolYearId,
+            'from_class_id' => $fromClassId,
+            'to_class_id' => $toClassId,
+            'movement_date' => now()->toDateString(),
+            'status' => 'active',
+            'note' => 'Chuyển lớp từ màn hình quản lý lớp học',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function archiveClass(SchoolClass $class, string $action, string $description): void

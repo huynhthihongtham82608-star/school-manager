@@ -187,7 +187,7 @@ class SubstituteTeachingController extends Controller
             'substitute_date' => ['nullable', 'date'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
-            'timetable_entry_id' => ['required', 'string', \Illuminate\Validation\Rule::exists('timetables', 'id')->where('timetable_record_type', 'entry')],
+            'timetable_entry_id' => ['required', 'string', Rule::exists('timetable_entries', 'id')],
             'substitute_teacher_id' => ['nullable', 'string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'teacher')],
             'ignore_substitute_id' => ['nullable', 'string'],
         ]);
@@ -215,14 +215,28 @@ class SubstituteTeachingController extends Controller
             'substitute_date' => ['nullable', 'date'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
-            'timetable_entry_id' => ['required', 'string', \Illuminate\Validation\Rule::exists('timetables', 'id')->where('timetable_record_type', 'entry')],
-            'substitute_teacher_id' => ['required', 'string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'teacher')],
+            'timetable_entry_id' => ['required', 'string', Rule::exists('timetable_entries', 'id')],
+            'substitute_teacher_id' => ['required', 'string', Rule::exists('users', 'id')->where('role_type', 'teacher')],
             'status' => ['required', Rule::in(array_keys(SubstituteTeaching::statusLabels()))],
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $entry = TimetableEntry::with(['timetable.classRoom', 'assignment.teacher'])->findOrFail($data['timetable_entry_id']);
         $originalTeacherId = $entry->assignment?->teacher_id ?: $entry->teacher_id;
+        $substituteTeacher = Teacher::findOrFail($data['substitute_teacher_id']);
+
+        if ((string) $data['substitute_teacher_id'] === (string) $originalTeacherId) {
+            throw ValidationException::withMessages([
+                'substitute_teacher_id' => 'Giáo viên dạy thay phải khác giáo viên gốc của tiết học.',
+            ]);
+        }
+
+        if (! $substituteTeacher->isWorking() || ! (bool) ($substituteTeacher->is_active ?? true)) {
+            throw ValidationException::withMessages([
+                'substitute_teacher_id' => 'Chỉ được chọn giáo viên đang công tác và còn hoạt động.',
+            ]);
+        }
+
         $dates = $this->resolveSubstituteDates($data, $entry, $current);
 
         return [

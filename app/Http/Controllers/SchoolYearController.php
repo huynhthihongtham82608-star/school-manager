@@ -423,8 +423,8 @@ class SchoolYearController extends Controller
 
         return [
             'name' => $name,
-            'start_date' => $validated['start_date'] ?: sprintf('%04d-08-01', $validated['start_year']),
-            'end_date' => $validated['end_date'] ?: sprintf('%04d-05-31', $validated['end_year']),
+            'start_date' => ($validated['start_date'] ?? null) ?: sprintf('%04d-08-01', $validated['start_year']),
+            'end_date' => ($validated['end_date'] ?? null) ?: sprintf('%04d-05-31', $validated['end_year']),
             'is_active' => $request->boolean('is_active'),
         ];
     }

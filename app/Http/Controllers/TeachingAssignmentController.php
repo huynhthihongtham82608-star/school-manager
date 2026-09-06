@@ -425,8 +425,16 @@ class TeachingAssignmentController extends Controller
 
     private function businessDataBlockReason(TeachingAssignment $assignment): ?string
     {
+        if ($this->hasSubstituteTeachingData($assignment)) {
+            return 'lịch dạy thay';
+        }
+
         if ($this->hasTimetableData($assignment)) {
             return 'thời khóa biểu';
+        }
+
+        if ($this->hasExamScheduleData($assignment)) {
+            return 'lịch kiểm tra';
         }
 
         if ($this->hasScoreData($assignment)) {
@@ -442,8 +450,8 @@ class TeachingAssignmentController extends Controller
 
     private function hasTimetableData(TeachingAssignment $assignment): bool
     {
-        if (! Schema::hasColumn('timetables', 'timetable_record_type')) {
-            return false;
+        if (Schema::hasTable('timetable_entries') && Schema::hasColumn('timetable_entries', 'assignment_id')) {
+            return TimetableEntry::where('assignment_id', $assignment->getKey())->exists();
         }
 
         $timetableIds = Timetable::where('school_year_id', $assignment->school_year_id)
@@ -455,6 +463,41 @@ class TeachingAssignmentController extends Controller
             && TimetableEntry::whereIn('timetable_id', $timetableIds)
                 ->where('assignment_id', $assignment->getKey())
                 ->exists();
+    }
+
+    private function hasSubstituteTeachingData(TeachingAssignment $assignment): bool
+    {
+        if (
+            ! Schema::hasTable('substitute_teachings')
+            || ! Schema::hasTable('timetable_entries')
+            || ! Schema::hasColumn('timetable_entries', 'assignment_id')
+            || ! Schema::hasColumn('substitute_teachings', 'timetable_entry_id')
+        ) {
+            return false;
+        }
+
+        return DB::table('substitute_teachings')
+            ->join('timetable_entries', 'timetable_entries.id', '=', 'substitute_teachings.timetable_entry_id')
+            ->where('timetable_entries.assignment_id', $assignment->getKey())
+            ->exists();
+    }
+
+    private function hasExamScheduleData(TeachingAssignment $assignment): bool
+    {
+        if (! Schema::hasTable('exam_schedules')) {
+            return false;
+        }
+
+        $query = DB::table('exam_schedules')
+            ->where('class_id', $assignment->class_id)
+            ->where('subject_id', $assignment->subject_id)
+            ->where('semester_id', $assignment->semester_id);
+
+        if (Schema::hasColumn('exam_schedules', 'school_year_id')) {
+            $query->where('school_year_id', $assignment->school_year_id);
+        }
+
+        return $query->exists();
     }
 
     private function hasScoreData(TeachingAssignment $assignment): bool

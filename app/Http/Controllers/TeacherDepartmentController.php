@@ -143,9 +143,10 @@ class TeacherDepartmentController extends Controller
     {
         $this->denyHistoricalWrite();
 
-        if ($department->teachers()->exists()) {
+        $dependencies = $this->departmentDependencyLabels($department);
+        if ($dependencies !== []) {
             return back()->withErrors([
-                'department' => 'Không thể xóa tổ chuyên môn vì vẫn còn giáo viên thuộc tổ. Vui lòng chuyển giáo viên sang tổ khác trước.',
+                'department' => 'Không thể xóa tổ chuyên môn vì đã phát sinh dữ liệu: ' . implode(', ', $dependencies) . '. Vui lòng ngừng sử dụng để giữ nguyên lịch sử.',
             ]);
         }
 
@@ -268,6 +269,25 @@ class TeacherDepartmentController extends Controller
                 'department_id' => $department->getKey(),
                 'updated_at' => now(),
             ]);
+    }
+
+    private function departmentDependencyLabels(TeacherDepartment $department): array
+    {
+        $dependencies = [];
+
+        if ($department->teachers()->exists()) {
+            $dependencies[] = 'giáo viên thuộc tổ';
+        }
+
+        if ($department->subjects()->exists()) {
+            $dependencies[] = 'môn học phụ trách';
+        }
+
+        if ($department->leader_teacher_id) {
+            $dependencies[] = 'tổ trưởng chuyên môn';
+        }
+
+        return array_values(array_unique($dependencies));
     }
 
     private function denyHistoricalWrite(): void

@@ -37,6 +37,7 @@ class ParentController extends Controller
     public function store(Request $request)
     {
         $data = $this->validatedData($request);
+        $this->denyHistoricalParentLinkMutation($data['student_ids'] ?? []);
 
         DB::transaction(function () use ($data) {
             $parent = ParentProfile::where('phone', $data['phone'])->first();
@@ -76,6 +77,7 @@ class ParentController extends Controller
     public function update(Request $request, ParentProfile $parent)
     {
         $data = $this->validatedData($request, $parent);
+        $this->denyHistoricalParentLinkMutation($data['student_ids'] ?? [], $parent);
 
         DB::transaction(function () use ($parent, $data) {
             if (! $parent->parent_code) {
@@ -180,12 +182,37 @@ class ParentController extends Controller
             $sync[$studentId] = ['relation' => $relation];
         }
 
+        if ($sync !== []) {
+            DB::table('parent_student')
+                ->whereIn('student_id', array_keys($sync))
+                ->where('parent_id', '!=', $parent->id)
+                ->delete();
+        }
+
         if ($replace) {
             $parent->students()->sync($sync);
             return;
         }
 
         $parent->students()->syncWithoutDetaching($sync);
+    }
+
+    private function denyHistoricalParentLinkMutation(array $studentIds, ?ParentProfile $parent = null): void
+    {
+        if (! $this->isHistoricalReadOnly()) {
+            return;
+        }
+
+        $requested = collect($studentIds)->map(fn ($id) => (string) $id)->sort()->values()->all();
+        $current = $parent
+            ? $parent->students()->pluck('users.id')->map(fn ($id) => (string) $id)->sort()->values()->all()
+            : [];
+
+        if ($requested !== $current) {
+            throw ValidationException::withMessages([
+                'student_ids' => 'Đang xem dữ liệu năm học cũ ở chế độ chỉ xem, không thể thay đổi liên kết học sinh - phụ huynh.',
+            ]);
+        }
     }
 
     private function ensureParentUser(ParentProfile $parent, bool $resetPassword = false): User

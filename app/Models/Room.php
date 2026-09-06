@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class Room extends Model
 {
@@ -88,7 +90,8 @@ class Room extends Model
 
     public function isUsed(): bool
     {
-        return $this->timetableEntries()->exists();
+        return $this->timetableEntries()->exists()
+            || $this->isReferencedByExamSchedule();
     }
 
     public function canEditName(): bool
@@ -99,5 +102,21 @@ class Room extends Model
     public function canDelete(): bool
     {
         return ! $this->isUsed();
+    }
+
+    private function isReferencedByExamSchedule(): bool
+    {
+        if (! Schema::hasTable('exam_schedules') || ! Schema::hasColumn('exam_schedules', 'room')) {
+            return false;
+        }
+
+        $values = collect([$this->name, $this->getKey()])
+            ->filter(fn ($value) => trim((string) $value) !== '')
+            ->map(fn ($value) => trim((string) $value))
+            ->unique()
+            ->values();
+
+        return $values->isNotEmpty()
+            && DB::table('exam_schedules')->whereIn('room', $values->all())->exists();
     }
 }
