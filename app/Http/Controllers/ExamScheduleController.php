@@ -49,7 +49,8 @@ class ExamScheduleController extends Controller
         }
 
         if ($query && $user->isParent() && $user->parentProfile) {
-            $students = $user->parentProfile->students()->orderBy('student_code')->get(['students.id', 'students.class_id']);
+            $studentTable = (new Student())->getTable();
+            $students = $user->parentProfile->students()->orderBy('student_code')->get(["{$studentTable}.id", "{$studentTable}.class_id"]);
             $selected = $students->firstWhere('id', session('selected_parent_student_id')) ?: $students->first();
             $classIds = collect([$selected?->class_id])->filter();
             $query->whereIn('class_id', $classIds);
@@ -195,6 +196,12 @@ class ExamScheduleController extends Controller
 
         if (! Schema::hasTable('exam_schedules')) {
             return back()->with('error', 'Chưa có bảng exam_schedules. Vui lòng chạy migration trước.');
+        }
+
+        if (ScoreDetail::where('exam_schedule_id', $examSchedule->id)->exists()) {
+            return back()->withErrors([
+                'exam_schedule' => 'Không thể xóa lịch kiểm tra vì đã có dữ liệu điểm liên kết.',
+            ]);
         }
 
         if ($examSchedule->semester?->isArchived()) {
@@ -351,7 +358,28 @@ class ExamScheduleController extends Controller
 
     private function ensureValidScheduleWindow(array $data): void
     {
+        $semester = Semester::findOrFail($data['semester_id']);
+        $class = SchoolClass::findOrFail($data['class_id']);
         $subject = Subject::findOrFail($data['subject_id']);
+
+        if ((string) $semester->school_year_id !== (string) $data['school_year_id']) {
+            throw ValidationException::withMessages([
+                'semester_id' => 'Học kỳ không thuộc năm học đã chọn.',
+            ]);
+        }
+
+        if ((string) $class->school_year_id !== (string) $data['school_year_id']) {
+            throw ValidationException::withMessages([
+                'class_id' => 'Lớp không thuộc năm học đã chọn.',
+            ]);
+        }
+
+        if (! $subject->appliesToGrade((int) $class->grade_level)) {
+            throw ValidationException::withMessages([
+                'subject_id' => 'Môn học không áp dụng cho khối của lớp đã chọn.',
+            ]);
+        }
+
         if (! $subject->isEvaluated()) {
             throw ValidationException::withMessages([
                 'subject_id' => 'Môn học này chỉ dùng trong thời khóa biểu, không tạo lịch kiểm tra.',

@@ -98,6 +98,20 @@ class KhenThuongController extends Controller
             ]);
         }
 
+        $duplicateStudentCodes = Reward::where('semester_id', $data['semester_id'])
+            ->whereIn('student_id', $data['student_ids'])
+            ->with('student')
+            ->get()
+            ->map(fn (Reward $reward) => $reward->student?->student_code ?: $reward->student?->name)
+            ->filter()
+            ->values();
+
+        if ($duplicateStudentCodes->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'student_ids' => 'Học sinh đã có quyết định khen thưởng trong học kỳ này: ' . $duplicateStudentCodes->join(', '),
+            ]);
+        }
+
         $createdRewards = DB::transaction(function () use ($data, $students) {
             return $students->map(function (Student $student) use ($data) {
                 $this->authorizeStudent($student);

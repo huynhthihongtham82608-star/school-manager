@@ -94,7 +94,7 @@ class AdminHomePageController extends Controller
 
     public function storeEvent(Request $request)
     {
-        if (! Schema::hasTable('school_events')) {
+        if (! $this->eventsTableReady()) {
             return back()->with('error', 'Chưa có bảng school_events. Vui lòng chạy migration trước.');
         }
 
@@ -119,7 +119,7 @@ class AdminHomePageController extends Controller
 
     public function storeDocument(Request $request)
     {
-        if (! Schema::hasTable('learning_documents')) {
+        if (! $this->documentsTableReady()) {
             return back()->with('error', 'Chưa có bảng learning_documents. Vui lòng chạy migration trước.');
         }
 
@@ -167,5 +167,17 @@ class AdminHomePageController extends Controller
         }
 
         return Storage::url($path);
+    }
+
+    private function eventsTableReady(): bool
+    {
+        return Schema::hasTable('school_events')
+            || (Schema::hasTable('school_posts') && Schema::hasColumn('school_posts', 'post_type'));
+    }
+
+    private function documentsTableReady(): bool
+    {
+        return Schema::hasTable('learning_documents')
+            || (Schema::hasTable('school_posts') && Schema::hasColumn('school_posts', 'post_type'));
     }
 }

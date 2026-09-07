@@ -347,6 +347,7 @@ class TimetableController extends Controller
             $pendingEntries = [];
             $pendingSpecialEntries = [];
             $pendingSlotKeys = [];
+            $missingTargetAssignments = [];
 
             foreach ($sourceTimetable->entries as $sourceEntry) {
                 if ($sourceEntry->isArchived()) {
@@ -394,6 +395,10 @@ class TimetableController extends Controller
                     ->first();
 
                 if (! $targetAssignment) {
+                    $missingTargetAssignments[] = $sourceEntry->assignment?->subject?->name
+                        ?: $sourceEntry->displaySubjectName()
+                        ?: 'môn học';
+
                     continue;
                 }
 
@@ -410,6 +415,14 @@ class TimetableController extends Controller
 
                 $pendingEntries[] = [$sourceEntry, $targetAssignment];
                 $pendingSlotKeys[] = $sourceEntry->day_of_week . '-' . $sourceEntry->period;
+            }
+
+            if (! empty($missingTargetAssignments)) {
+                throw ValidationException::withMessages([
+                    'target_semester_id' => 'Học kỳ đích chưa có phân công giảng dạy tương ứng cho: '
+                        . collect($missingTargetAssignments)->unique()->implode(', ')
+                        . '. Vui lòng phân công giáo viên trước khi clone thời khóa biểu.',
+                ]);
             }
 
             TimetableEntry::where('timetable_id', $targetTimetable->id)

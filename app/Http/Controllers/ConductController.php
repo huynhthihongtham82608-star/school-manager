@@ -204,12 +204,16 @@ class ConductController extends Controller
             return;
         }
 
-        abort(403, 'Chỉ giáo viên chủ nhiệm của lớp mới được nhập hoặc chỉnh sửa hạnh kiểm.');
+        abort(403, 'Chỉ Admin hoặc giáo viên chủ nhiệm của lớp mới được nhập hoặc chỉnh sửa hạnh kiểm.');
     }
 
     private function canEditConduct(SchoolClass $class): bool
     {
         $user = Auth::user();
+
+        if ($user?->isAdmin() || $user?->isStaff()) {
+            return true;
+        }
 
         return $user->isHomeroom()
             && $user->teacher

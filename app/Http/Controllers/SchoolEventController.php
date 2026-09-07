@@ -17,7 +17,7 @@ class SchoolEventController extends Controller
                 ? SchoolPost::query()->latest('published_at')->latest()->paginate(10, ['*'], 'posts_page')->withQueryString()
                 : collect();
 
-            $events = Schema::hasTable('school_events')
+            $events = $this->eventsTableReady()
                 ? SchoolEvent::query()->latest('starts_at')->latest()->paginate(10, ['*'], 'events_page')->withQueryString()
                 : collect();
 
@@ -26,7 +26,7 @@ class SchoolEventController extends Controller
             return view('announcements.manage', compact('posts', 'events', 'activeTab'));
         }
 
-        if (Schema::hasTable('school_events')) {
+        if ($this->eventsTableReady()) {
             $events = SchoolEvent::where('is_published', true)->orderBy('starts_at')->paginate(10);
             $events->setCollection($events->getCollection()
                 ->filter(fn (SchoolEvent $event) => $event->isVisibleToUser($request->user()))
@@ -40,7 +40,7 @@ class SchoolEventController extends Controller
 
     public function store(Request $request)
     {
-        if (! Schema::hasTable('school_events')) {
+        if (! $this->eventsTableReady()) {
             return back()->with('error', 'Chưa có bảng school_events. Vui lòng import SQL tạo bảng trước.');
         }
 
@@ -63,7 +63,7 @@ class SchoolEventController extends Controller
 
     public function update(Request $request, SchoolEvent $event)
     {
-        if (! Schema::hasTable('school_events')) {
+        if (! $this->eventsTableReady()) {
             return back()->with('error', 'Chưa có bảng school_events. Vui lòng import SQL tạo bảng trước.');
         }
 
@@ -86,7 +86,7 @@ class SchoolEventController extends Controller
 
     public function destroy(SchoolEvent $event)
     {
-        if (! Schema::hasTable('school_events')) {
+        if (! $this->eventsTableReady()) {
             return back()->with('error', 'Chưa có bảng school_events. Vui lòng import SQL tạo bảng trước.');
         }
 
@@ -119,5 +119,11 @@ class SchoolEventController extends Controller
         $user = $request->user();
 
         return $user && ($user->isAdmin() || $user->isStaff());
+    }
+
+    private function eventsTableReady(): bool
+    {
+        return Schema::hasTable('school_events')
+            || (Schema::hasTable('school_posts') && Schema::hasColumn('school_posts', 'post_type'));
     }
 }

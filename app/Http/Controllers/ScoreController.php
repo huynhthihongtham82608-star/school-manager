@@ -1350,6 +1350,7 @@ class ScoreController extends Controller
             'subject_id' => 'required|exists:subjects,id',
             'semester_id' => 'required|exists:semesters,id',
             'scores' => 'array',
+            'scores.*' => 'array',
         ]);
 
         $class = SchoolClass::findOrFail($data['class_id']);
@@ -1362,7 +1363,9 @@ class ScoreController extends Controller
         $scoreColumns = $this->scoreColumnsFor($class, $subject, $semester);
         $scoreSetting = ScoreSetting::current();
         $columnPermissions = $this->scoreColumnPermissions($class, $subject, $semester, $scoreColumns);
-        $editableColumns = $scoreColumns->filter(fn (ScoreColumn $column) => $columnPermissions[$column->id]['editable'] ?? false);
+        $submittedScores = collect($request->input('scores', []));
+        $editableColumns = $scoreColumns->filter(fn (ScoreColumn $column) => ($columnPermissions[$column->id]['editable'] ?? false)
+            && $submittedScores->has((string) $column->id));
         $usesPassFailAssessment = $subject->usesPassFailAssessment();
         $isScoreAdmin = Auth::user()->isAdmin() || Auth::user()->isStaff();
 
@@ -1384,7 +1387,13 @@ class ScoreController extends Controller
         $errors = [];
 
         foreach ($editableColumns as $column) {
+            $columnScores = $submittedScores->get((string) $column->id, []);
+
             foreach ($students as $student) {
+                if (! array_key_exists((string) $student->id, $columnScores) && ! array_key_exists($student->id, $columnScores)) {
+                    continue;
+                }
+
                 $header = $existingHeaders->get($student->id);
                 $detail = $header?->details?->firstWhere('score_column_id', $column->id);
                 $columnEditable = (bool) ($columnPermissions[$column->id]['editable'] ?? false);
@@ -1393,7 +1402,7 @@ class ScoreController extends Controller
                 }
 
                 $field = "scores.{$column->id}.{$student->id}";
-                $value = trim((string) $request->input($field, ''));
+                $value = trim((string) ($columnScores[(string) $student->id] ?? $columnScores[$student->id] ?? ''));
 
                 if ($value === '') {
                     $normalizedScores[$column->id][$student->id] = null;

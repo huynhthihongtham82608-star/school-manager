@@ -21,7 +21,7 @@ class LearningDocumentController extends Controller
             ? SchoolClass::where('school_year_id', $selectedYearId)->pluck('id')
             : collect();
 
-        if (Schema::hasTable('learning_documents')) {
+        if ($this->documentsTableReady()) {
             $query = LearningDocument::with(['subject', 'classRoom'])->latest();
 
             if ($selectedYearId) {
@@ -31,15 +31,17 @@ class LearningDocumentController extends Controller
                 });
             }
 
-            if (! (request()->user()->isAdmin() || request()->user()->isStaff())) {
-                $query->where(function ($scope) {
+            $user = $request->user();
+
+            if (! ($user->isAdmin() || $user->isStaff())) {
+                $query->where(function ($scope) use ($user) {
                     $scope->where('is_published', true)
-                        ->orWhere('uploaded_by', request()->user()->id);
+                        ->orWhere('uploaded_by', $user->id);
                 });
             }
 
-            if ($request->user()->isStudent() && $request->user()->student) {
-                $studentClassId = $request->user()->student->class_id;
+            if ($user->isStudent() && $user->student) {
+                $studentClassId = $user->student->class_id;
                 $query->where(function ($scope) use ($studentClassId) {
                     $scope->whereNull('class_id')
                         ->orWhere('class_id', $studentClassId);
@@ -48,10 +50,10 @@ class LearningDocumentController extends Controller
 
             $documents = $query->paginate(12);
 
-            if (! (request()->user()->isAdmin() || request()->user()->isStaff())) {
+            if (! ($user->isAdmin() || $user->isStaff())) {
                 $documents->setCollection(
                     $documents->getCollection()
-                        ->filter(fn (LearningDocument $document) => $document->isVisibleToUser(request()->user()))
+                        ->filter(fn (LearningDocument $document) => $document->isVisibleToUser($user))
                         ->values()
                 );
             }
@@ -85,7 +87,7 @@ class LearningDocumentController extends Controller
     {
         abort_unless($this->canCreateDocument($request->user()), 403);
 
-        if (! Schema::hasTable('learning_documents')) {
+        if (! $this->documentsTableReady()) {
             return back()->with('error', 'Chưa có bảng learning_documents. Vui lòng chạy migration trước.');
         }
 
@@ -113,7 +115,7 @@ class LearningDocumentController extends Controller
     {
         abort_unless($this->canManageDocument($request->user(), $document), 403);
 
-        if (! Schema::hasTable('learning_documents')) {
+        if (! $this->documentsTableReady()) {
             return back()->with('error', 'Chưa có bảng learning_documents. Vui lòng chạy migration trước.');
         }
 
@@ -143,7 +145,7 @@ class LearningDocumentController extends Controller
     {
         abort_unless($this->canManageDocument($request->user(), $document), 403);
 
-        if (! Schema::hasTable('learning_documents')) {
+        if (! $this->documentsTableReady()) {
             return back()->with('error', 'Chưa có bảng learning_documents. Vui lòng chạy migration trước.');
         }
 
@@ -266,5 +268,11 @@ class LearningDocumentController extends Controller
                 ->unique()
                 ->values()
             : collect();
+    }
+
+    private function documentsTableReady(): bool
+    {
+        return Schema::hasTable('learning_documents')
+            || (Schema::hasTable('school_posts') && Schema::hasColumn('school_posts', 'post_type'));
     }
 }

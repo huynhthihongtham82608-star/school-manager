@@ -1002,7 +1002,8 @@ class AttendanceController extends Controller
 
     private function selectedParentStudentIds($user)
     {
-        $students = $user->parentProfile->students()->orderBy('student_code')->get(['students.id']);
+        $studentTable = (new Student())->getTable();
+        $students = $user->parentProfile->students()->orderBy('student_code')->get(["{$studentTable}.id"]);
 
         if ($students->isEmpty()) {
             return collect();
