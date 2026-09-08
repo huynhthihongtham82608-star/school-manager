@@ -13,7 +13,7 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">Khối</label>
-            <select name="grade_level" class="form-select" required>
+            <select name="grade_level" class="form-select" required data-class-grade>
                 @foreach([10, 11, 12] as $grade)
                     <option value="{{ $grade }}" @selected(old('grade_level', $class->grade_level) == $grade)>{{ $grade }}</option>
                 @endforeach
@@ -24,14 +24,14 @@
             <label class="form-label">Năm học</label>
             <select name="school_year_id" class="form-select" required data-class-year>
                 @foreach($years as $year)
-                    <option value="{{ $year->id }}" @selected(old('school_year_id', $class->school_year_id) == $year->id)>{{ $year->name }}</option>
+                    <option value="{{ $year->id }}" data-start-year="{{ $year->start_date?->format('Y') ?: preg_replace('/^.*?((?:19|20|21)\d{2}).*$/', '$1', $year->name) }}" @selected(old('school_year_id', $class->school_year_id) == $year->id)>{{ $year->name }}</option>
                 @endforeach
             </select>
             @error('school_year_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-3">
             <label class="form-label">Niên khóa</label>
-            <input type="text" name="cohort" class="form-control" value="{{ old('cohort', $class->cohort) }}" placeholder="2026 - 2029">
+            <input type="text" name="cohort" class="form-control" value="{{ old('cohort', $class->cohort) }}" placeholder="2026 - 2029" data-class-cohort data-cohort-autofill="{{ old('cohort', $class->cohort) ? '0' : '1' }}">
             @error('cohort')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
         <div class="col-md-4">
@@ -60,5 +60,45 @@
         <button class="btn btn-primary">Cập nhật</button>
     </div>
 </form>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('form').forEach((form) => {
+        const gradeInput = form.querySelector('[data-class-grade]');
+        const yearInput = form.querySelector('[data-class-year]');
+        const cohortInput = form.querySelector('[data-class-cohort]');
+
+        if (!gradeInput || !yearInput || !cohortInput) {
+            return;
+        }
+
+        const suggestedCohort = () => {
+            const grade = Number.parseInt(gradeInput.value || '', 10);
+            const selectedYear = yearInput.options[yearInput.selectedIndex];
+            const schoolYearStart = Number.parseInt(selectedYear?.dataset.startYear || '', 10);
+
+            if (!schoolYearStart || ![10, 11, 12].includes(grade)) {
+                return '';
+            }
+
+            const cohortStart = schoolYearStart - (grade - 10);
+            return `${cohortStart} - ${cohortStart + 3}`;
+        };
+
+        const fillCohort = () => {
+            if (cohortInput.dataset.cohortAutofill === '1') {
+                cohortInput.value = suggestedCohort();
+            }
+        };
+
+        cohortInput.addEventListener('input', () => {
+            cohortInput.dataset.cohortAutofill = cohortInput.value.trim() === '' ? '1' : '0';
+        });
+        gradeInput.addEventListener('change', fillCohort);
+        yearInput.addEventListener('change', fillCohort);
+        fillCohort();
+    });
+});
+</script>
 
 @endsection

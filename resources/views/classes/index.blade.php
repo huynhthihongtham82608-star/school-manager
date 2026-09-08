@@ -209,9 +209,27 @@
                                         @else
                                             <li><span class="dropdown-item text-muted"><i class="bi bi-pencil-square"></i>Sửa thông tin</span></li>
                                         @endif
-                                        @if($class->canLock() && ! $class->isLocked())
+                                        @if($class->canEdit() && $class->schoolYear?->is_active)
                                             <li>
-                                                <form action="{{ route('classes.lock', $class) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn khóa lớp học này?');">
+                                                <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#manageStudents{{ $class->id }}">
+                                                    <i class="bi bi-arrow-left-right"></i>Xếp / Chuyển học sinh
+                                                </button>
+                                            </li>
+                                        @endif
+                                        @if($class->canActivate())
+                                            <li>
+                                                <form action="{{ route('classes.activate', $class) }}" method="POST" onsubmit="return confirm('{{ $class->isLocked() ? 'Bạn có chắc chắn muốn mở khóa lớp học này?' : 'Bạn có chắc chắn muốn kích hoạt lớp học này?' }}');">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit" class="dropdown-item">
+                                                        <i class="bi {{ $class->isLocked() ? 'bi-unlock' : 'bi-play-circle' }}"></i>{{ $class->isLocked() ? 'Mở khóa lớp' : 'Kích hoạt lớp' }}
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @endif
+                                        @if($class->canLock())
+                                            <li>
+                                                <form action="{{ route('classes.lock', $class) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn khóa lớp học này? Sau khi khóa, lớp chỉ được xem cho đến khi mở khóa lại.');">
                                                     @csrf
                                                     @method('PATCH')
                                                     <button type="submit" class="dropdown-item">
@@ -219,7 +237,8 @@
                                                     </button>
                                                 </form>
                                             </li>
-                                        @elseif($class->canArchive())
+                                        @endif
+                                        @if($class->canArchive())
                                             <li>
                                                 <form action="{{ route('classes.archive', $class) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn lưu trữ lớp học này?');">
                                                     @csrf
@@ -229,8 +248,6 @@
                                                     </button>
                                                 </form>
                                             </li>
-                                        @else
-                                            <li><span class="dropdown-item text-muted"><i class="bi bi-lock"></i>Khóa lớp</span></li>
                                         @endif
                                         @if($deleteCheck['allowed'])
                                             <li>
@@ -243,7 +260,15 @@
                                                 </form>
                                             </li>
                                         @else
-                                            <li><span class="dropdown-item text-muted"><i class="bi bi-trash"></i>Xóa bỏ</span></li>
+                                            <li>
+                                                <form action="{{ route('classes.destroy', $class) }}" method="POST" onsubmit="return confirm('{{ $deleteCheck['message'] ?? 'Không thể xóa lớp này vì đã có dữ liệu liên quan.' }}');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="dropdown-item danger">
+                                                        <i class="bi bi-trash"></i>Xóa bỏ
+                                                    </button>
+                                                </form>
+                                            </li>
                                         @endif
                                     @else
                                         <li><span class="dropdown-item text-muted">Chỉ xem</span></li>
@@ -276,7 +301,10 @@
             ->unique()
             ->values();
         $cohortSummary = $class->cohort ?: ($cohortLabels->count() > 1 ? 'Nhiều niên khóa' : ($cohortLabels->first() ?? '-'));
-        $availableTransferClasses = $transferClasses->reject(fn ($targetClass) => (string) $targetClass->getKey() === (string) $class->getKey())->values();
+        $availableTransferClasses = $transferClasses
+            ->filter(fn ($targetClass) => (int) $targetClass->grade_level === (int) $class->grade_level)
+            ->reject(fn ($targetClass) => (string) $targetClass->getKey() === (string) $class->getKey())
+            ->values();
         $usedTeacherIdsForClassYear = collect($homeroomTeacherIdsByYear->get($class->school_year_id, collect()))
             ->reject(fn ($row) => (string) $row->id === (string) $class->getKey())
             ->pluck('homeroom_teacher_id')
@@ -306,7 +334,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Khối</label>
-                                    <select name="grade_level" class="form-select" required>
+                                    <select name="grade_level" class="form-select" required data-class-grade>
                                         @foreach([10, 11, 12] as $grade)
                                             <option value="{{ $grade }}" @selected(old('grade_level', $class->grade_level) == $grade)>Khối {{ $grade }}</option>
                                         @endforeach
@@ -314,15 +342,15 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Năm học</label>
-                                    <select name="school_year_id" class="form-select" required>
+                                    <select name="school_year_id" class="form-select" required data-class-year>
                                         @foreach($years as $year)
-                                            <option value="{{ $year->id }}" @selected(old('school_year_id', $class->school_year_id) == $year->id)>{{ $year->name }}</option>
+                                            <option value="{{ $year->id }}" data-start-year="{{ $year->start_date?->format('Y') ?: preg_replace('/^.*?((?:19|20|21)\d{2}).*$/', '$1', $year->name) }}" @selected(old('school_year_id', $class->school_year_id) == $year->id)>{{ $year->name }}</option>
                                         @endforeach
                                     </select>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Niên khóa</label>
-                                    <input type="text" name="cohort" class="form-control" value="{{ old('cohort', $class->cohort) }}" placeholder="2026 - 2029">
+                                    <input type="text" name="cohort" class="form-control" value="{{ old('cohort', $class->cohort) }}" placeholder="2026 - 2029" data-class-cohort data-cohort-autofill="{{ old('cohort', $class->cohort) ? '0' : '1' }}">
                                 </div>
                                 <div class="col-md-8">
                                     <label class="form-label">Giáo viên chủ nhiệm</label>
@@ -394,11 +422,6 @@
                     <section class="class-detail-section mt-3">
                         <div class="class-student-title-row">
                             <h6>Danh sách học sinh chính thức</h6>
-                            @if(! $readOnly && $class->canEdit())
-                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#assignStudents{{ $class->id }}">
-                                    <i class="bi bi-person-plus me-1"></i>Xếp học sinh vào lớp
-                                </button>
-                            @endif
                         </div>
                         <div class="table-responsive class-detail-table-wrap">
                             <table class="table class-detail-table">
@@ -439,68 +462,13 @@
         </div>
     </div>
 
-    @if(! $readOnly)
-        <div class="modal fade content-modal" id="transferStudents{{ $class->id }}" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-lg">
-                <div class="modal-content">
-                    <form method="POST" action="{{ route('classes.student-assignments.update', $class) }}">
-                        @csrf
-                        <input type="hidden" name="action" value="transfer">
-                        <div class="modal-header">
-                            <div>
-                                <h5 class="modal-title">Chuyển học sinh sang lớp khác</h5>
-                                <div class="text-muted small">{{ $class->name }} - {{ $class->schoolYear->name ?? '' }}</div>
-                            </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Lớp đích</label>
-                                <select name="target_class_id" class="form-select" required>
-                                    <option value="">Chọn lớp đích</option>
-                                    @foreach($availableTransferClasses as $targetClass)
-                                        <option value="{{ $targetClass->id }}">
-                                            {{ $targetClass->name }} ({{ $targetClass->currentStudentCount() }} / {{ $targetClass->maxCapacity() }})
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <div class="class-assignment-panel">
-                                <div class="class-assignment-title">Chọn học sinh cần chuyển</div>
-                                <div class="class-assignment-list">
-                                    @forelse($currentStudents as $student)
-                                        <label class="class-assignment-row">
-                                            <input type="checkbox" name="student_ids[]" value="{{ $student->id }}">
-                                            <span>
-                                                <strong>{{ $student->student_code }}</strong>
-                                                <em>{{ $student->name }}</em>
-                                                <small>{{ $student->genderLabel() }} - {{ $student->dob?->format('d/m/Y') ?? '-' }}</small>
-                                            </span>
-                                        </label>
-                                    @empty
-                                        <div class="empty-state"><i class="bi bi-people"></i>Lớp chưa có học sinh để chuyển.</div>
-                                    @endforelse
-                                </div>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                            <button type="submit" class="btn btn-primary">Chuyển lớp</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    @endif
-
     @if(! $readOnly && $class->canEdit())
-        <div class="modal fade content-modal" id="assignStudents{{ $class->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal fade content-modal" id="manageStudents{{ $class->id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-xl">
                 <div class="modal-content">
                     <div class="modal-header">
                         <div>
-                            <h5 class="modal-title">Phân học sinh vào lớp {{ $class->name }}</h5>
+                            <h5 class="modal-title">Xếp / Chuyển học sinh lớp {{ $class->name }}</h5>
                             <div class="text-muted small">Sĩ số: {{ $class->currentStudentCount() }} / {{ $class->maxCapacity() }}</div>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
@@ -510,7 +478,22 @@
                             <div class="alert alert-warning">Lớp đã đủ 45 học sinh, không thể phân thêm học sinh.</div>
                         @endif
 
-                        <div class="class-assignment-board">
+                        <ul class="nav nav-tabs mb-3" id="studentManageTabs{{ $class->id }}" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="assign-tab-{{ $class->id }}" data-bs-toggle="tab" data-bs-target="#assign-pane-{{ $class->id }}" type="button" role="tab" aria-controls="assign-pane-{{ $class->id }}" aria-selected="true">
+                                    Xếp học sinh
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="transfer-tab-{{ $class->id }}" data-bs-toggle="tab" data-bs-target="#transfer-pane-{{ $class->id }}" type="button" role="tab" aria-controls="transfer-pane-{{ $class->id }}" aria-selected="false">
+                                    Chuyển lớp
+                                </button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <div class="tab-pane fade show active" id="assign-pane-{{ $class->id }}" role="tabpanel" aria-labelledby="assign-tab-{{ $class->id }}" tabindex="0">
+                                <div class="class-assignment-board">
                             <div class="class-assignment-panel">
                                 <div class="class-assignment-title">Học sinh chưa có lớp</div>
                                 <form id="assignStudentsForm{{ $class->id }}" method="POST" action="{{ route('classes.student-assignments.update', $class) }}">
@@ -562,6 +545,50 @@
                                         @endforelse
                                     </div>
                                 </form>
+                                </div>
+                            </div>
+                            </div>
+
+                            <div class="tab-pane fade" id="transfer-pane-{{ $class->id }}" role="tabpanel" aria-labelledby="transfer-tab-{{ $class->id }}" tabindex="0">
+                                <form method="POST" action="{{ route('classes.student-assignments.update', $class) }}">
+                                    @csrf
+                                    <input type="hidden" name="action" value="transfer">
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Lớp đích</label>
+                                        <select name="target_class_id" class="form-select" required>
+                                            <option value="">Chọn lớp đích</option>
+                                            @foreach($availableTransferClasses as $targetClass)
+                                                <option value="{{ $targetClass->id }}">
+                                                    {{ $targetClass->name }} ({{ $targetClass->currentStudentCount() }} / {{ $targetClass->maxCapacity() }})
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <div class="form-text">Chỉ hiển thị các lớp cùng khối, cùng năm học và đang cho phép chuyển.</div>
+                                    </div>
+
+                                    <div class="class-assignment-panel">
+                                        <div class="class-assignment-title">Chọn học sinh cần chuyển</div>
+                                        <div class="class-assignment-list">
+                                            @forelse($currentStudents as $student)
+                                                <label class="class-assignment-row">
+                                                    <input type="checkbox" name="student_ids[]" value="{{ $student->id }}">
+                                                    <span>
+                                                        <strong>{{ $student->student_code }}</strong>
+                                                        <em>{{ $student->name }}</em>
+                                                        <small>{{ $student->genderLabel() }} - {{ $student->dob?->format('d/m/Y') ?? '-' }}</small>
+                                                    </span>
+                                                </label>
+                                            @empty
+                                                <div class="empty-state"><i class="bi bi-people"></i>Lớp chưa có học sinh để chuyển.</div>
+                                            @endforelse
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-end gap-2 mt-3">
+                                        <button type="submit" class="btn btn-primary" {{ ($availableTransferClasses->isEmpty() || $currentStudents->isEmpty()) ? 'disabled' : '' }}>Chuyển lớp</button>
+                                    </div>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -573,4 +600,43 @@
         </div>
     @endif
 @endforeach
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('form').forEach((form) => {
+        const gradeInput = form.querySelector('[data-class-grade]');
+        const yearInput = form.querySelector('[data-class-year]');
+        const cohortInput = form.querySelector('[data-class-cohort]');
+
+        if (!gradeInput || !yearInput || !cohortInput) {
+            return;
+        }
+
+        const suggestedCohort = () => {
+            const grade = Number.parseInt(gradeInput.value || '', 10);
+            const selectedYear = yearInput.options[yearInput.selectedIndex];
+            const schoolYearStart = Number.parseInt(selectedYear?.dataset.startYear || '', 10);
+
+            if (!schoolYearStart || ![10, 11, 12].includes(grade)) {
+                return '';
+            }
+
+            const cohortStart = schoolYearStart - (grade - 10);
+            return `${cohortStart} - ${cohortStart + 3}`;
+        };
+
+        const fillCohort = () => {
+            if (cohortInput.dataset.cohortAutofill === '1') {
+                cohortInput.value = suggestedCohort();
+            }
+        };
+
+        cohortInput.addEventListener('input', () => {
+            cohortInput.dataset.cohortAutofill = cohortInput.value.trim() === '' ? '1' : '0';
+        });
+        gradeInput.addEventListener('change', fillCohort);
+        yearInput.addEventListener('change', fillCohort);
+        fillCohort();
+    });
+});
+</script>
 @endsection

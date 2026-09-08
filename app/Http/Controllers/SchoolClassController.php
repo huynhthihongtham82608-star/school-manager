@@ -175,17 +175,38 @@ class SchoolClassController extends Controller
         $this->denyHistoricalWrite();
 
         if ($class->schoolYear?->isArchived()) {
-            return back()->withErrors(['class' => 'Không thể kích hoạt lớp thuộc năm học đã lưu trữ.']);
+            return back()
+                ->withErrors(['class' => 'Không thể kích hoạt lớp thuộc năm học đã lưu trữ.'])
+                ->with('error', 'Không thể kích hoạt lớp thuộc năm học đã lưu trữ.');
         }
 
         if ($class->isArchived()) {
-            return back()->withErrors(['class' => 'Không thể kích hoạt lớp đã lưu trữ.']);
+            return back()
+                ->withErrors(['class' => 'Không thể kích hoạt lớp đã lưu trữ.'])
+                ->with('error', 'Không thể kích hoạt lớp đã lưu trữ.');
         }
 
-        $class->update(['status' => SchoolClass::STATUS_ACTIVE]);
-        AuditLogger::log('class_activated', SchoolClass::class, (string) $class->getKey(), 'Kích hoạt lớp học ' . $class->name);
+        if (! $class->canActivate()) {
+            return back()
+                ->withErrors(['class' => 'Lớp học đang hoạt động, không cần kích hoạt lại.'])
+                ->with('error', 'Lớp học đang hoạt động, không cần kích hoạt lại.');
+        }
 
-        return back()->with('success', 'Đã kích hoạt lớp học.');
+        $wasLocked = $class->isLocked();
+
+        $class->update([
+            'status' => SchoolClass::STATUS_ACTIVE,
+            'locked_at' => null,
+        ]);
+
+        AuditLogger::log(
+            $wasLocked ? 'class_restored' : 'class_activated',
+            SchoolClass::class,
+            (string) $class->getKey(),
+            ($wasLocked ? 'Mở khóa lớp học ' : 'Kích hoạt lớp học ') . $class->name
+        );
+
+        return back()->with('success', $wasLocked ? 'Đã mở khóa lớp học.' : 'Đã kích hoạt lớp học.');
     }
 
     public function lock(SchoolClass $class)
@@ -193,7 +214,15 @@ class SchoolClassController extends Controller
         $this->denyHistoricalWrite();
 
         if ($class->isArchived()) {
-            return back()->withErrors(['class' => 'Lớp đã lưu trữ, không thể khóa.']);
+            return back()
+                ->withErrors(['class' => 'Lớp đã lưu trữ, không thể khóa.'])
+                ->with('error', 'Lớp đã lưu trữ, không thể khóa.');
+        }
+
+        if (! $class->canLock()) {
+            return back()
+                ->withErrors(['class' => 'Chỉ có thể khóa lớp đang hoạt động. Với lớp bản nháp, hãy kích hoạt trước.'])
+                ->with('error', 'Chỉ có thể khóa lớp đang hoạt động.');
         }
 
         $class->update([
@@ -219,7 +248,7 @@ class SchoolClassController extends Controller
         $deleteCheck = $this->deleteCheck($class);
 
         if (! $deleteCheck['allowed']) {
-            return back()->withErrors(['class' => $deleteCheck['message']]);
+            return back()->with('error', $deleteCheck['message']);
         }
 
         $className = $class->name;
@@ -360,6 +389,10 @@ class SchoolClassController extends Controller
             return back()->withErrors(['target_class_id' => 'Chỉ được chuyển học sinh trong cùng năm học.']);
         }
 
+        if ((int) $targetClass->grade_level !== (int) $class->grade_level) {
+            return back()->withErrors(['target_class_id' => 'Chỉ được chuyển học sinh sang lớp cùng khối trong cùng năm học.']);
+        }
+
         if ($targetClass->isReadOnly() || $targetClass->schoolYear?->isArchived()) {
             return back()->withErrors(['target_class_id' => 'Lớp đích đang khóa hoặc thuộc năm học lưu trữ.']);
         }
@@ -461,9 +494,7 @@ class SchoolClassController extends Controller
         $validated['semester_id'] = $class?->semester_id ?: $this->defaultSemesterIdForYear((string) $year->getKey());
         $validated['cohort'] = trim((string) ($validated['cohort'] ?? ''));
         if ($validated['cohort'] === '') {
-            $start = $year->start_date?->format('Y') ?: null;
-            $end = $start ? ((int) $start + 3) : null;
-            $validated['cohort'] = $start && $end ? $start . ' - ' . $end : null;
+            $validated['cohort'] = $this->defaultCohortForGrade($year, (int) $validated['grade_level']);
         }
 
         if ($year->isArchived()) {
@@ -526,6 +557,10 @@ class SchoolClassController extends Controller
             return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có học sinh.'];
         }
 
+        if ($this->tableHasRows('student_class_assignments', 'class_id', (string) $class->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có lịch sử phân lớp học sinh.'];
+        }
+
         if ($this->hasScoreData($class)) {
             return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã phát sinh điểm.'];
         }
@@ -544,6 +579,14 @@ class SchoolClassController extends Controller
 
         if ($this->hasTimetableEntriesForClass((string) $class->getKey())) {
             return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có tiết học trong thời khóa biểu.'];
+        }
+
+        if ($this->tableHasRows('timetable_entries', 'class_id', (string) $class->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đã có tiết học trong thời khóa biểu.'];
+        }
+
+        if ($this->tableHasRows('rooms', 'fixed_class_id', (string) $class->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa lớp vì đang được gắn phòng học cố định.'];
         }
 
         if ($this->tableHasRows('teaching_assignments', 'class_id', (string) $class->getKey())) {
@@ -583,6 +626,11 @@ class SchoolClassController extends Controller
     {
         if (! Schema::hasTable('student_scores')) {
             return false;
+        }
+
+        if (Schema::hasColumn('student_scores', 'class_id')
+            && DB::table('student_scores')->where('class_id', (string) $class->getKey())->exists()) {
+            return true;
         }
 
         $studentIds = Student::where('class_id', $class->getKey())->pluck('id');
@@ -705,5 +753,32 @@ class SchoolClassController extends Controller
                 'history_readonly' => 'Đang xem dữ liệu lịch sử, không thể thay đổi lớp học.',
             ]);
         }
+    }
+
+    private function defaultCohortForGrade(SchoolYear $year, int $gradeLevel): ?string
+    {
+        $schoolYearStart = $this->schoolYearStartYear($year);
+
+        if (! $schoolYearStart || ! in_array($gradeLevel, [10, 11, 12], true)) {
+            return null;
+        }
+
+        $cohortStart = $schoolYearStart - ($gradeLevel - 10);
+        $cohortEnd = $cohortStart + 3;
+
+        return $cohortStart . ' - ' . $cohortEnd;
+    }
+
+    private function schoolYearStartYear(SchoolYear $year): ?int
+    {
+        if ($year->start_date) {
+            return (int) $year->start_date->format('Y');
+        }
+
+        if (preg_match('/(19|20|21)\d{2}/', (string) $year->name, $matches)) {
+            return (int) $matches[0];
+        }
+
+        return null;
     }
 }

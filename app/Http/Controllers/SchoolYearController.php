@@ -28,6 +28,7 @@ class SchoolYearController extends Controller
 {
     private const INITIALIZE_OPTIONS = [
         'promote_students' => 'Thăng lớp học sinh',
+        'repeat_students' => 'Giữ học sinh ở lại lớp',
         'graduate_grade_12' => 'Đánh dấu học sinh lớp 12 đã tốt nghiệp',
     ];
 
@@ -330,18 +331,34 @@ class SchoolYearController extends Controller
             $classMap = [];
             $createdClasses = 0;
             $promotedStudents = 0;
+            $repeatedStudents = 0;
             $graduatedStudents = 0;
 
             if (in_array('promote_students', $data['options'], true)) {
-                [$classMap, $createdClasses] = $this->createPromotionClasses(
+                [$classMap, $createdPromotionClasses] = $this->createPromotionClasses(
                     $sourceYear,
                     $targetYear,
                     $data['promote_student_ids']
                 );
+                $createdClasses += $createdPromotionClasses;
                 $promotedStudents = $this->promoteStudents(
                     $classMap,
                     $targetYear,
                     $data['promote_student_ids']
+                );
+            }
+
+            if (in_array('repeat_students', $data['options'], true)) {
+                [$repeatClassMap, $createdRepeatClasses] = $this->createRepeatClasses(
+                    $sourceYear,
+                    $targetYear,
+                    $data['repeat_student_ids']
+                );
+                $createdClasses += $createdRepeatClasses;
+                $repeatedStudents = $this->repeatStudents(
+                    $repeatClassMap,
+                    $targetYear,
+                    $data['repeat_student_ids']
                 );
             }
 
@@ -358,6 +375,7 @@ class SchoolYearController extends Controller
                 'source_year_name' => $sourceYear->name,
                 'created_classes' => $createdClasses,
                 'promoted_students' => $promotedStudents,
+                'repeated_students' => $repeatedStudents,
                 'graduated_students' => $graduatedStudents,
                 'counts' => $report['counts'],
             ];
@@ -375,6 +393,7 @@ class SchoolYearController extends Controller
                 'counts' => array_merge($report['counts'], [
                     'created_classes' => $createdClasses,
                     'promote_students' => $promotedStudents,
+                    'repeat_students' => $repeatedStudents,
                     'graduate_grade_12' => $graduatedStudents,
                 ]),
                 'selected_options' => $data['options'],
@@ -439,6 +458,8 @@ class SchoolYearController extends Controller
             'options.*' => ['string', 'in:' . implode(',', array_keys(self::INITIALIZE_OPTIONS))],
             'promote_student_ids' => ['nullable', 'array'],
             'promote_student_ids.*' => ['string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
+            'repeat_student_ids' => ['nullable', 'array'],
+            'repeat_student_ids.*' => ['string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
             'graduate_student_ids' => ['nullable', 'array'],
             'graduate_student_ids.*' => ['string', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
             'confirm_initialization' => ['nullable', 'boolean'],
@@ -484,6 +505,7 @@ class SchoolYearController extends Controller
         ));
 
         $validated['promote_student_ids'] = array_values(array_unique($validated['promote_student_ids'] ?? []));
+        $validated['repeat_student_ids'] = array_values(array_unique($validated['repeat_student_ids'] ?? []));
         $validated['graduate_student_ids'] = array_values(array_unique($validated['graduate_student_ids'] ?? []));
 
         if ($requireConfirm) {
@@ -491,9 +513,20 @@ class SchoolYearController extends Controller
                 ? $this->validPromotionStudentIds($sourceYear, $validated['promote_student_ids'])
                 : [];
 
+            $validated['repeat_student_ids'] = in_array('repeat_students', $validated['options'], true)
+                ? $this->validRepeatStudentIds($sourceYear, $validated['repeat_student_ids'])
+                : [];
+
             $validated['graduate_student_ids'] = in_array('graduate_grade_12', $validated['options'], true)
                 ? $this->validGraduationStudentIds($sourceYear, $validated['graduate_student_ids'])
                 : [];
+
+            $overlapIds = array_intersect($validated['promote_student_ids'], $validated['repeat_student_ids']);
+            if (! empty($overlapIds)) {
+                throw ValidationException::withMessages([
+                    'repeat_student_ids' => 'Một học sinh không thể vừa lên lớp vừa ở lại lớp trong cùng lần khởi tạo năm học.',
+                ]);
+            }
         }
 
         return [$sourceYear, $validated];
@@ -503,6 +536,7 @@ class SchoolYearController extends Controller
     {
         $counts = [
             'promote_students' => in_array('promote_students', $selectedOptions, true) ? $this->promotableStudentCount($sourceYear) : 0,
+            'repeat_students' => in_array('repeat_students', $selectedOptions, true) ? $this->repeatableStudentCount($sourceYear) : 0,
             'graduate_grade_12' => in_array('graduate_grade_12', $selectedOptions, true) ? $this->graduatableStudentCount($sourceYear) : 0,
         ];
 
@@ -513,6 +547,9 @@ class SchoolYearController extends Controller
             'counts' => $counts,
             'promotion_groups' => in_array('promote_students', $selectedOptions, true)
                 ? $this->promotionStudentGroups($sourceYear, $targetName)
+                : collect(),
+            'repeat_groups' => in_array('repeat_students', $selectedOptions, true)
+                ? $this->repeatStudentGroups($sourceYear, $targetName)
                 : collect(),
             'graduation_groups' => in_array('graduate_grade_12', $selectedOptions, true)
                 ? $this->graduationStudentGroups($sourceYear)
@@ -544,6 +581,28 @@ class SchoolYearController extends Controller
                     'students' => $class->students,
                 ];
             })
+            ->values();
+    }
+
+    private function repeatStudentGroups(SchoolYear $sourceYear, string $targetName)
+    {
+        return SchoolClass::with(['students' => function ($query) {
+            $query->where('status', Student::STATUS_STUDYING)
+                ->orderBy('student_code')
+                ->orderBy('name');
+        }])
+            ->where('school_year_id', $sourceYear->getKey())
+            ->whereIn('grade_level', [10, 11])
+            ->orderBy('grade_level')
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (SchoolClass $class) => $class->students->isNotEmpty())
+            ->map(fn (SchoolClass $class) => [
+                'source_class' => $class,
+                'target_name' => $this->uniqueClassName($class->name, $targetName),
+                'target_grade' => (int) $class->grade_level,
+                'students' => $class->students,
+            ])
             ->values();
     }
 
@@ -587,6 +646,27 @@ class SchoolYearController extends Controller
         return $eligibleIds;
     }
 
+    private function validRepeatStudentIds(SchoolYear $sourceYear, array $studentIds): array
+    {
+        if (empty($studentIds)) {
+            return [];
+        }
+
+        $eligibleIds = $this->repeatEligibleStudentsQuery($sourceYear)
+            ->whereIn('id', $studentIds)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        if (count($eligibleIds) !== count($studentIds)) {
+            throw ValidationException::withMessages([
+                'repeat_student_ids' => 'Danh sách học sinh ở lại lớp không hợp lệ hoặc có học sinh không thuộc lớp nguồn.',
+            ]);
+        }
+
+        return $eligibleIds;
+    }
+
     private function validGraduationStudentIds(SchoolYear $sourceYear, array $studentIds): array
     {
         if (empty($studentIds)) {
@@ -609,6 +689,16 @@ class SchoolYearController extends Controller
     }
 
     private function promotionEligibleStudentsQuery(SchoolYear $sourceYear)
+    {
+        $classIds = SchoolClass::where('school_year_id', $sourceYear->getKey())
+            ->whereIn('grade_level', [10, 11])
+            ->pluck('id');
+
+        return Student::whereIn('class_id', $classIds)
+            ->where('status', Student::STATUS_STUDYING);
+    }
+
+    private function repeatEligibleStudentsQuery(SchoolYear $sourceYear)
     {
         $classIds = SchoolClass::where('school_year_id', $sourceYear->getKey())
             ->whereIn('grade_level', [10, 11])
@@ -672,7 +762,85 @@ class SchoolYearController extends Controller
         return [$classMap, $created];
     }
 
+    private function createRepeatClasses(SchoolYear $sourceYear, SchoolYear $targetYear, array $studentIds): array
+    {
+        $classMap = [];
+        $created = 0;
+
+        if (empty($studentIds)) {
+            return [$classMap, $created];
+        }
+
+        $sourceClassIds = Student::whereIn('id', $studentIds)
+            ->where('status', Student::STATUS_STUDYING)
+            ->pluck('class_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($sourceClassIds->isEmpty()) {
+            return [$classMap, $created];
+        }
+
+        SchoolClass::where('school_year_id', $sourceYear->getKey())
+            ->whereIn('grade_level', [10, 11])
+            ->whereIn('id', $sourceClassIds)
+            ->orderBy('grade_level')
+            ->orderBy('name')
+            ->get()
+            ->each(function (SchoolClass $sourceClass) use ($targetYear, &$classMap, &$created) {
+                $targetClass = SchoolClass::create([
+                    'name' => $this->uniqueClassName($sourceClass->name, $targetYear->name),
+                    'grade_level' => (int) $sourceClass->grade_level,
+                    'school_year_id' => $targetYear->getKey(),
+                    'homeroom_teacher_id' => $sourceClass->homeroom_teacher_id,
+                    'capacity' => $sourceClass->capacity,
+                ]);
+
+                $classMap[$sourceClass->getKey()] = $targetClass->getKey();
+                $created++;
+            });
+
+        return [$classMap, $created];
+    }
+
     private function promoteStudents(array $classMap, SchoolYear $targetYear, array $studentIds): int
+    {
+        if (! $classMap || empty($studentIds)) {
+            return 0;
+        }
+
+        $students = Student::whereIn('id', $studentIds)
+            ->whereIn('class_id', array_keys($classMap))
+            ->where('status', Student::STATUS_STUDYING)
+            ->get();
+
+        $students->each(function (Student $student) use ($classMap, $targetYear) {
+            $targetClassId = $classMap[$student->class_id] ?? null;
+
+            if (! $targetClassId) {
+                return;
+            }
+
+            $student->update([
+                'class_id' => $targetClassId,
+                'school_year_id' => $targetYear->getKey(),
+                'status' => Student::STATUS_STUDYING,
+            ]);
+
+            StudentClassAssignment::updateOrCreate([
+                'student_id' => $student->getKey(),
+                'class_id' => $targetClassId,
+                'academic_year_id' => $targetYear->getKey(),
+            ], [
+                'status' => StudentClassAssignment::STATUS_ACTIVE,
+            ]);
+        });
+
+        return $students->count();
+    }
+
+    private function repeatStudents(array $classMap, SchoolYear $targetYear, array $studentIds): int
     {
         if (! $classMap || empty($studentIds)) {
             return 0;
@@ -729,6 +897,19 @@ class SchoolYearController extends Controller
     }
 
     private function promotableStudentCount(SchoolYear $sourceYear): int
+    {
+        $classIds = SchoolClass::where('school_year_id', $sourceYear->getKey())
+            ->whereIn('grade_level', [10, 11])
+            ->pluck('id');
+
+        if ($classIds->isEmpty()) {
+            return 0;
+        }
+
+        return Student::whereIn('class_id', $classIds)->where('status', Student::STATUS_STUDYING)->count();
+    }
+
+    private function repeatableStudentCount(SchoolYear $sourceYear): int
     {
         $classIds = SchoolClass::where('school_year_id', $sourceYear->getKey())
             ->whereIn('grade_level', [10, 11])
@@ -1261,6 +1442,27 @@ class SchoolYearController extends Controller
                         'class_id' => $sourceClass->getKey(),
                     ]);
             });
+
+        SchoolClass::where('school_year_id', $sourceYear->getKey())
+            ->whereIn('grade_level', [10, 11])
+            ->get()
+            ->each(function (SchoolClass $sourceClass) use ($targetYear, $targetClasses) {
+                $targetClass = $targetClasses->first(function (SchoolClass $class) use ($sourceClass, $targetYear) {
+                    return (int) $class->grade_level === (int) $sourceClass->grade_level
+                        && $this->isRepeatedClassCandidate($class->name, $sourceClass->name, $targetYear->name);
+                });
+
+                if (! $targetClass) {
+                    return;
+                }
+
+                Student::where('school_year_id', $targetYear->getKey())
+                    ->where('class_id', $targetClass->getKey())
+                    ->update([
+                        'school_year_id' => $sourceClass->school_year_id,
+                        'class_id' => $sourceClass->getKey(),
+                    ]);
+            });
     }
 
     private function deleteRemainingStudentsForYear(string $schoolYearId, $classIds): void
@@ -1555,5 +1757,11 @@ class SchoolYearController extends Controller
         }
 
         return $candidate . ' (' . $suffix . ')';
+    }
+
+    private function isRepeatedClassCandidate(string $className, string $sourceName, string $targetYearName): bool
+    {
+        return $className === $sourceName
+            || str_starts_with($className, $sourceName . ' - ' . $targetYearName);
     }
 }

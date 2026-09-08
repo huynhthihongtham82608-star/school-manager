@@ -125,14 +125,24 @@ class SchoolClass extends Model
         return ! $this->isReadOnly();
     }
 
+    public function canActivate(): bool
+    {
+        return $this->isDraft() || $this->isLocked();
+    }
+
     public function canLock(): bool
     {
-        return $this->isActive() || $this->isDraft();
+        return $this->isActive();
+    }
+
+    public function canRestore(): bool
+    {
+        return $this->isLocked();
     }
 
     public function canArchive(): bool
     {
-        return ! $this->isArchived();
+        return $this->isActive() || $this->isLocked();
     }
 
     public function currentStudentCount(): int

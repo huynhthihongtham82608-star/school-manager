@@ -49,6 +49,12 @@
             </div>
             <div class="col-md-3 col-sm-6">
                 <div class="border rounded-3 p-3 h-100">
+                    <div class="text-muted small">Học sinh ở lại lớp</div>
+                    <div class="fs-4 fw-bold">{{ number_format($result['counts']['repeat_students'] ?? 0, 0, ',', '.') }}</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="border rounded-3 p-3 h-100">
                     <div class="text-muted small">Học sinh tốt nghiệp</div>
                     <div class="fs-4 fw-bold">{{ number_format($result['counts']['graduate_grade_12'] ?? 0, 0, ',', '.') }}</div>
                 </div>
@@ -133,6 +139,8 @@
                                     <span class="fw-semibold d-block">{{ $label }}</span>
                                     @if($key === 'promote_students')
                                         <span class="text-muted small">Khối 10 lên 11, khối 11 lên 12.</span>
+                                    @elseif($key === 'repeat_students')
+                                        <span class="text-muted small">Khối 10/11 ở lại cùng khối trong năm học mới.</span>
                                     @elseif($key === 'graduate_grade_12')
                                         <span class="text-muted small">Đánh dấu học sinh khối 12 là đã tốt nghiệp.</span>
                                     @endif
@@ -184,6 +192,10 @@
                             <strong>{{ number_format($preview['counts']['promote_students'] ?? 0, 0, ',', '.') }}</strong>
                         </div>
                         <div>
+                            <span>Ở lại lớp</span>
+                            <strong>{{ number_format($preview['counts']['repeat_students'] ?? 0, 0, ',', '.') }}</strong>
+                        </div>
+                        <div>
                             <span>Tốt nghiệp</span>
                             <strong>{{ number_format($preview['counts']['graduate_grade_12'] ?? 0, 0, ',', '.') }}</strong>
                         </div>
@@ -230,6 +242,55 @@
                                         <tr>
                                             <td colspan="6">
                                                 <div class="empty-state"><i class="bi bi-person-check"></i>Không có học sinh đủ điều kiện thăng lớp.</div>
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="academic-preview-table">
+                        <div class="academic-preview-table-head">
+                            <div>
+                                <h6>Danh sách học sinh ở lại lớp</h6>
+                                <p>Chỉ chọn học sinh cần giữ nguyên khối trong năm học mới; không chọn trùng với danh sách thăng lớp.</p>
+                            </div>
+                            <label class="form-check d-flex align-items-center gap-2 mb-0">
+                                <input class="form-check-input" type="checkbox" data-select-all="repeat">
+                                <span class="fw-semibold">Chọn tất cả</span>
+                            </label>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table align-middle mb-0" data-admin-table-skip>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 44px;"></th>
+                                        <th>Mã học sinh</th>
+                                        <th>Họ tên</th>
+                                        <th>Lớp hiện tại</th>
+                                        <th>Lớp năm mới</th>
+                                        <th>Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($preview['repeat_groups'] as $group)
+                                        @foreach($group['students'] as $student)
+                                            <tr>
+                                                <td>
+                                                    <input class="form-check-input" type="checkbox" name="repeat_student_ids[]" value="{{ $student->id }}" data-select-item="repeat">
+                                                </td>
+                                                <td class="fw-semibold">{{ $student->student_code }}</td>
+                                                <td>{{ $student->name }}</td>
+                                                <td>{{ $group['source_class']->name }}</td>
+                                                <td>{{ $group['target_name'] }}</td>
+                                                <td><span class="badge {{ $student->statusBadgeClass() }}">{{ $student->statusLabel() }}</span></td>
+                                            </tr>
+                                        @endforeach
+                                    @empty
+                                        <tr>
+                                            <td colspan="6">
+                                                <div class="empty-state"><i class="bi bi-arrow-repeat"></i>Không có học sinh đủ điều kiện ở lại lớp.</div>
                                             </td>
                                         </tr>
                                     @endforelse
@@ -407,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
         checkbox.addEventListener('change', () => refreshSelectAll(checkbox.dataset.selectItem));
     });
 
-    ['promote', 'graduate'].forEach(refreshSelectAll);
+    ['promote', 'repeat', 'graduate'].forEach(refreshSelectAll);
     showStep(currentStep);
 });
 </script>
