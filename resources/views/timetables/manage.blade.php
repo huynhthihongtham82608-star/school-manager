@@ -3,7 +3,7 @@
 
 @php
     $defaultRoom = $selectedClass?->fixedRoom;
-    $fallbackRoom = $defaultRoom ?: $rooms->first();
+    $fallbackRoom = $defaultRoom;
     $activeEntryRows = $entries->filter(fn ($entry) => ($entry->status ?? \App\Models\TimetableEntry::STATUS_ACTIVE) !== \App\Models\TimetableEntry::STATUS_ARCHIVED);
     $assignmentCounts = $activeEntryRows
         ->filter(fn ($entry) => filled($entry->assignment_id))
@@ -86,24 +86,54 @@
     }
 
     $existingSlots = [];
+    $assignmentMatchesCurrentTimetable = function ($assignment) use ($selectedClass, $selectedSemester) {
+        return $assignment
+            && $selectedClass
+            && $selectedSemester
+            && (string) $assignment->class_id === (string) $selectedClass->id
+            && (string) $assignment->semester_id === (string) $selectedSemester->id
+            && $assignment->status === \App\Models\TeachingAssignment::STATUS_ACTIVE
+            && (bool) $assignment->teacher?->isWorking();
+    };
+    $matchingCurrentAssignment = function ($entry) use ($assignments, $assignmentMatchesCurrentTimetable) {
+        $assignment = $entry?->assignment;
+
+        if ($assignmentMatchesCurrentTimetable($assignment)) {
+            return $assignment;
+        }
+
+        $subjectId = $entry?->subject_id ?: $assignment?->subject_id;
+        $teacherId = $entry?->teacher_id ?: $assignment?->teacher_id;
+
+        if (! $subjectId || ! $teacherId) {
+            return null;
+        }
+
+        return $assignments->first(fn ($candidate) => (string) $candidate->subject_id === (string) $subjectId
+            && (string) $candidate->teacher_id === (string) $teacherId
+            && $assignmentMatchesCurrentTimetable($candidate));
+    };
     foreach ($days as $day => $dayLabel) {
         foreach ($periods as $period) {
             $entry = $entries[$day . '-' . $period] ?? null;
-            $entryValue = $entry ? ($entry->assignment_id ? 'assignment:' . $entry->assignment_id : ($entry->subject_id ? 'subject:' . $entry->subject_id : '')) : '';
+            $entryAssignment = $matchingCurrentAssignment($entry);
+            $entrySubject = $entryAssignment?->subject ?: $entry?->subject;
+            $entryTeacher = $entryAssignment?->teacher ?: $entry?->teacher ?: $entry?->assignment?->teacher;
+            $entryValue = $entry ? ($entryAssignment ? 'assignment:' . $entryAssignment->getKey() : ($entry->subject_id ? 'subject:' . $entry->subject_id : '')) : '';
             $existingSlots[$day . '-' . $period] = [
                 'dayOfWeek' => (int) $day,
                 'periodId' => (int) $period,
                 'entryValue' => $entryValue,
-                'assignmentId' => $entry?->assignment_id ? (string) $entry->assignment_id : '',
-                'subjectId' => $entry?->subject_id ? (string) $entry->subject_id : '',
+                'assignmentId' => $entryAssignment?->getKey() ? (string) $entryAssignment->getKey() : '',
+                'subjectId' => $entrySubject?->getKey() ? (string) $entrySubject->getKey() : ($entry?->subject_id ? (string) $entry->subject_id : ''),
                 'subjectName' => $entry ? $entry->displaySubjectName() : '',
-                'teacherId' => $entry?->teacher_id ? (string) $entry->teacher_id : ($entry?->assignment?->teacher_id ? (string) $entry->assignment->teacher_id : ''),
+                'teacherId' => $entryTeacher?->getKey() ? (string) $entryTeacher->getKey() : ($entry?->teacher_id ? (string) $entry->teacher_id : ''),
                 'teacherName' => $entry ? $entry->displayTeacherName() : '',
                 'roomId' => $entry?->room_id ? (string) $entry->room_id : '',
                 'roomName' => (string) ($entry?->displayRoomLabel() ?? ''),
                 'status' => $entry?->status ?: \App\Models\TimetableEntry::STATUS_ACTIVE,
                 'requiresAssignment' => false,
-                'isOfficial' => (bool) ($entry?->assignment_id),
+                'isOfficial' => (bool) $entryAssignment,
             ];
         }
     }
@@ -194,8 +224,13 @@
 
     .resource-filter-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
         gap: .75rem;
+    }
+
+    .resource-filter-grid .form-select {
+        width: 100%;
+        min-width: 0;
     }
 
     .resource-list {
@@ -483,6 +518,12 @@
 </x-page-header>
 
 <div class="timetable-scheduler">
+    @if(!empty($selectionError))
+        <div class="alert alert-warning text-start fw-normal mb-3">
+            {{ $selectionError }}
+        </div>
+    @endif
+
     @if($timetable && ! $readOnly && $cloneTargetSemesters->isNotEmpty())
         <div class="card mb-3 border-0">
             <div class="card-body">
@@ -511,12 +552,12 @@
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 w-full mt-4 timetable-scheduler-grid">
         <aside class="resource-panel">
             <div class="resource-panel-body">
-                <form method="GET" data-scheduler-filter-form>
+                <form method="GET" action="{{ route('timetable.manage') }}" data-scheduler-filter-form>
                     <input type="hidden" name="school_year_id" value="{{ $selectedYearId }}">
                     <div class="resource-filter-grid">
                         <div>
                             <label class="form-label text-sm">Chọn lớp</label>
-                            <select class="form-select" name="class_id" required data-auto-submit-filter>
+                            <select class="form-select" id="timetable-manage-class-select" name="class_id" required data-auto-submit-filter>
                                 <option value="">Chọn lớp</option>
                                 @foreach($classes as $class)
                                     <option value="{{ $class->id }}" @selected($selectedClass && $selectedClass->id === $class->id)>{{ $class->name }}</option>
@@ -525,7 +566,7 @@
                         </div>
                         <div>
                             <label class="form-label text-sm">Chọn học kỳ</label>
-                            <select class="form-select" name="semester_id" required data-auto-submit-filter>
+                            <select class="form-select" id="timetable-manage-semester-select" name="semester_id" required data-auto-submit-filter>
                                 <option value="">Chọn học kỳ</option>
                                 @foreach($semesters as $semester)
                                     <option value="{{ $semester->id }}" @selected(($selectedSemester?->id ?? $selectedSemesterId) === $semester->id)>{{ $semester->normalizedName() }}</option>
@@ -534,6 +575,30 @@
                         </div>
                     </div>
                 </form>
+                <script data-scheduler-filter-script>
+                    (() => {
+                        const submitSchedulerFilter = (form) => {
+                            const classValue = form?.querySelector('[name="class_id"]')?.value;
+                            const semesterValue = form?.querySelector('[name="semester_id"]')?.value;
+
+                            if (!form || !classValue || !semesterValue || form.dataset.submitting === '1') {
+                                return;
+                            }
+
+                            form.dataset.submitting = '1';
+                            const params = new URLSearchParams(new FormData(form));
+                            const action = form.getAttribute('action') || window.location.pathname;
+                            window.location.assign(`${action}?${params.toString()}`);
+                        };
+
+                        document.querySelectorAll('[data-scheduler-filter-form]').forEach((form) => {
+                            form.querySelectorAll('[data-auto-submit-filter]').forEach((select) => {
+                                select.addEventListener('input', () => submitSchedulerFilter(form));
+                                select.addEventListener('change', () => submitSchedulerFilter(form));
+                            });
+                        });
+                    })();
+                </script>
 
                 <div class="mt-3 mb-2 d-flex align-items-center justify-content-between">
                     <div class="text-gray-900 text-base fw-medium">Khay môn học</div>
@@ -1063,33 +1128,7 @@
                 }
             });
 
-            document.querySelectorAll('[data-auto-submit-filter]').forEach((select) => {
-                select.addEventListener('change', () => {
-                    const filterForm = select.closest('[data-scheduler-filter-form]');
-                    const classValue = filterForm?.querySelector('[name="class_id"]')?.value;
-                    const semesterValue = filterForm?.querySelector('[name="semester_id"]')?.value;
-                    if (classValue && semesterValue) {
-                        filterForm.submit();
-                    }
-                });
-            });
-
             validateAllSlots();
-        })();
-    </script>
-@else
-    <script>
-        (() => {
-            document.querySelectorAll('[data-auto-submit-filter]').forEach((select) => {
-                select.addEventListener('change', () => {
-                    const filterForm = select.closest('[data-scheduler-filter-form]');
-                    const classValue = filterForm?.querySelector('[name="class_id"]')?.value;
-                    const semesterValue = filterForm?.querySelector('[name="semester_id"]')?.value;
-                    if (classValue && semesterValue) {
-                        filterForm.submit();
-                    }
-                });
-            });
         })();
     </script>
 @endif

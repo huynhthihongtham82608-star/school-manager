@@ -88,10 +88,13 @@
 
     .tuition-qr-box {
         width: 100%;
+        max-width: 220px;
+        max-height: 220px;
         aspect-ratio: 1 / 1;
         display: flex;
         align-items: center;
         justify-content: center;
+        margin: 0 auto;
         overflow: hidden;
         color: #9a3412;
         background: #fff7ed;
@@ -172,7 +175,7 @@
 
         <div class="w-full lg:w-1/3 bg-white border border-orange-100 p-5 rounded-xl shadow-2xs text-left">
             <h2 class="text-base font-semibold text-gray-900 mb-1 text-left">QR chuyển khoản</h2>
-            <p class="text-sm font-normal text-orange-700/70 mb-4 text-left">Phụ huynh quét mã nhận tiền toàn trường do Admin cấu hình.</p>
+            <p class="text-sm font-normal text-orange-700/70 mb-4 text-left">Quét mã QR để chuyển khoản thanh toán học phí.</p>
             <div class="tuition-qr-box">
                 @if($qrImageUrl)
                     <img src="{{ $qrImageUrl }}" alt="QR nhận tiền học phí">

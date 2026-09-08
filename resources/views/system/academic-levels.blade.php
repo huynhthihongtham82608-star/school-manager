@@ -96,7 +96,7 @@
 </style>
 
 <x-page-header
-    title="⚖️ Mốc điểm học lực"
+    title="Mốc điểm học lực"
     subtitle="Quản lý tên hiển thị, mốc điểm trung bình GPA và điều kiện điểm khống khống của từng cấp độ."
 >
     <div class="d-flex align-items-center gap-2">
@@ -115,6 +115,7 @@
 <form method="POST" action="{{ route('system.academic-levels.update') }}" class="w-full font-sans text-left text-gray-700 font-normal" data-academic-level-form>
     @csrf
     @method('PUT')
+    <input type="hidden" name="confirmed_delete" value="0" data-confirmed-delete>
 
     <div class="card w-full bg-white border border-orange-100 p-0 rounded-xl shadow-2xs text-left">
         <div class="table-responsive">
@@ -249,6 +250,12 @@
         const bindRow = (row) => {
             row.querySelector('[data-edit-academic-row]')?.addEventListener('click', () => openModal(row));
             row.querySelector('[data-delete-academic-row]')?.addEventListener('click', () => {
+                const label = row.dataset.label || 'mức học lực này';
+                if (!window.confirm(`Bạn có chắc chắn muốn xóa "${label}" khỏi cấu hình mốc điểm học lực?`)) {
+                    return;
+                }
+
+                form.querySelector('[data-confirmed-delete]').value = '1';
                 row.remove();
                 refreshIndexes();
                 if (rows.querySelectorAll('.academic-level-row').length > 0) {

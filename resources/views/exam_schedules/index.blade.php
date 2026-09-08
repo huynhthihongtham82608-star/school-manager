@@ -121,33 +121,60 @@
         : 'Theo dõi lịch kiểm tra phù hợp với lớp, môn học và vai trò đang đăng nhập.'"
 >
     <div class="d-flex align-items-center gap-2">
-        <div class="dropdown d-none">
-            <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Bộ lọc" aria-label="Bộ lọc">
-                <i class="bi bi-funnel"></i>
-            </button>
-            <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 280px;">
-                <form method="GET" action="{{ route('exam-schedules.index') }}" class="d-grid gap-3">
-                    <div>
-                        <label class="form-label small">Năm học</label>
-                        <select name="school_year_id" class="form-select">
-                            <option value="">Tất cả năm học</option>
-                            @foreach($years as $year)
-                                <option value="{{ $year->id }}" @selected($selectedYearId === $year->id)>{{ $year->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('exam-schedules.index') }}" class="btn btn-secondary">Xóa lọc</a>
-                        <button class="btn btn-primary">Áp dụng</button>
-                    </div>
-                </form>
-            </div>
-        </div>
         @if($canManageSchedules)
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#examScheduleCreateModal">
                 <i class="bi bi-plus-lg me-1"></i>Thêm lịch kiểm tra
             </button>
         @endif
+        <div class="dropdown">
+            <button type="button" class="content-action-btn icon-only dropdown-toggle-clean" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Bộ lọc" aria-label="Bộ lọc">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 320px;" data-exam-filter-toolbar>
+                <div class="d-grid gap-3">
+                    <div>
+                        <label class="form-label small">Lớp</label>
+                        <select class="form-select" data-exam-filter="class">
+                            <option value="">Tất cả lớp</option>
+                            @foreach($classes as $class)
+                                <option value="{{ $class->id }}">{{ $class->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label small">Môn học</label>
+                        <select class="form-select" data-exam-filter="subject">
+                            <option value="">Tất cả môn học</option>
+                            @foreach($subjects as $subject)
+                                <option value="{{ $subject->id }}">{{ $subject->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label small">Loại kiểm tra</label>
+                        <select class="form-select" data-exam-filter="type">
+                            <option value="">Tất cả loại kiểm tra</option>
+                            @foreach($examTypes as $type => $label)
+                                <option value="{{ $type }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label small">Trạng thái</label>
+                        <select class="form-select" data-exam-filter="status">
+                            <option value="">Tất cả trạng thái</option>
+                            <option value="draft">Bản nháp</option>
+                            <option value="published">Công bố</option>
+                            <option value="canceled">Đã hủy</option>
+                        </select>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-secondary" data-exam-filter-clear>Xóa lọc</button>
+                        <button type="button" class="btn btn-primary" data-exam-filter-apply>Áp dụng</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </x-page-header>
 
@@ -183,9 +210,9 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Lớp</label>
-                <select name="class_id" class="form-select" required>
+                <select name="class_id" class="form-select" required data-exam-class-select>
                     @foreach($classes as $class)
-                        <option value="{{ $class->id }}">{{ $class->name }}</option>
+                        <option value="{{ $class->id }}" data-fixed-room="{{ $class->fixedRoom?->name }}">{{ $class->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -221,9 +248,14 @@
                 <label class="form-label">Giờ kết thúc</label>
                 <input type="time" name="end_time" class="form-control" required>
             </div>
-            <div class="col-md-1">
+            <div class="col-md-3">
                 <label class="form-label">Phòng</label>
-                <input name="room" class="form-control" required>
+                <select name="room" class="form-select" required data-exam-room-select>
+                    <option value="">Chọn phòng</option>
+                    @foreach($rooms as $room)
+                        <option value="{{ $room->name }}">{{ $room->name }}</option>
+                    @endforeach
+                </select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Ngày mở nhập điểm</label>
@@ -260,40 +292,6 @@
 @endif
 
 <div class="management-card">
-    <div class="management-card-header">
-        <div>
-            <h6>Danh sách lịch kiểm tra</h6>
-            <p>Trạng thái thời gian được hệ thống tự động xác định theo ngày giờ kiểm tra.</p>
-        </div>
-    </div>
-    <div class="unified-table-toolbar exam-filter-toolbar mb-3" data-exam-filter-toolbar>
-        <div class="admin-table-tools-left">
-            <select class="form-select form-select-sm" data-exam-filter="class">
-                <option value="">Tất cả lớp</option>
-                @foreach($classes as $class)
-                    <option value="{{ $class->id }}">{{ $class->name }}</option>
-                @endforeach
-            </select>
-            <select class="form-select form-select-sm" data-exam-filter="subject">
-                <option value="">Tất cả môn học</option>
-                @foreach($subjects as $subject)
-                    <option value="{{ $subject->id }}">{{ $subject->name }}</option>
-                @endforeach
-            </select>
-            <select class="form-select form-select-sm" data-exam-filter="type">
-                <option value="">Tất cả loại kiểm tra</option>
-                @foreach($examTypes as $type => $label)
-                    <option value="{{ $type }}">{{ $label }}</option>
-                @endforeach
-            </select>
-            <select class="form-select form-select-sm" data-exam-filter="status">
-                <option value="">Tất cả trạng thái</option>
-                <option value="draft">Bản nháp</option>
-                <option value="published">Công bố</option>
-                <option value="canceled">Đã hủy</option>
-            </select>
-        </div>
-    </div>
     <div class="table-responsive content-table-wrap">
         <table class="table content-table align-middle">
             <thead>
@@ -401,6 +399,7 @@
                     </td>
                 </tr>
 
+                @push('exam-schedule-modals')
                 <div class="modal fade content-modal exam-detail-modal academic-detail-center-modal" id="{{ $detailId }}" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content">
@@ -607,9 +606,9 @@
                                             </div>
                                             <div class="col-md-3">
                                                 <label class="form-label">Lớp</label>
-                                                <select name="class_id" class="form-select" required>
+                                                <select name="class_id" class="form-select" required data-exam-class-select>
                                                     @foreach($classes as $class)
-                                                        <option value="{{ $class->id }}" @selected($schedule->class_id === $class->id)>{{ $class->name }}</option>
+                                                        <option value="{{ $class->id }}" data-fixed-room="{{ $class->fixedRoom?->name }}" @selected($schedule->class_id === $class->id)>{{ $class->name }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
@@ -645,9 +644,17 @@
                                                 <label class="form-label">Giờ kết thúc</label>
                                                 <input type="time" name="end_time" class="form-control" value="{{ $schedule->end_time ? substr($schedule->end_time, 0, 5) : '' }}" required>
                                             </div>
-                                            <div class="col-md-1">
+                                            <div class="col-md-3">
                                                 <label class="form-label">Phòng</label>
-                                                <input name="room" class="form-control" value="{{ $schedule->room }}" required>
+                                                <select name="room" class="form-select" required data-exam-room-select>
+                                                    <option value="">Chọn phòng</option>
+                                                    @if($schedule->room && ! $rooms->contains('name', $schedule->room))
+                                                        <option value="{{ $schedule->room }}" selected>{{ $schedule->room }} (ngoài danh mục)</option>
+                                                    @endif
+                                                    @foreach($rooms as $room)
+                                                        <option value="{{ $room->name }}" @selected($schedule->room === $room->name)>{{ $room->name }}</option>
+                                                    @endforeach
+                                                </select>
                                             </div>
                                             <div class="col-md-3">
                                                 <label class="form-label">Ngày mở nhập điểm</label>
@@ -680,6 +687,7 @@
                         </div>
                     </div>
                 @endif
+                @endpush
             @empty
                 <tr>
                     <td colspan="9"><div class="empty-state"><i class="bi bi-calendar2-x"></i>Chưa có lịch kiểm tra.</div></td>
@@ -688,6 +696,8 @@
             </tbody>
         </table>
     </div>
+
+    @stack('exam-schedule-modals')
 
     @if(method_exists($schedules, 'links'))
         <div class="content-pagination">{{ $schedules->links() }}</div>
@@ -722,6 +732,46 @@
                 clearTimeout(examFilterTimer);
                 examFilterTimer = setTimeout(applyExamFilters, 300);
             });
+        });
+
+        examToolbar?.querySelector('[data-exam-filter-apply]')?.addEventListener('click', applyExamFilters);
+        examToolbar?.querySelector('[data-exam-filter-clear]')?.addEventListener('click', () => {
+            examToolbar.querySelectorAll('[data-exam-filter]').forEach((field) => {
+                field.value = '';
+            });
+            applyExamFilters();
+        });
+
+        document.querySelectorAll('form').forEach((form) => {
+            const classSelect = form.querySelector('[data-exam-class-select]');
+            const roomSelect = form.querySelector('[data-exam-room-select]');
+
+            if (!classSelect || !roomSelect) {
+                return;
+            }
+
+            let roomTouched = Boolean(roomSelect.value);
+            roomSelect.addEventListener('change', () => {
+                roomTouched = true;
+            });
+
+            const suggestFixedRoom = () => {
+                const fixedRoom = classSelect.selectedOptions[0]?.dataset.fixedRoom || '';
+                if (!fixedRoom || roomTouched) {
+                    return;
+                }
+
+                const option = Array.from(roomSelect.options).find((item) => item.value === fixedRoom);
+                if (option) {
+                    roomSelect.value = fixedRoom;
+                }
+            };
+
+            classSelect.addEventListener('change', () => {
+                roomTouched = false;
+                suggestFixedRoom();
+            });
+            suggestFixedRoom();
         });
 
         document.querySelectorAll('form').forEach((form) => {

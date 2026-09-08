@@ -6,23 +6,24 @@
     $selectedClassIds = collect(old('class_ids', [$assignment->class_id]))->map(fn ($id) => (string) $id);
 @endphp
 
-<form method="POST" action="{{ route('assignments.update', $assignment) }}" class="card p-4 shadow-sm">
+<form method="POST" action="{{ route('assignments.update', $assignment) }}" class="card p-4 shadow-sm assignment-form-compact">
     @csrf
     @method('PUT')
     <input type="hidden" name="role" value="{{ \App\Models\TeachingAssignment::ROLE_PRIMARY }}">
 
-    <div class="row g-3">
-        <div class="col-md-3">
+    <div class="row g-3 align-items-start">
+        <div class="col-lg-6">
             <label class="form-label">Năm học</label>
             <div class="form-control bg-light">{{ $assignment->schoolYear->name ?? '-' }}</div>
         </div>
-        <div class="col-md-3">
+        <div class="col-lg-6">
             <label class="form-label">Học kỳ</label>
             <div class="form-control bg-light">{{ $assignment->semester?->normalizedName() ?? '-' }}</div>
         </div>
-        <div class="col-md-3">
+
+        <div class="col-lg-6">
             <label class="form-label">Lớp</label>
-            <select name="class_ids[]" class="form-select" multiple size="6" required>
+            <select name="class_ids[]" class="form-select" multiple size="5" required>
                 @foreach($classes as $class)
                     <option value="{{ $class->id }}" @selected($selectedClassIds->contains((string) $class->id))>
                         {{ $class->name }}
@@ -33,7 +34,7 @@
             @error('class_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
             @error('class_ids.*')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-3">
+        <div class="col-lg-6">
             <label class="form-label">Môn học</label>
             <select name="subject_id" class="form-select" required data-assignment-subject-select>
                 @foreach($subjects as $subject)
@@ -49,7 +50,8 @@
             <div class="form-text" data-assignment-subject-departments>Chọn môn để xem tổ phụ trách.</div>
             @error('subject_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-3">
+
+        <div class="col-lg-6">
             <label class="form-label">Lọc theo tổ chuyên môn</label>
             <select class="form-select" data-assignment-department-filter>
                 <option value="">Tất cả tổ</option>
@@ -58,7 +60,7 @@
                 @endforeach
             </select>
         </div>
-        <div class="col-md-5">
+        <div class="col-lg-6">
             <label class="form-label">Giáo viên</label>
             <select name="teacher_id" class="form-select" required data-assignment-teacher>
                 @foreach($teachers as $teacher)
@@ -73,7 +75,8 @@
             <div class="form-text text-warning d-none" data-assignment-department-warning>Giáo viên này không thuộc tổ phụ trách môn học.</div>
             @error('teacher_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-4">
+
+        <div class="col-lg-4">
             <label class="form-label">Điều chỉnh số tiết/tuần</label>
             <input type="number" name="weekly_periods" class="form-control" value="{{ old('weekly_periods', $assignment->weekly_periods) }}" min="1" max="20">
             <div class="form-text">
@@ -81,7 +84,7 @@
             </div>
             @error('weekly_periods')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-md-4">
+        <div class="col-lg-4">
             <label class="form-label">Trạng thái</label>
             <select name="status" class="form-select" required>
                 @foreach(\App\Models\TeachingAssignment::STATUSES as $value => $label)
@@ -90,13 +93,14 @@
             </select>
             @error('status')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
-        <div class="col-12">
+        <div class="col-lg-4">
             <label class="form-label">Ghi chú</label>
-            <textarea name="note" class="form-control" rows="3">{{ old('note', $assignment->note) }}</textarea>
+            <textarea name="note" class="form-control" rows="2">{{ old('note', $assignment->note) }}</textarea>
             @error('note')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
     </div>
-    <div class="form-actions mt-4">
+
+    <div class="form-actions mt-4 pt-3 border-top d-flex justify-content-end gap-2 bg-white">
         <a href="{{ route('assignments.index') }}" class="btn btn-secondary">Hủy</a>
         <button class="btn btn-primary">Cập nhật</button>
     </div>

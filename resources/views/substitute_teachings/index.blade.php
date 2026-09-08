@@ -419,7 +419,7 @@
                     <select id="substitute-entry" name="timetable_entry_id" class="substitute-input w-full" required>
                         <option value="">Chọn lớp & tiết học</option>
                         @foreach($entries as $entry)
-                            <option value="{{ $entry->id }}">
+                            <option value="{{ $entry->id }}" data-day="{{ (int) $entry->day_of_week }}">
                                 {{ $entry->timetable?->classRoom?->name ?? '-' }} • {{ $dayLabels[(int) $entry->day_of_week] ?? 'Thứ ' . $entry->day_of_week }} • {{ $entry->displayPeriod() }} • {{ $entry->displaySubjectName() }} • {{ $entry->displayTeacherName() ?: 'Chưa có giáo viên' }}
                             </option>
                         @endforeach
@@ -490,6 +490,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const today = () => new Date().toISOString().slice(0, 10);
+    const isoWeekdayOf = (value) => {
+        if (!value) {
+            return null;
+        }
+
+        const day = new Date(`${value}T00:00:00`).getDay();
+        return day === 0 ? 7 : day;
+    };
+
+    const syncEntryOptionsForDate = () => {
+        if (!entryInput) {
+            return;
+        }
+
+        const selectedDay = scopeInput.value === 'period' ? isoWeekdayOf(dateInput.value) : null;
+        let selectedOptionAllowed = true;
+
+        [...entryInput.options].forEach((option) => {
+            if (!option.value || !selectedDay) {
+                option.hidden = false;
+                option.disabled = false;
+                return;
+            }
+
+            const allowed = Number(option.dataset.day || 0) === Number(selectedDay);
+            option.hidden = !allowed;
+            option.disabled = !allowed;
+            if (option.selected && !allowed) {
+                selectedOptionAllowed = false;
+            }
+        });
+
+        if (!selectedOptionAllowed) {
+            entryInput.value = '';
+        }
+    };
 
     const syncScopeFields = () => {
         const isRange = scopeInput.value === 'date_range';
@@ -498,6 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dateInput.required = !isRange;
         fromDateInput.required = isRange;
         toDateInput.required = isRange;
+        syncEntryOptionsForDate();
     };
 
     const hideSuggestions = () => {
@@ -662,6 +699,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     [scopeInput, dateInput, fromDateInput, toDateInput, entryInput, teacherInput].forEach((input) => {
         input.addEventListener('change', () => {
+            if (input === scopeInput || input === dateInput) {
+                syncEntryOptionsForDate();
+            }
             bypassAvailabilityCheck = false;
             checkAvailability();
         });

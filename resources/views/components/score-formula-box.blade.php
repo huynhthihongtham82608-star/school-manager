@@ -24,7 +24,7 @@
             </div>
         </div>
     </div>
-    <p class="score-formula-note">💡 Quy tắc làm tròn: Hệ thống tự động kết xuất dữ liệu và làm tròn kết quả đến đúng 1 chữ số thập phân bằng hàm .toFixed(1) theo quy chế học vụ quốc gia.</p>
+    <p class="score-formula-note">💡 Quy tắc làm tròn: Hệ thống làm tròn kết quả đến 1 chữ số thập phân.</p>
 </div>
 
 @once

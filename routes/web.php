@@ -236,7 +236,7 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         ->except(['show', 'create', 'edit'])
         ->middleware('role:admin,staff,teacher');
 
-    Route::middleware('role:teacher')->group(function () {
+    Route::middleware('role:admin,staff,teacher')->group(function () {
         Route::post('attendance', [AttendanceController::class, 'store'])->name('attendance.store');
     });
 

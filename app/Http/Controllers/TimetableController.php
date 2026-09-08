@@ -60,7 +60,13 @@ class TimetableController extends Controller
     {
         $user = Auth::user();
         $selectedYearId = $this->effectiveSchoolYearId($request);
-        $selectedSemesterId = $this->selectedSemesterId($request);
+        $selectedSemesterId = $this->effectiveSemesterId($request, $selectedYearId);
+        $viewMode = ($user->isAdmin() || $user->isStaff()) && $request->query('view_mode') === 'teacher'
+            ? 'teacher'
+            : 'class';
+        $teachers = collect();
+        $selectedTeacher = null;
+        $teacherSchedule = collect();
         $classesQuery = SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
             ->orderBy('name');
 
@@ -78,6 +84,12 @@ class TimetableController extends Controller
             ->orderBy('name')
             ->get();
 
+        if ($user->isAdmin() || $user->isStaff()) {
+            $teachers = Teacher::where('work_status', Teacher::STATUS_WORKING)
+                ->orderBy('name')
+                ->get();
+        }
+
         $selectedClass = null;
         $selectedSemester = null;
         $timetable = null;
@@ -91,7 +103,7 @@ class TimetableController extends Controller
             $selectedClass = $child?->classRoom;
         } elseif ($user->isTeacher() && $user->teacher) {
             return $this->teacherView();
-        } elseif ($request->filled('class_id')) {
+        } elseif ($viewMode === 'class' && $request->filled('class_id')) {
             $request->validate([
                 'class_id' => 'required|exists:classes,id',
             ]);
@@ -99,7 +111,40 @@ class TimetableController extends Controller
             $selectedClass = SchoolClass::find($request->input('class_id'));
         }
 
-        if ($selectedClass && $selectedSemesterId) {
+        if ($viewMode === 'teacher' && $selectedSemesterId) {
+            $request->validate([
+                'teacher_id' => 'nullable|exists:users,id',
+            ]);
+
+            $selectedSemester = Semester::find($selectedSemesterId);
+            $selectedTeacher = $request->filled('teacher_id')
+                ? Teacher::find($request->input('teacher_id'))
+                : $teachers->first();
+
+            if ($selectedTeacher && $selectedSemester) {
+                $teacherEntries = TimetableEntry::with(['timetable.classRoom.homeroomTeacher', 'assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo', 'approvedSubstitutes'])
+                    ->where('status', TimetableEntry::STATUS_ACTIVE)
+                    ->where(function ($query) use ($selectedTeacher) {
+                        $query->where('teacher_id', $selectedTeacher->id)
+                            ->orWhereHas('assignment', fn ($assignment) => $assignment->where('teacher_id', $selectedTeacher->id))
+                            ->orWhere(function ($homeroomQuery) use ($selectedTeacher) {
+                                $homeroomQuery->whereHas('subject', fn ($subject) => $subject->where('type', Subject::TYPE_HOMEROOM))
+                                    ->whereHas('timetable.classRoom', fn ($class) => $class->where('homeroom_teacher_id', $selectedTeacher->id));
+                            });
+                    })
+                    ->whereHas('timetable', function ($query) use ($selectedYearId, $selectedSemester) {
+                        $query->when($selectedYearId, fn ($yearQuery) => $yearQuery->where('school_year_id', $selectedYearId))
+                            ->where('semester_id', $selectedSemester->id);
+                    })
+                    ->get()
+                    ->sortBy(fn ($entry) => sprintf('%d-%02d', (int) $entry->day_of_week, (int) $entry->period))
+                    ->values();
+
+                $teacherSchedule = $teacherEntries->groupBy(fn (TimetableEntry $entry) => ((int) $entry->day_of_week) . '-' . ((int) $entry->period));
+            }
+        }
+
+        if ($viewMode === 'class' && $selectedClass && $selectedSemesterId) {
             $selectedSemester = Semester::find($selectedSemesterId);
 
             if ($selectedSemester) {
@@ -129,13 +174,17 @@ class TimetableController extends Controller
             'periodGroups' => self::PERIOD_GROUPS,
             'selectedYearId' => $selectedYearId,
             'selectedSemesterId' => $selectedSemesterId,
+            'viewMode' => $viewMode,
+            'teachers' => $teachers,
+            'selectedTeacher' => $selectedTeacher,
+            'teacherSchedule' => $teacherSchedule,
         ]);
     }
 
     public function manage(Request $request)
     {
         $selectedYearId = $this->effectiveSchoolYearId($request);
-        $selectedSemesterId = $this->selectedSemesterId($request);
+        $selectedSemesterId = $this->effectiveSemesterId($request, $selectedYearId);
         $readOnly = $this->isHistoricalReadOnly();
         $years = $readOnly
             ? SchoolYear::whereKey($selectedYearId)->get()
@@ -162,6 +211,7 @@ class TimetableController extends Controller
         $specialSubjects = $this->specialSubjectsForTimetable();
         $cloneTargetSemesters = collect();
         $rooms = $readOnly ? Room::orderBy('name')->get() : Room::where('status', Room::STATUS_ACTIVE)->orderBy('name')->get();
+        $selectionError = null;
 
         if ($request->filled('class_id') && $selectedSemesterId) {
             $request->validate([
@@ -170,55 +220,64 @@ class TimetableController extends Controller
 
             $selectedClass = SchoolClass::with(['fixedRoom', 'homeroomTeacher'])->find($request->input('class_id'));
             $selectedSemester = Semester::find($selectedSemesterId);
-            $this->validateSelection($selectedClass, $selectedSemester, $readOnly);
-
-            $timetableQuery = Timetable::where('class_id', $selectedClass->id)
-                ->where('semester_id', $selectedSemester->id);
-
-            $timetable = $readOnly
-                ? $timetableQuery->first()
-                : Timetable::firstOrCreate([
-                    'class_id' => $selectedClass->id,
-                    'semester_id' => $selectedSemester->id,
-                ], [
-                    'school_year_id' => $selectedSemester->school_year_id,
-                ]);
-
-            $assignments = $this->activeAssignmentsFor($selectedClass, $selectedSemester);
-            $assignedSubjectIds = $assignments->pluck('subject_id')->filter()->unique()->values();
-            $unassignedOfficialSubjects = Subject::with('periodNorms')
-                ->where('status', Subject::STATUS_ACTIVE)
-                ->where(function ($query) {
-                    $query->where('type', Subject::TYPE_OFFICIAL)
-                        ->orWhereIn('type', Subject::LEGACY_SCORABLE_TYPES);
-                })
-                ->when($assignedSubjectIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $assignedSubjectIds))
-                ->orderBy('name')
-                ->get();
-
-            if ($timetable) {
-                $entries = TimetableEntry::where('timetable_id', $timetable->id)
-                    ->with(['assignment.subject.periodNorms', 'assignment.teacher', 'subject', 'teacher', 'roomInfo'])
-                    ->get()
-                    ->keyBy(fn ($entry) => $entry->day_of_week . '-' . $entry->period);
+            try {
+                $this->validateSelection($selectedClass, $selectedSemester, $readOnly);
+            } catch (ValidationException $exception) {
+                $selectionError = collect($exception->errors())->flatten()->first()
+                    ?: 'Không thể mở thời khóa biểu theo lớp và học kỳ đã chọn.';
             }
 
-            $validationEntries = TimetableEntry::with(['timetable.classRoom', 'assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo'])
-                ->where('status', TimetableEntry::STATUS_ACTIVE)
-                ->whereHas('timetable', function ($query) use ($selectedSemester) {
-                    $query->where('school_year_id', $selectedSemester->school_year_id)
-                        ->where('semester_id', $selectedSemester->id);
-                })
-                ->get();
+            if (! $selectionError) {
+                $timetableQuery = Timetable::where('class_id', $selectedClass->id)
+                    ->where('semester_id', $selectedSemester->id);
 
-            $cloneTargetSemesters = $semesters->filter(function (Semester $semester) use ($selectedSemester) {
-                return $selectedSemester
-                    && $this->semesterTermIndex($selectedSemester) === 1
-                    && $this->semesterTermIndex($semester) === 2
-                    && (string) $semester->school_year_id === (string) $selectedSemester->school_year_id
-                    && ! $semester->isLocked()
-                    && ! $semester->isArchived();
-            });
+                $timetable = $readOnly
+                    ? $timetableQuery->first()
+                    : Timetable::firstOrCreate([
+                        'class_id' => $selectedClass->id,
+                        'semester_id' => $selectedSemester->id,
+                    ], [
+                        'school_year_id' => $selectedSemester->school_year_id,
+                    ]);
+
+                $assignments = $this->activeAssignmentsFor($selectedClass, $selectedSemester);
+                $assignedSubjectIds = $assignments->pluck('subject_id')->filter()->unique()->values();
+                $unassignedOfficialSubjects = Subject::with('periodNorms')
+                    ->where('status', Subject::STATUS_ACTIVE)
+                    ->where(function ($query) {
+                        $query->where('type', Subject::TYPE_OFFICIAL)
+                            ->orWhereIn('type', Subject::LEGACY_SCORABLE_TYPES);
+                    })
+                    ->when($assignedSubjectIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $assignedSubjectIds))
+                    ->orderBy('name')
+                    ->get();
+
+                if ($timetable) {
+                    $entries = TimetableEntry::where('timetable_id', $timetable->id)
+                        ->with(['assignment.subject.periodNorms', 'assignment.teacher', 'subject', 'teacher', 'roomInfo'])
+                        ->get()
+                        ->keyBy(fn ($entry) => $entry->day_of_week . '-' . $entry->period);
+                }
+
+                $validationEntries = TimetableEntry::with(['timetable.classRoom', 'assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo'])
+                    ->where('status', TimetableEntry::STATUS_ACTIVE)
+                    ->whereHas('timetable', function ($query) use ($selectedSemester) {
+                        $query->where('school_year_id', $selectedSemester->school_year_id)
+                            ->where('semester_id', $selectedSemester->id);
+                    })
+                    ->get();
+
+                $cloneTargetSemesters = $semesters->filter(function (Semester $semester) use ($selectedSemester) {
+                    return $selectedSemester
+                        && $this->semesterTermIndex($selectedSemester) === 1
+                        && $this->semesterTermIndex($semester) === 2
+                        && (string) $semester->school_year_id === (string) $selectedSemester->school_year_id
+                        && ! $semester->isLocked()
+                        && ! $semester->isArchived();
+                });
+            }
+        } elseif ($request->filled('class_id') && $request->filled('semester_id')) {
+            $selectionError = 'Học kỳ đã chọn không thuộc năm học hiện tại hoặc không còn tồn tại.';
         }
 
         return view('timetables.manage', [
@@ -242,6 +301,7 @@ class TimetableController extends Controller
             'statuses' => TimetableEntry::STATUSES,
             'cloneTargetSemesters' => $cloneTargetSemesters,
             'rooms' => $rooms,
+            'selectionError' => $selectionError,
         ]);
     }
 
@@ -617,6 +677,7 @@ class TimetableController extends Controller
 
     private function validatedSlotsForTimetable(Request $request, Timetable $timetable): array
     {
+        $timetable->loadMissing('classRoom.fixedRoom');
         $slots = [];
         $assignmentCounts = [];
 
@@ -655,6 +716,12 @@ class TimetableController extends Controller
                     $roomLabel = $selection['room_label'];
                     $note = $selection['note'];
                     $room = $this->validatedRoomForTimetable($roomId);
+
+                    if (! $room && ! $roomLabel) {
+                        $room = $timetable->classRoom?->fixedRoom?->isActive()
+                            ? $timetable->classRoom->fixedRoom
+                            : null;
+                    }
 
                     if ($assignment && $status !== TimetableEntry::STATUS_ARCHIVED) {
                         $assignmentCounts[$assignment->id] = ($assignmentCounts[$assignment->id] ?? 0) + 1;
@@ -769,13 +836,15 @@ class TimetableController extends Controller
     {
         $assignment = TeachingAssignment::with(['subject.periodNorms', 'teacher'])->findOrFail($assignmentId);
 
-        if (
-            (string) $assignment->school_year_id !== (string) $timetable->school_year_id
-            || (string) $assignment->semester_id !== (string) $timetable->semester_id
-            || (string) $assignment->class_id !== (string) $timetable->class_id
-            || $assignment->status !== TeachingAssignment::STATUS_ACTIVE
-            || ! $assignment->teacher?->isWorking()
-        ) {
+        if (! $this->assignmentCanBeScheduledInTimetable($assignment, $timetable)) {
+            $replacement = $this->matchingActiveAssignmentForTimetable($assignment, $timetable);
+
+            if ($replacement) {
+                $assignment = $replacement;
+            }
+        }
+
+        if (! $this->assignmentCanBeScheduledInTimetable($assignment, $timetable)) {
             throw ValidationException::withMessages([
                 'assignment_id' => 'Phân công không hợp lệ hoặc không còn hoạt động.',
             ]);
@@ -798,6 +867,31 @@ class TimetableController extends Controller
         $this->ensureSubjectPeriodNormConfigured($assignment, $timetable->classRoom);
 
         return $assignment;
+    }
+
+    private function assignmentCanBeScheduledInTimetable(TeachingAssignment $assignment, Timetable $timetable): bool
+    {
+        return (string) $assignment->school_year_id === (string) $timetable->school_year_id
+            && (string) $assignment->semester_id === (string) $timetable->semester_id
+            && (string) $assignment->class_id === (string) $timetable->class_id
+            && $assignment->status === TeachingAssignment::STATUS_ACTIVE
+            && (bool) $assignment->teacher?->isWorking();
+    }
+
+    private function matchingActiveAssignmentForTimetable(TeachingAssignment $assignment, Timetable $timetable): ?TeachingAssignment
+    {
+        if (! $assignment->subject_id || ! $assignment->teacher_id) {
+            return null;
+        }
+
+        return TeachingAssignment::with(['subject.periodNorms', 'teacher'])
+            ->where('school_year_id', $timetable->school_year_id)
+            ->where('semester_id', $timetable->semester_id)
+            ->where('class_id', $timetable->class_id)
+            ->where('subject_id', $assignment->subject_id)
+            ->where('teacher_id', $assignment->teacher_id)
+            ->where('status', TeachingAssignment::STATUS_ACTIVE)
+            ->first();
     }
 
     private function validatedRoomForTimetable(?string $roomId): ?Room
@@ -1021,7 +1115,40 @@ class TimetableController extends Controller
 
     private function effectiveSchoolYearId(Request $request): ?string
     {
+        if ($request->filled('school_year_id')) {
+            return (string) $request->query('school_year_id');
+        }
+
+        if ($request->filled('semester_id')) {
+            $semester = Semester::find($request->query('semester_id'));
+
+            if ($semester) {
+                return (string) $semester->school_year_id;
+            }
+        }
+
         return $this->selectedSchoolYearId($request);
+    }
+
+    private function effectiveSemesterId(Request $request, ?string $schoolYearId): ?string
+    {
+        $semesterId = $request->query('semester_id') ?: $this->selectedSemesterId($request);
+
+        if (! $semesterId) {
+            return null;
+        }
+
+        $semester = Semester::find($semesterId);
+
+        if (! $semester) {
+            return null;
+        }
+
+        if ($schoolYearId && (string) $semester->school_year_id !== (string) $schoolYearId) {
+            return null;
+        }
+
+        return (string) $semester->getKey();
     }
 
     private function denyHistoricalWrite(): void

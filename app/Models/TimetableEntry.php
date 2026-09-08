@@ -149,7 +149,13 @@ class TimetableEntry extends Model
 
         $subject = $this->assignment?->subject ?? $this->subject;
 
-        return $subject?->isActivitySubject() ? 'Sân trường' : null;
+        if ($subject?->isActivitySubject()) {
+            return 'Sân trường';
+        }
+
+        $this->loadMissing('timetable.classRoom.fixedRoom');
+
+        return $this->timetable?->classRoom?->fixedRoom?->name;
     }
 
     public function sessionLabel(): string

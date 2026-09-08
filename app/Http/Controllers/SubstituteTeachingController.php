@@ -19,6 +19,16 @@ use Illuminate\Validation\ValidationException;
 
 class SubstituteTeachingController extends Controller
 {
+    private const DAY_LABELS = [
+        1 => 'Thứ 2',
+        2 => 'Thứ 3',
+        3 => 'Thứ 4',
+        4 => 'Thứ 5',
+        5 => 'Thứ 6',
+        6 => 'Thứ 7',
+        7 => 'Chủ nhật',
+    ];
+
     public function index(Request $request)
     {
         $this->authorizeAdmin();
@@ -289,7 +299,22 @@ class SubstituteTeachingController extends Controller
             ]);
         }
 
+        $this->ensureDateMatchesTimetableEntry($data['substitute_date'], $entry);
+
         return [$data['substitute_date']];
+    }
+
+    private function ensureDateMatchesTimetableEntry(string $date, TimetableEntry $entry): void
+    {
+        $actualDay = (int) Carbon::parse($date)->isoWeekday();
+        $entryDay = (int) $entry->day_of_week;
+
+        if ($actualDay !== $entryDay) {
+            throw ValidationException::withMessages([
+                'substitute_date' => 'Ngày đã chọn là ' . (self::DAY_LABELS[$actualDay] ?? 'không xác định')
+                    . ', không khớp với tiết trong thời khóa biểu là ' . (self::DAY_LABELS[$entryDay] ?? 'không xác định') . '.',
+            ]);
+        }
     }
 
     private function ensureSubstituteTeacherAvailable(TimetableEntry $entry, string $teacherId, string $date, ?string $ignoreSubstituteId = null): void
@@ -319,7 +344,7 @@ class SubstituteTeachingController extends Controller
 
         $hasSubstituteBusySlot = SubstituteTeaching::where('substitute_teacher_id', $teacherId)
             ->where('substitute_date', $date)
-            ->where('status', SubstituteTeaching::STATUS_APPROVED)
+            ->whereIn('status', [SubstituteTeaching::STATUS_PENDING, SubstituteTeaching::STATUS_APPROVED])
             ->when($ignoreSubstituteId, fn ($query) => $query->where('id', '!=', $ignoreSubstituteId))
             ->whereHas('timetableEntry', function ($query) use ($period, $dayOfWeek, $entry) {
                 $query->where('day_of_week', $dayOfWeek)
@@ -328,7 +353,18 @@ class SubstituteTeachingController extends Controller
             })
             ->exists();
 
-        return $hasBaseBusySlot || $hasSubstituteBusySlot;
+        $hasClassBusySlot = SubstituteTeaching::where('class_id', $entry->timetable?->class_id)
+            ->where('substitute_date', $date)
+            ->whereIn('status', [SubstituteTeaching::STATUS_PENDING, SubstituteTeaching::STATUS_APPROVED])
+            ->when($ignoreSubstituteId, fn ($query) => $query->where('id', '!=', $ignoreSubstituteId))
+            ->whereHas('timetableEntry', function ($query) use ($period, $dayOfWeek, $entry) {
+                $query->where('day_of_week', $dayOfWeek)
+                    ->where('period', $period)
+                    ->where('id', '!=', $entry->id);
+            })
+            ->exists();
+
+        return $hasBaseBusySlot || $hasSubstituteBusySlot || $hasClassBusySlot;
     }
 
     private function availableReplacementTeachers(TimetableEntry $entry, array $dates, ?string $ignoreSubstituteId = null)

@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\StudentClassAssignment;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Request;
+use Illuminate\Support\ViewErrorBag;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -199,6 +200,16 @@ class ClassTransferAndSchoolYearInitializationTest extends TestCase
         $year = $this->makeSchoolYear('2086 - 2087', false);
         $class = $this->makeClass($year, '12C cohort ' . Str::random(6), 12);
         $class->update(['cohort' => 'custom cohort']);
+
+        $this->be(new \App\Models\User([
+            'role' => 'admin',
+            'role_type' => 'admin',
+            'name' => 'Test Admin',
+            'username' => 'test-admin',
+            'is_active' => true,
+            'login_status' => true,
+        ]));
+        view()->share('errors', new ViewErrorBag());
 
         $html = app(SchoolClassController::class)->edit($class)->render();
 

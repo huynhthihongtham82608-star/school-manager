@@ -40,7 +40,25 @@ class SystemRegulationController extends Controller
             'academic_levels.*.label' => ['required', 'string', 'max:80'],
             'academic_levels.*.gpa_min' => ['required', 'numeric', 'min:0', 'max:10'],
             'academic_levels.*.subject_min' => ['required', 'numeric', 'min:0', 'max:10'],
+            'confirmed_delete' => ['nullable', 'boolean'],
         ]);
+
+        $existingAcademicKeys = Setting::query()
+            ->where('group', 'evaluation_rules')
+            ->where('key', 'like', 'level_%')
+            ->pluck('key');
+
+        $incomingAcademicKeys = collect($data['academic_levels'])
+            ->values()
+            ->keys()
+            ->map(fn (int $index) => 'level_' . ($index + 1));
+        $deletedAcademicKeys = $existingAcademicKeys->diff($incomingAcademicKeys);
+
+        if ($deletedAcademicKeys->isNotEmpty() && ! $request->boolean('confirmed_delete')) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'academic_levels' => 'Thao tác xóa mốc điểm học lực cần được xác nhận trước khi lưu.',
+            ]);
+        }
 
         $savedAcademicKeys = $this->storeAcademicLevels($data['academic_levels']);
 
@@ -73,7 +91,25 @@ class SystemRegulationController extends Controller
             'conduct_levels.*.max_unexcused_absence' => ['required', 'integer', 'min:0', 'max:365'],
             'conduct_levels.*.max_period_absence' => ['required', 'integer', 'min:0', 'max:500'],
             'conduct_levels.*.max_late' => ['required', 'integer', 'min:0', 'max:500'],
+            'confirmed_delete' => ['nullable', 'boolean'],
         ]);
+
+        $existingConductKeys = Setting::query()
+            ->where('group', 'evaluation_rules')
+            ->where('key', 'like', 'conduct_level_%')
+            ->pluck('key');
+
+        $incomingConductKeys = collect($data['conduct_levels'])
+            ->values()
+            ->keys()
+            ->map(fn (int $index) => 'conduct_level_' . ($index + 1));
+        $deletedConductKeys = $existingConductKeys->diff($incomingConductKeys);
+
+        if ($deletedConductKeys->isNotEmpty() && ! $request->boolean('confirmed_delete')) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'conduct_levels' => 'Thao tác xóa định mức hạnh kiểm cần được xác nhận trước khi lưu.',
+            ]);
+        }
 
         $savedConductKeys = $this->storeConductLevels($data['conduct_levels']);
 
@@ -101,7 +137,7 @@ class SystemRegulationController extends Controller
 
         return view('system.tuition-levels', [
             'feeItems' => TuitionFee::configuredFeeItems(),
-            'qrImageUrl' => $qrImage ? Storage::url($qrImage) : null,
+            'qrImageUrl' => $qrImage ? asset('storage/' . ltrim($qrImage, '/')) : null,
             'settingsTableReady' => Schema::hasColumn('system_settings', 'setting_record_type'),
         ]);
     }

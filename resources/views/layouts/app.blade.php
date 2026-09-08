@@ -172,8 +172,8 @@
 
         $strictSystemRegulationItems = [
             $adminItem('bi-sliders', 'Cấu hình đầu điểm', route('score-columns.index'), ['score-columns.*', 'score-columns*'], 'lock_score_window'),
-            $adminItem('bi-graph-up-arrow', '⚖️ Mốc điểm học lực', route('system.academic-levels.index'), ['system.academic-levels.*', 'system/academic-levels*'], 'system.settings'),
-            $adminItem('bi-award', '🏆 Định mức hạnh kiểm', route('system.conduct-levels.index'), ['system.conduct-levels.*', 'system/conduct-levels*'], 'system.settings'),
+            $adminItem('bi-graph-up-arrow', 'Mốc điểm học lực', route('system.academic-levels.index'), ['system.academic-levels.*', 'system/academic-levels*'], 'system.settings'),
+            $adminItem('bi-award', 'Định mức hạnh kiểm', route('system.conduct-levels.index'), ['system.conduct-levels.*', 'system/conduct-levels*'], 'system.settings'),
             $adminItem('bi-receipt-cutoff', 'Cấu hình mức thu', route('system.tuition-levels.index'), ['system.tuition-levels.*', 'system/tuition-levels*'], 'setup_tuition_fees'),
             $adminItem('bi-calendar2-plus', 'Lịch dạy thay', route('substitute-teachings.index'), ['substitute-teachings.*', 'substitute-teachings*'], 'system.settings'),
         ];
@@ -711,9 +711,10 @@
                     @endif
                     <form method="POST" action="{{ route('academic-context.update') }}" class="admin-period-meta admin-period-form" style="width: 170px !important; min-width: 170px !important; max-width: 170px !important; overflow: visible !important;" aria-label="Năm học và học kỳ đang làm việc">
                         @csrf
+                        <input type="hidden" name="redirect_to" value="" data-academic-context-redirect>
                         <label class="admin-period-field">
                             <span class="visually-hidden">Năm học đang làm việc</span>
-                            <select name="school_year_id" class="admin-period-select" style="width: 146px !important; min-width: 146px !important; max-width: none !important; overflow: visible !important;" onchange="this.form.submit()" @disabled($headerSchoolYears->isEmpty())>
+                            <select name="school_year_id" class="admin-period-select" style="width: 146px !important; min-width: 146px !important; max-width: none !important; overflow: visible !important;" data-academic-context-select @disabled($headerSchoolYears->isEmpty())>
                                 @forelse($headerSchoolYears as $year)
                                     <option value="{{ $year->id }}" @selected((string) $headerSchoolYear?->id === (string) $year->id)>{{ $year->name }}</option>
                                 @empty
@@ -723,7 +724,7 @@
                         </label>
                         <label class="admin-period-field">
                             <span class="visually-hidden">Học kỳ hiện hành</span>
-                            <select name="semester_id" class="admin-period-select" style="width: 146px !important; min-width: 146px !important; max-width: none !important; overflow: visible !important;" onchange="this.form.submit()" @disabled($headerSemesters->isEmpty())>
+                            <select name="semester_id" class="admin-period-select" style="width: 146px !important; min-width: 146px !important; max-width: none !important; overflow: visible !important;" data-academic-context-select @disabled($headerSemesters->isEmpty())>
                                 @forelse($headerSemesters as $semester)
                                     <option value="{{ $semester->id }}" @selected((string) $headerSemester?->id === (string) $semester->id)>{{ $semester->normalizedName() }}</option>
                                 @empty
@@ -3257,6 +3258,67 @@
             }
         });
     });
+
+    (() => {
+        document.querySelectorAll('form[action*="/academic-context"]').forEach((form) => {
+            const redirectInput = form.querySelector('[data-academic-context-redirect]');
+            const yearSelect = form.querySelector('select[name="school_year_id"]');
+            const semesterSelect = form.querySelector('select[name="semester_id"]');
+
+            if (!yearSelect || !semesterSelect) {
+                return;
+            }
+
+            const updateRedirectTarget = () => {
+                if (!redirectInput) {
+                    return;
+                }
+
+                const nextUrl = new URL(window.location.href);
+                if (yearSelect.value) {
+                    nextUrl.searchParams.set('school_year_id', yearSelect.value);
+                }
+
+                if (semesterSelect.value) {
+                    nextUrl.searchParams.set('semester_id', semesterSelect.value);
+                } else {
+                    nextUrl.searchParams.delete('semester_id');
+                }
+
+                redirectInput.value = nextUrl.toString();
+            };
+
+            const submitContext = () => {
+                if (form.dataset.submitting === '1') {
+                    return;
+                }
+
+                form.dataset.submitting = '1';
+                updateRedirectTarget();
+                HTMLFormElement.prototype.submit.call(form);
+            };
+
+            [yearSelect, semesterSelect].forEach((select) => {
+                let openedByPointer = false;
+
+                select.addEventListener('pointerdown', () => {
+                    openedByPointer = true;
+                    select.dataset.previousValue = select.value;
+                });
+
+                select.addEventListener('change', submitContext);
+                select.addEventListener('blur', () => {
+                    if (openedByPointer && select.dataset.previousValue === select.value) {
+                        window.setTimeout(submitContext, 0);
+                    }
+
+                    openedByPointer = false;
+                });
+            });
+
+            form.addEventListener('submit', updateRedirectTarget);
+        });
+    })();
 
     @if($historySchoolYear)
     (() => {

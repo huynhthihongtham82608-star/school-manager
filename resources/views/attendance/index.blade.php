@@ -40,7 +40,7 @@
         && ! $isSubjectTeacherAttendanceView
         && $selectedClass
         && $isHomeroomForSelectedClass;
-    $useFlatAttendanceButtons = $isSubjectTeacherAttendanceView || $isHomeroomAttendanceView;
+    $useFlatAttendanceButtons = true;
     $canAdminEditAttendanceRoster = $isAdminAttendanceView
         && $selectedClass
         && $selectedSemester
@@ -853,6 +853,10 @@
                 'attendance_type' => $selectedSessionType,
             ]"
             :allow-import="$canEditAttendanceRoster"
+            :show-template-button="false"
+            template-button-label="Tải file mẫu Excel"
+            export-button-label="Xuất Excel"
+            import-button-label="Nhập Excel"
         />
     @endif
 </x-page-header>
@@ -1240,7 +1244,7 @@
                                             Nghỉ có phép (P)
                                         </span>
                                     @elseif($canEditAttendanceRoster)
-                                        <div class="{{ $useFlatAttendanceButtons ? 'attendance-period-actions' : 'flex items-center justify-end gap-1.5' }}">
+                                        <div class="{{ $useFlatAttendanceButtons ? 'attendance-period-actions' : 'flex items-center justify-start gap-1.5 flex-wrap' }}">
                                             @php
                                                 $attendanceButtonBase = 'attendance-btn text-xs font-normal text-gray-400 bg-transparent border-none cursor-pointer flex items-center gap-1 p-1.5 transition-all';
                                                 $attendanceOptions = $isHomeroomAttendanceView
@@ -1280,11 +1284,6 @@
                                         ])>
                                             {{ $record?->status ? ($statusLabels[$record->status] ?? $record->status) : 'Chưa ghi nhận' }}
                                         </span>
-                                    @endif
-                                    @if($isLockedByApprovedLeave)
-                                        <div class="text-info small mt-2">
-                                            Học sinh đã có đơn nghỉ được GVCN phê duyệt. Phiên điểm danh này được khóa ở trạng thái nghỉ có phép.
-                                        </div>
                                     @endif
                                     @if($isSubjectTeacherAttendanceView)
                                         <input type="hidden" name="note[{{ $student->id }}]" value="{{ old("note.{$student->id}", $record?->note) }}">

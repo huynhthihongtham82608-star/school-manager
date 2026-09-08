@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ExamSchedule;
+use App\Models\Room;
 use App\Models\SchoolClass;
 use App\Models\SchoolYear;
 use App\Models\ScoreColumn;
@@ -110,7 +111,7 @@ class ExamScheduleController extends Controller
 
         $schedules = $query ? $query->orderBy('exam_date')->orderBy('start_time')->paginate(12) : collect();
         $classes = Schema::hasTable('classes')
-            ? SchoolClass::when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->orderBy('name')->get()
+            ? SchoolClass::with('fixedRoom')->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->orderBy('name')->get()
             : collect();
         $subjects = Schema::hasTable('subjects')
             ? Subject::whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
@@ -123,9 +124,12 @@ class ExamScheduleController extends Controller
             ? Semester::with('schoolYear')->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))->orderByDesc('created_at')->get()
             : collect();
         $years = Schema::hasTable('school_years') ? SchoolYear::orderByDesc('start_date')->get() : collect();
+        $rooms = Schema::hasTable('rooms')
+            ? Room::where('status', Room::STATUS_ACTIVE)->orderBy('name')->get()
+            : collect();
         $examTypes = ExamSchedule::EXAM_TYPES;
 
-        return view('exam_schedules.index', compact('schedules', 'classes', 'subjects', 'semesters', 'years', 'examTypes', 'selectedYearId', 'selectedSemesterId'));
+        return view('exam_schedules.index', compact('schedules', 'classes', 'subjects', 'semesters', 'years', 'rooms', 'examTypes', 'selectedYearId', 'selectedSemesterId'));
     }
 
     public function store(Request $request)
@@ -139,6 +143,7 @@ class ExamScheduleController extends Controller
         $data = $request->validate($this->rules());
         $this->ensureSemesterWritable($data['semester_id']);
         $this->ensureValidScheduleWindow($data);
+        $this->ensureCatalogRoom($data['room']);
         $this->ensureNoConflicts($data);
         $examTypeData = $this->resolveExamTypeData($data);
 
@@ -170,6 +175,7 @@ class ExamScheduleController extends Controller
         $data = $request->validate($this->rules());
         $this->ensureSemesterWritable($data['semester_id']);
         $this->ensureValidScheduleWindow($data);
+        $this->ensureCatalogRoom($data['room']);
         $this->ensureNoConflicts($data, $examSchedule);
         $examTypeData = $this->resolveExamTypeData($data);
 
@@ -441,6 +447,23 @@ class ExamScheduleController extends Controller
                     'room' => 'Phòng này đã có lịch kiểm tra trùng thời gian.',
                 ]);
             }
+        }
+    }
+
+    private function ensureCatalogRoom(string $roomName): void
+    {
+        if (! Schema::hasTable('rooms')) {
+            return;
+        }
+
+        $exists = Room::where('status', Room::STATUS_ACTIVE)
+            ->where('name', $roomName)
+            ->exists();
+
+        if (! $exists) {
+            throw ValidationException::withMessages([
+                'room' => 'Vui lòng chọn phòng kiểm tra từ danh mục phòng học đang hoạt động.',
+            ]);
         }
     }
 

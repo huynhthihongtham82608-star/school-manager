@@ -96,7 +96,7 @@
 </style>
 
 <x-page-header
-    title="🏆 Định mức hạnh kiểm"
+    title="Định mức hạnh kiểm"
     subtitle="Quản lý các ngưỡng chuyên cần không phép, vắng tiết lẻ để làm căn cứ gợi ý hạ bậc rèn luyện."
 >
     <div class="d-flex align-items-center gap-2">
@@ -115,6 +115,7 @@
 <form method="POST" action="{{ route('system.conduct-levels.update') }}" class="w-full font-sans text-left text-gray-700 font-normal" data-conduct-level-form>
     @csrf
     @method('PUT')
+    <input type="hidden" name="confirmed_delete" value="0" data-confirmed-delete>
 
     <div class="card w-full bg-white border border-orange-100 p-0 rounded-xl shadow-2xs text-left">
         <div class="table-responsive">
@@ -261,6 +262,12 @@
         const bindRow = (row) => {
             row.querySelector('[data-edit-conduct-row]')?.addEventListener('click', () => openModal(row));
             row.querySelector('[data-delete-conduct-row]')?.addEventListener('click', () => {
+                const label = row.dataset.label || 'mức hạnh kiểm này';
+                if (!window.confirm(`Bạn có chắc chắn muốn xóa "${label}" khỏi cấu hình định mức hạnh kiểm?`)) {
+                    return;
+                }
+
+                form.querySelector('[data-confirmed-delete]').value = '1';
                 row.remove();
                 refreshIndexes();
                 if (rows.querySelectorAll('.conduct-level-row').length > 0) {

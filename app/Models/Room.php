@@ -90,7 +90,8 @@ class Room extends Model
 
     public function isUsed(): bool
     {
-        return $this->timetableEntries()->exists()
+        return filled($this->fixed_class_id)
+            || $this->timetableEntries()->exists()
             || $this->isReferencedByExamSchedule();
     }
 

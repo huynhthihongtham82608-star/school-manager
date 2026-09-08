@@ -249,6 +249,7 @@ class SchoolYearController extends Controller
         $data = $request->validate([
             'school_year_id' => ['required', 'exists:school_years,id'],
             'semester_id' => ['nullable', 'exists:semesters,id'],
+            'redirect_to' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $schoolYear = SchoolYear::findOrFail($data['school_year_id']);
@@ -274,6 +275,12 @@ class SchoolYearController extends Controller
 
         if ($isCurrentYear) {
             $this->clearHistoryContext($request);
+            $request->session()->put('working_school_year_id', $schoolYear->getKey());
+            if ($semester) {
+                $request->session()->put('working_semester_id', $semester->getKey());
+            } else {
+                $request->session()->forget('working_semester_id');
+            }
         } else {
             $request->session()->put('working_school_year_id', $schoolYear->getKey());
             if ($semester) {
@@ -287,7 +294,7 @@ class SchoolYearController extends Controller
         return redirect()
             ->to($this->cleanPreviousUrl($request))
             ->with('success', $isCurrentYear
-                ? 'Đã quay về năm học hiện hành.'
+                ? 'Đã cập nhật học kỳ làm việc.'
                 : 'Đã chuyển sang chế độ xem dữ liệu năm học ' . $schoolYear->name . '.');
     }
 
@@ -937,7 +944,14 @@ class SchoolYearController extends Controller
 
     private function sourceYears()
     {
-        return SchoolYear::orderByDesc('start_date')->orderByDesc('created_at')->get();
+        return SchoolYear::where('is_active', false)
+            ->where(function ($query) {
+                $query->whereNotNull('archived_at')
+                    ->orWhereDate('end_date', '<', today());
+            })
+            ->orderByDesc('start_date')
+            ->orderByDesc('created_at')
+            ->get();
     }
 
     private function schoolYearDataCards(SchoolYear $schoolYear): array
@@ -1655,20 +1669,25 @@ class SchoolYearController extends Controller
 
     private function cleanPreviousUrl(Request $request): string
     {
-        $previous = url()->previous() ?: route('dashboard');
+        $previous = $request->input('redirect_to') ?: url()->previous() ?: route('dashboard');
         $parts = parse_url($previous);
 
         if (! $parts || empty($parts['path'])) {
             return route('dashboard');
         }
 
-        $base = ($parts['scheme'] ?? $request->getScheme()) . '://' . ($parts['host'] ?? $request->getHost());
+        $host = $parts['host'] ?? $request->getHost();
+        if ($host !== $request->getHost()) {
+            return route('dashboard');
+        }
+
+        $base = ($parts['scheme'] ?? $request->getScheme()) . '://' . $host;
 
         if (! empty($parts['port'])) {
             $base .= ':' . $parts['port'];
         }
 
-        return $base . $parts['path'];
+        return $base . $parts['path'] . (! empty($parts['query']) ? '?' . $parts['query'] : '');
     }
 
     private function formatYearName(int $startYear, int $endYear): string

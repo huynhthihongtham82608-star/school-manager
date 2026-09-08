@@ -429,7 +429,7 @@ class AttendanceController extends Controller
             'semester_id' => ['required', 'string', 'max:50', 'exists:semesters,id'],
             'attendance_date' => ['required', 'date'],
             'attendance_type' => ['required', 'in:' . implode(',', array_keys(AttendanceRecord::SESSION_TYPES))],
-            'timetable_entry_id' => ['nullable', 'string', 'max:50', \Illuminate\Validation\Rule::exists('timetables', 'id')->where('timetable_record_type', 'entry')],
+            'timetable_entry_id' => ['nullable', 'string', 'max:50', \Illuminate\Validation\Rule::exists('timetable_entries', 'id')],
             'action_mode' => ['nullable', 'in:create,update'],
             'attendance_session_id' => ['nullable', 'string', 'max:64'],
             'status' => ['required', 'array'],

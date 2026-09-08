@@ -10,7 +10,6 @@ use App\Models\TuitionFee;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -254,7 +253,7 @@ class TuitionFeeController extends Controller
     {
         $path = Setting::valueOf('tuition_qr_image');
 
-        return $path ? Storage::url($path) : null;
+        return $path ? asset('storage/' . ltrim($path, '/')) : null;
     }
 
     private function authorizeAdmin(): void

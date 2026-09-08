@@ -64,7 +64,7 @@ class RoomController extends Controller
         }
 
         return view('rooms.edit', [
-            'room' => $room,
+            'room' => $room->loadMissing('fixedClass.schoolYear'),
             'isUsed' => $room->isUsed(),
             'classes' => $this->classOptions($room->fixed_class_id ? (string) $room->fixed_class_id : null),
         ]);
@@ -100,7 +100,7 @@ class RoomController extends Controller
 
         if (! $room->canDelete()) {
             return back()->withErrors([
-                'room' => 'Không thể xóa phòng học vì đã phát sinh thời khóa biểu. Hãy chuyển trạng thái sang Ngưng sử dụng nếu không còn dùng.',
+                'room' => 'Không thể xóa phòng học vì đã gắn lớp cố định, thời khóa biểu hoặc lịch kiểm tra. Hãy gỡ liên kết an toàn hoặc chuyển trạng thái sang Ngưng sử dụng nếu không còn dùng.',
             ]);
         }
 
@@ -151,10 +151,12 @@ class RoomController extends Controller
 
     private function classOptions(?string $currentClassId = null)
     {
+        $classKeyName = (new SchoolClass())->getKeyName();
+
         return SchoolClass::with('schoolYear')
-            ->where(function ($query) use ($currentClassId) {
+            ->where(function ($query) use ($currentClassId, $classKeyName) {
                 $query->whereDoesntHave('fixedRoom')
-                    ->when($currentClassId, fn ($classQuery) => $classQuery->orWhereKey($currentClassId));
+                    ->when($currentClassId, fn ($classQuery) => $classQuery->orWhere($classKeyName, $currentClassId));
             })
             ->where('status', '!=', SchoolClass::STATUS_ARCHIVED)
             ->orderBy('grade_level')

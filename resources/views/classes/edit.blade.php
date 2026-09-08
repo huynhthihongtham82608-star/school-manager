@@ -85,17 +85,30 @@ document.addEventListener('DOMContentLoaded', () => {
             return `${cohortStart} - ${cohortStart + 3}`;
         };
 
-        const fillCohort = () => {
-            if (cohortInput.dataset.cohortAutofill === '1') {
-                cohortInput.value = suggestedCohort();
+        let cohortWasEdited = false;
+
+        const fillCohort = (force = false) => {
+            if (force && cohortWasEdited && cohortInput.value.trim() !== '') {
+                return;
+            }
+
+            if (!force && cohortInput.dataset.cohortAutofill !== '1') {
+                return;
+            }
+
+            const suggestion = suggestedCohort();
+            if (suggestion) {
+                cohortInput.value = suggestion;
+                cohortInput.dataset.cohortAutofill = '1';
             }
         };
 
         cohortInput.addEventListener('input', () => {
+            cohortWasEdited = true;
             cohortInput.dataset.cohortAutofill = cohortInput.value.trim() === '' ? '1' : '0';
         });
-        gradeInput.addEventListener('change', fillCohort);
-        yearInput.addEventListener('change', fillCohort);
+        gradeInput.addEventListener('change', () => fillCohort(true));
+        yearInput.addEventListener('change', () => fillCohort(true));
         fillCohort();
     });
 });

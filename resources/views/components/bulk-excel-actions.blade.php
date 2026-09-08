@@ -2,6 +2,10 @@
     'module',
     'context' => [],
     'allowImport' => true,
+    'showTemplateButton' => true,
+    'templateButtonLabel' => 'Xuất File Mẫu Excel',
+    'exportButtonLabel' => 'Xuất danh sách Excel',
+    'importButtonLabel' => 'Nhập Dữ Liệu Từ Excel',
 ])
 
 @php
@@ -24,18 +28,20 @@
     data-modal-id="{{ $modalId }}"
     data-export-modal-id="{{ $exportModalId }}"
 >
-    <a
-        href="{{ route('bulk-excel.template', array_merge(['module' => $module], $context)) }}"
-        class="bulk-excel-btn"
-    >
-        📥 Xuất File Mẫu Excel
-    </a>
+    @if($showTemplateButton)
+        <a
+            href="{{ route('bulk-excel.template', array_merge(['module' => $module], $context)) }}"
+            class="bulk-excel-btn"
+        >
+            📥 {{ $templateButtonLabel }}
+        </a>
+    @endif
     <button type="button" class="bulk-excel-btn" data-bulk-excel-export>
-        📥 Xuất danh sách Excel
+        📥 {{ $exportButtonLabel }}
     </button>
     @if($allowImport)
         <label class="bulk-excel-btn mb-0">
-            📤 Nhập Dữ Liệu Từ Excel
+            📤 {{ $importButtonLabel }}
             <input type="file" accept=".xlsx,.csv,.txt" class="d-none" data-bulk-excel-file>
         </label>
     @endif
@@ -91,6 +97,16 @@
             <button type="button" class="btn-close" data-bulk-excel-cancel aria-label="Đóng"></button>
         </div>
         <div class="bulk-excel-alert d-none" data-bulk-excel-alert></div>
+        @if(! $showTemplateButton)
+            <div class="d-flex align-items-center justify-content-start mb-3">
+                <a
+                    href="{{ route('bulk-excel.template', array_merge(['module' => $module], $context)) }}"
+                    class="bulk-excel-btn"
+                >
+                    📥 {{ $templateButtonLabel }}
+                </a>
+            </div>
+        @endif
         <div class="table-responsive bulk-excel-table-wrap">
             <table class="table align-middle bulk-excel-table">
                 <thead data-bulk-excel-head></thead>

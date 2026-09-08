@@ -4,7 +4,7 @@
 @section('content')
 <x-page-header
     title="Quản lý học kỳ"
-    subtitle="Cấu hình mốc thời gian bắt đầu/kết thúc các học kỳ và thiết lập thời hạn khóa sổ cổng nhập điểm."
+    subtitle="Quản lý học kỳ theo năm học, thiết lập trạng thái hoạt động và kiểm soát việc nhập điểm."
 >
     @unless($readOnly)
         <a class="btn btn-primary" href="{{ route('semesters.create') }}"><i class="bi bi-plus-lg me-1"></i>Thêm học kỳ</a>
