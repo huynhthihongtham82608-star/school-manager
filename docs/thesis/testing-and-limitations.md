@@ -1,49 +1,40 @@
 # Kiểm thử và hạn chế
 
-## Kiểm thử đã thực hiện trong đợt này
+## Kiểm thử cuối
 
-Các kiểm tra không cần database:
+Môi trường kiểm thử:
 
-- `php -l app/Models/User.php`: PASS.
-- `php -l app/Http/Controllers/RbacRoleController.php`: PASS.
-- `php -l tests/Feature/RbacRoleStatusTest.php`: PASS.
-- `php artisan route:list`: PASS, đọc được 238 route.
-- `php artisan route:list --path=rbac-roles`: PASS, có route index/store/update/destroy/toggle.
+- `APP_ENV=testing`.
+- Database kiểm thử: `school_manager_testing`.
+- Database vận hành: `school_manager`, không dùng cho automated test.
+
+Kết quả regression gần nhất:
+
+- `php artisan test --env=testing`: PASS, 62 tests, 327 assertions.
+- `php artisan view:cache`: PASS.
 - `php artisan view:clear`: PASS.
+- `git diff --check`: PASS.
 
-Kiểm thử cần database:
+Các nhóm đã được kiểm tra bằng feature/unit test:
 
-- `php artisan test --env=testing --filter=RbacRoleStatusTest`: SKIP do môi trường, MySQL/MariaDB tại `127.0.0.1:3306` từ chối kết nối.
-
-## Fix đã thực hiện
-
-- Sửa luồng RBAC để checkbox “Đang sử dụng” trong modal chỉnh sửa vai trò có tác dụng thực tế lên quyền hiệu lực.
-- Khi role bị tắt, user đang gán role mất quyền hiệu lực nhưng quan hệ gán role vẫn được giữ.
-- Khi role bật lại, snapshot quyền được khôi phục từ các role đang active.
-- Không tạo thêm nút bật/tắt ngoài bảng.
+- Auth, logout, khóa đăng nhập và RBAC.
+- Quản lý học sinh, giáo viên, phụ huynh, vai trò và quyền.
+- Lớp học, xếp/chuyển học sinh, niên khóa, năm học và học kỳ.
+- Phân công giảng dạy, thời khóa biểu, phòng học, lịch kiểm tra và dạy thay.
+- Điểm số, cấu hình cột điểm, công thức tổng hợp và scope giáo viên.
+- Điểm danh theo ngày, tuần, nhật ký, sáng/chiều, theo tiết và đơn xin nghỉ đã duyệt.
+- Hạnh kiểm, khen thưởng, học phí.
+- Nội dung, tin nhắn, báo cáo.
+- Portal học sinh, phụ huynh, giáo viên bộ môn và giáo viên chủ nhiệm.
+- Chatbot Gemini, function calling, history, sanitization, scope theo vai trò và các tình huống lỗi 429/503/timeout/missing key.
 
 ## Hạn chế còn tồn tại
 
-- Không xác minh được dynamic test có ghi DB trong phiên này vì database testing không kết nối được.
-- Migration chain hiện tại có rủi ro dựng mới từ zero; nên dùng clone `school_manager_testing` từ database thật đã kiểm soát để kiểm thử nghiệp vụ.
-- Gemini phụ thuộc API key, mạng, quota và cấu hình CA bundle.
-- Một số kiểm thử UI cuối cùng vẫn nên chạy thủ công trên trình duyệt trước khi demo.
+- Migration chain legacy từng có rủi ro dựng mới từ zero; môi trường kiểm thử hiện dùng database `school_manager_testing` được chuẩn bị riêng để bám theo schema vận hành.
+- Migration mới nhất `2026_09_07_000001_fix_teaching_assignment_semester_unique_index.php` đã được áp dụng cho database vận hành sau khi backup, chỉ thay đổi unique index của `teaching_assignments`.
+- Gemini phụ thuộc API key, mạng, quota và cấu hình CA bundle bên ngoài.
+- Một số kiểm tra UI cuối cùng vẫn nên được thao tác thủ công trên trình duyệt demo thật để xác nhận cảm giác sử dụng.
 
-## Khuyến nghị kiểm thử trước demo
+## Đánh giá phục vụ khóa luận
 
-1. Bật MySQL/MariaDB trong XAMPP.
-2. Xác nhận `.env.testing` trỏ tới `school_manager_testing`.
-3. Chạy các test liên quan:
-
-```bash
-php artisan test --env=testing --filter=RbacRoleStatusTest
-php artisan test --env=testing --filter=AdminFinalBatchTest
-php artisan test --env=testing --filter=ChatbotRequestFlowTest
-php artisan test --env=testing --filter=ChatbotToolRegistryTest
-```
-
-4. Smoke test trình duyệt: đăng nhập Admin, chỉnh sửa một vai trò tùy chỉnh, tắt/bật “Đang sử dụng”, kiểm tra tài khoản staff gán role đó mất/có lại quyền.
-
-## Đánh giá phục vụ tiểu luận
-
-Hệ thống đã có đầy đủ nhóm chức năng quản lý trường học ở mức demo khóa luận. Cần chạy lại dynamic tests sau khi MySQL testing hoạt động để xác nhận dữ liệu và phân quyền trong môi trường thực thi.
+Hệ thống đã có đầy đủ nhóm chức năng quản lý trường học ở mức demo khóa luận. Sau vòng kiểm thử cuối, có thể khóa code để chuyển sang hoàn thiện tài liệu luận văn và UML.

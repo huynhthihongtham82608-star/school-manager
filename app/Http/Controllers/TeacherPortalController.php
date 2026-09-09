@@ -18,6 +18,8 @@ class TeacherPortalController extends Controller
         $isHomeroomScope = $request->query('scope') === 'homeroom' || $request->routeIs('teacher.homeroom');
 
         if ($isHomeroomScope) {
+            abort_unless($request->user()->isHomeroom(), 403);
+
             $homeroomClass = SchoolClass::with([
                 'schoolYear',
                 'semester',
@@ -72,6 +74,7 @@ class TeacherPortalController extends Controller
     {
         $teacher = $request->user()->teacher;
         abort_unless($teacher, 403);
+        abort_unless($request->user()->isHomeroom(), 403);
 
         $homeroomClass = SchoolClass::with(['schoolYear', 'semester', 'students' => fn ($q) => $q->where('status', 'studying')->orderBy('student_code')])
             ->where('homeroom_teacher_id', $teacher->id)

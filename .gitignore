@@ -1,4 +1,8 @@
 *.log
+school_manager_backup_*.sql
+school_manager_before_testing_*.sql
+*_backup_*.sql
+*_before_testing_*.sql
 .DS_Store
 .env
 .env.testing

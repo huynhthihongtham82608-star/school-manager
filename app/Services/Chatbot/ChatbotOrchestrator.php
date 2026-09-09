@@ -81,6 +81,10 @@ class ChatbotOrchestrator
             ]);
         }
 
+        if ((bool) config('services.chatbot.demo_mode', false)) {
+            return $this->demoAnswer($user, $question, $startedAt);
+        }
+
         $history = $this->recentMessages($user, 4);
         $systemInstruction = $this->systemInstruction($user);
         $toolDeclarations = $this->registry->declarations();
@@ -140,6 +144,105 @@ class ChatbotOrchestrator
             'gemini_rounds' => 2,
             'error' => $error,
         ]);
+    }
+
+    private function demoAnswer(User $user, string $question, float $startedAt): array
+    {
+        $toolName = $this->demoToolFor($user, $question);
+        $prefix = 'Chế độ trình diễn - phản hồi được tạo từ dữ liệu hệ thống, không gọi Gemini.';
+
+        if (! $toolName) {
+            return $this->storeAndPayload(
+                $user,
+                $question,
+                $prefix . "\n" . 'Bạn có thể hỏi về lịch học, điểm số, chuyên cần, học phí hoặc lớp đang giảng dạy.',
+                'success',
+                [
+                    'intent' => 'demo_mode_help',
+                    'latency_ms' => $this->duration($startedAt),
+                    'model' => 'local-demo',
+                ]
+            );
+        }
+
+        $toolArgs = $this->demoToolArgs($question);
+        $toolResult = $this->executor->execute($user, $toolName, $toolArgs);
+        $reply = $this->fallbackReplyForToolResult($toolName, $toolResult);
+        $status = ($toolResult['success'] ?? false) ? 'success' : 'error';
+
+        return $this->storeAndPayload($user, $question, $prefix . "\n" . $reply, $status, [
+            'intent' => $toolName,
+            'entities' => $this->extractEntityMetadata($toolResult),
+            'tool_name' => $toolName,
+            'tool_args' => $toolArgs,
+            'tool_result_summary' => $this->summarizeToolResult($toolResult),
+            'model' => 'local-demo',
+            'latency_ms' => $this->duration($startedAt),
+            'error' => $status === 'success' ? null : ($toolResult['error_type'] ?? 'demo_tool_failed'),
+        ]);
+    }
+
+    private function demoToolFor(User $user, string $question): ?string
+    {
+        $normalized = $this->scope->normalize($question);
+
+        if ($user->isTeacher()) {
+            if ($this->containsAny($normalized, ['hoc sinh', 'danh sach lop', 'si so'])) {
+                return str_contains($normalized, 'si so') ? 'get_class_student_count' : 'get_class_students';
+            }
+
+            if ($this->containsAny($normalized, ['lop toi', 'dang day', 'day lop', 'phan cong', 'chu nhiem'])) {
+                return 'get_teacher_classes';
+            }
+
+            if ($this->containsAny($normalized, ['lich day', 'thoi khoa bieu', 'lich hoc'])) {
+                return 'get_teacher_schedule';
+            }
+        }
+
+        if ($this->containsAny($normalized, ['hoc phi', 'tien', 'khoan thu']) && ($user->isParent() || $this->scope->isAdminLike($user))) {
+            return 'get_child_tuition';
+        }
+
+        if ($this->containsAny($normalized, ['diem danh', 'chuyen can', 'vang', 'muon', 'di tre'])) {
+            return 'get_student_attendance';
+        }
+
+        if ($this->containsAny($normalized, ['thoi khoa bieu', 'lich hoc', 'hom nay hoc'])) {
+            return 'get_student_timetable';
+        }
+
+        if ($this->containsAny($normalized, ['diem', 'hoc luc', 'ket qua'])) {
+            return 'get_student_scores';
+        }
+
+        return null;
+    }
+
+    private function demoToolArgs(string $question): array
+    {
+        $args = [];
+
+        if (preg_match('/\b(10|11|12)\s*([a-zA-Z])\s*(\d+)\b/u', $question, $matches)) {
+            $args['class_name'] = strtoupper($matches[1] . $matches[2] . $matches[3]);
+        }
+
+        if (preg_match('/\b(HS[0-9A-Z]+)\b/iu', $question, $matches)) {
+            $args['student_code'] = strtoupper($matches[1]);
+        }
+
+        return $args;
+    }
+
+    private function containsAny(string $haystack, array $needles): bool
+    {
+        foreach ($needles as $needle) {
+            if (str_contains($haystack, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function systemInstruction(User $user): string

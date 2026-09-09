@@ -48,6 +48,7 @@ return [
 
     'chatbot' => [
         'avatar_path' => env('CHATBOT_AVATAR_PATH', 'images/chatbot-avatar.png'),
+        'demo_mode' => env('CHATBOT_DEMO_MODE', false),
     ],
 
 ];

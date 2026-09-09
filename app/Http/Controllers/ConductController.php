@@ -25,6 +25,10 @@ class ConductController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
+        if ($request->is('teacher/conduct') && ! $user->isHomeroom()) {
+            abort(403);
+        }
+
         $selectedYearId = $this->selectedSchoolYearId($request);
         $selectedSemesterId = $this->selectedSemesterId($request);
         $viewStudent = null;
