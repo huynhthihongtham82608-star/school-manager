@@ -17,10 +17,6 @@
             <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 320px;">
                 <form method="GET" action="{{ route('departments.index') }}" class="d-grid gap-3">
                     <div>
-                        <label class="form-label small">Tìm kiếm</label>
-                        <input type="search" name="q" class="form-control" value="{{ $filters['q'] }}" placeholder="Mã tổ, tên tổ, môn, tổ trưởng">
-                    </div>
-                    <div>
                         <label class="form-label small">Trạng thái</label>
                         <select name="status" class="form-select">
                             @foreach($statusFilters as $value => $label)

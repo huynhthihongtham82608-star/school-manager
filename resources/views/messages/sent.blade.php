@@ -4,7 +4,7 @@
 @section('content')
 @include('messages._filters', ['action' => route('messages.sent'), 'filters' => $filters])
 
-<div class="card">
+<div class="card message-card">
     <div class="table-responsive">
         <table class="table message-table" data-no-auto-toolbar>
             <thead>
@@ -22,15 +22,28 @@
                     $threadMessages = $messageThreads->get($message->conversationKey(), collect([$message]));
                     $canReply = (bool) ($canReplyMap[(string) $message->id] ?? false);
                     $messageTitle = $message->title ?: '(Không tiêu đề)';
+                    $readCount = $message->recipients->where('is_read', true)->count();
+                    $recipientCount = $message->recipients->count();
+                    $singleRecipient = $message->recipients->first();
                 @endphp
                 <tr>
                     <td>
-                        @if($message->recipients->count() > 1)
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#recipients-{{ $message->id }}">
-                                Đã gửi cho {{ $message->recipients->count() }} người
-                            </button>
+                        @if($recipientCount > 1)
+                            <div class="d-flex flex-column align-items-start gap-1">
+                                <span class="badge bg-light text-dark border">{{ $readCount }}/{{ $recipientCount }} đã đọc</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#recipients-{{ $message->id }}">
+                                    Xem người nhận
+                                </button>
+                            </div>
                         @else
-                            {{ $message->recipients->first()?->receiver?->display_name ?? $message->recipient_summary }}
+                            <div class="d-flex flex-column align-items-start gap-1">
+                                <span>{{ $singleRecipient?->receiver?->display_name ?? $message->recipient_summary }}</span>
+                                @if($singleRecipient)
+                                    <span class="badge {{ $singleRecipient->is_read ? 'bg-secondary' : 'bg-primary' }}">
+                                        {{ $singleRecipient->is_read ? 'Đã đọc' : 'Chưa đọc' }}
+                                    </span>
+                                @endif
+                            </div>
                         @endif
                     </td>
                     <td class="fw-semibold">
@@ -197,4 +210,5 @@
         </div>
     @endif
 @endforeach
+@include('messages._dropdown_positioning')
 @endsection

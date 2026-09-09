@@ -4,7 +4,7 @@
 @section('content')
 @include('messages._filters', ['action' => route('messages.inbox'), 'filters' => $filters, 'showStatus' => true])
 
-<div class="card">
+<div class="card message-card">
     <div class="table-responsive">
         <table class="table message-table" data-no-auto-toolbar>
             <thead>
@@ -29,14 +29,14 @@
                 <tr>
                     <td>
                         @if($recipient->is_read)
-                            <span class="badge bg-secondary">Đã đọc</span>
+                            <span class="badge bg-secondary" data-message-read-badge>Đã đọc</span>
                         @else
-                            <span class="badge bg-primary">Chưa đọc</span>
+                            <span class="badge bg-primary" data-message-read-badge>Chưa đọc</span>
                         @endif
                     </td>
                     <td>{{ $message->sender?->display_name ?? $message->sender?->username }}</td>
                     <td class="fw-semibold">
-                        <button type="button" class="message-title-button" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}">
+                        <button type="button" class="message-title-button" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}" data-message-open-read data-message-read-url="{{ route('messages.show', $message) }}">
                             {{ $messageTitle }}
                         </button>
                         @if($message->attachments->isNotEmpty())
@@ -52,7 +52,7 @@
                                     <i class="bi bi-three-dots-vertical"></i>
                                 </button>
                                 <div class="dropdown-menu dropdown-menu-end content-action-menu">
-                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}">
+                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}" data-message-open-read data-message-read-url="{{ route('messages.show', $message) }}">
                                         <i class="bi bi-eye"></i>Xem chi tiết
                                     </button>
                                     <form method="POST" action="{{ route('messages.destroy', $message) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa tin nhắn này vào thùng rác?')">
@@ -89,7 +89,7 @@
         $canReply = (bool) ($canReplyMap[(string) $message->id] ?? false);
         $messageTitle = $message->title ?: '(Không tiêu đề)';
     @endphp
-    <div class="modal fade message-thread-modal" id="{{ $modalId }}" tabindex="-1" aria-hidden="true">
+    <div class="modal fade message-thread-modal" id="{{ $modalId }}" tabindex="-1" aria-hidden="true" data-message-modal-read-url="{{ route('messages.show', $message) }}">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <form method="POST" action="{{ route('messages.reply', $message) }}" enctype="multipart/form-data">
@@ -100,7 +100,7 @@
                             <h5 class="modal-title">{{ $messageTitle }}</h5>
                             <div>Chuỗi hội thoại <span>•</span> {{ $threadMessages->count() }} tin nhắn</div>
                         </div>
-                        <span class="message-thread-status ms-auto">
+                        <span class="message-thread-status ms-auto" data-message-modal-read-status>
                             <i class="bi bi-circle-fill"></i>{{ $recipient->is_read ? 'Đã đọc' : 'Đang mở' }}
                         </span>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
@@ -167,4 +167,61 @@
         </div>
     </div>
 @endforeach
+@include('messages._dropdown_positioning')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const markMessageRead = async function (trigger) {
+        const url = trigger?.dataset?.messageReadUrl;
+        if (! url || trigger.dataset.messageMarked === 'true') {
+            return;
+        }
+
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (! response.ok) {
+                return;
+            }
+
+            trigger.dataset.messageMarked = 'true';
+            const row = trigger.closest('tr');
+            const badge = row?.querySelector('[data-message-read-badge]');
+            if (badge) {
+                badge.className = 'badge bg-secondary';
+                badge.textContent = 'Đã đọc';
+            }
+
+            const modalTarget = trigger.getAttribute('data-bs-target');
+            const modal = modalTarget ? document.querySelector(modalTarget) : null;
+            const modalStatus = modal?.querySelector('[data-message-modal-read-status]');
+            if (modalStatus) {
+                modalStatus.innerHTML = '<i class="bi bi-circle-fill"></i>Đã đọc';
+            }
+        } catch (error) {
+            // Trạng thái đọc sẽ được đồng bộ lại ở lần tải trang kế tiếp.
+        }
+    };
+
+    document.querySelectorAll('[data-message-open-read]').forEach(function (trigger) {
+        trigger.addEventListener('click', function () {
+            markMessageRead(trigger);
+        });
+    });
+
+    document.querySelectorAll('.message-thread-modal[data-message-modal-read-url]').forEach(function (modal) {
+        modal.addEventListener('shown.bs.modal', function () {
+            const trigger = document.querySelector('[data-message-open-read][data-bs-target="#' + modal.id + '"]');
+            if (trigger) {
+                markMessageRead(trigger);
+            }
+        });
+    });
+});
+</script>
 @endsection

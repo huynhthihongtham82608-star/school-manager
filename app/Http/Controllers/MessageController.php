@@ -88,6 +88,20 @@ class MessageController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        $messageIds = $messages->getCollection()->pluck('id')->filter()->values();
+        if ($messageIds->isNotEmpty()) {
+            $recipientsByMessage = MessageRecipient::query()
+                ->with(['receiver.teacher', 'receiver.student', 'receiver.parentProfile'])
+                ->whereIn('message_id', $messageIds)
+                ->orderBy('created_at')
+                ->get()
+                ->groupBy(fn (MessageRecipient $recipient) => (string) $recipient->message_id);
+
+            $messages->getCollection()->each(function (Message $message) use ($recipientsByMessage): void {
+                $message->setRelation('recipients', $recipientsByMessage->get((string) $message->id, collect())->values());
+            });
+        }
+
         $conversationIds = $messages->getCollection()
             ->map(fn (Message $message) => $message->conversationKey())
             ->filter()
@@ -265,7 +279,7 @@ class MessageController extends Controller
         return redirect()->route('messages.sent')->with('success', 'Đã gửi tin nhắn.');
     }
 
-    public function show(Message $message)
+    public function show(Request $request, Message $message)
     {
         $userId = Auth::id();
         $message->load(['sender.teacher', 'sender.student', 'sender.parentProfile', 'recipients.receiver.teacher', 'recipients.receiver.student', 'recipients.receiver.parentProfile', 'attachments']);
@@ -302,6 +316,14 @@ class MessageController extends Controller
             ]);
 
         $canReply = $this->canReplyToMessage(Auth::user(), $message);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => 'success',
+                'is_read' => true,
+                'read_label' => 'Đã đọc',
+            ]);
+        }
 
         return view('messages.show', compact('message', 'recipient', 'threadMessages', 'canReply'));
     }

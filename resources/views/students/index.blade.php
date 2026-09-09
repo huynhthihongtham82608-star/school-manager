@@ -140,6 +140,12 @@
                                             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#studentEdit{{ $student->id }}">
                                                 <i class="bi bi-pencil-square me-2"></i>Sửa thông tin
                                             </button>
+                                            <form action="{{ route('students.reset-password', $student) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn đặt lại mật khẩu cho học sinh này về 12345678?');">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item text-left">
+                                                    <i class="bi bi-key me-2"></i>Đặt lại mật khẩu
+                                                </button>
+                                            </form>
                                             <form action="{{ route('students.toggle-login', $student) }}" method="POST" onsubmit="return confirm('{{ $loginLocked ? 'Bạn có chắc muốn mở khóa tài khoản đăng nhập học sinh này?' : 'Bạn có chắc muốn khóa tài khoản đăng nhập học sinh này?' }}');">
                                                 @csrf
                                                 @method('PATCH')
@@ -254,7 +260,6 @@
                                 @endif
                             </div>
                             <div class="student-v2-identity">
-                                <div class="student-v2-kicker">Thẻ học sinh</div>
                                 <h5>{{ $student->name }}</h5>
                                 <div class="student-v2-code">{{ $student->student_code }}</div>
                             </div>

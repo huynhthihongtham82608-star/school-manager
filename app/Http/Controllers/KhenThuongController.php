@@ -8,6 +8,7 @@ use App\Models\SchoolClass;
 use App\Models\ScoreHeader;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\Subject;
 use App\Services\AcademicEvaluationService;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
@@ -223,6 +224,20 @@ class KhenThuongController extends Controller
             ->get()
             ->keyBy('student_id');
 
+        $requiredNumericSubjectIdsByGrade = Subject::with('gradeMappings')
+            ->whereIn('type', array_merge([Subject::TYPE_OFFICIAL], Subject::LEGACY_SCORABLE_TYPES))
+            ->where('status', Subject::STATUS_ACTIVE)
+            ->withEvaluatedAssessment()
+            ->get()
+            ->filter(fn (Subject $subject) => $subject->usesNumericAssessment())
+            ->flatMap(fn (Subject $subject) => collect($subject->applicableGradeLevels())
+                ->map(fn (int $gradeLevel) => [
+                    'grade_level' => $gradeLevel,
+                    'subject_id' => $subject->id,
+                ]))
+            ->groupBy('grade_level')
+            ->map(fn ($rows) => $rows->pluck('subject_id')->unique()->values());
+
         $topAcademicKey = array_key_first($evaluationService->levels());
         $created = 0;
         $updated = 0;
@@ -230,8 +245,23 @@ class KhenThuongController extends Controller
 
         foreach ($students as $student) {
             $headers = collect($scoreHeaders->get($student->id, []));
-            $numericScores = $headers
+            $gradeLevel = (int) ($student->classRoom?->grade_level ?? 0);
+            $requiredNumericSubjectIds = collect($requiredNumericSubjectIdsByGrade->get($gradeLevel, collect()))
+                ->filter()
+                ->unique()
+                ->values();
+            $completedNumericSubjectIds = $headers
                 ->filter(fn (ScoreHeader $header) => $header->subject?->usesNumericAssessment() && $header->average !== null)
+                ->pluck('subject_id')
+                ->unique()
+                ->values();
+
+            if ($requiredNumericSubjectIds->isEmpty() || $requiredNumericSubjectIds->diff($completedNumericSubjectIds)->isNotEmpty()) {
+                continue;
+            }
+
+            $numericScores = $headers
+                ->filter(fn (ScoreHeader $header) => $requiredNumericSubjectIds->contains($header->subject_id) && $header->average !== null)
                 ->pluck('average')
                 ->map(fn ($average) => (float) $average)
                 ->values();
@@ -250,23 +280,40 @@ class KhenThuongController extends Controller
 
             $excellentSubjectCount = $numericScores->filter(fn (float $average) => $average >= 9.0)->count();
             $rewardType = $excellentSubjectCount >= 6 ? Reward::TYPE_OUTSTANDING : Reward::TYPE_GOOD;
-            $reward = Reward::updateOrCreate(
-                [
-                    'student_id' => $student->id,
-                    'semester_id' => $semester->id,
-                ],
-                [
+            $existingReward = Reward::where('student_id', $student->id)
+                ->where('semester_id', $semester->id)
+                ->first();
+            $automaticDetail = $this->automaticRewardDetail($rewardType, $gpa, $excellentSubjectCount);
+
+            if ($existingReward && ! str_starts_with((string) $existingReward->detail, 'Tự động ghi nhận:')) {
+                continue;
+            }
+
+            if ($existingReward) {
+                $existingReward->update([
                     'class_id' => $student->class_id,
                     'school_year_id' => $semester->school_year_id,
                     'reward_type' => $rewardType,
-                    'detail' => $this->automaticRewardDetail($rewardType, $gpa, $excellentSubjectCount),
+                    'detail' => $automaticDetail,
+                    'decision_number' => null,
+                    'updated_by' => Auth::id(),
+                ]);
+                $updated++;
+            } else {
+                Reward::create([
+                    'student_id' => $student->id,
+                    'class_id' => $student->class_id,
+                    'semester_id' => $semester->id,
+                    'school_year_id' => $semester->school_year_id,
+                    'reward_type' => $rewardType,
+                    'detail' => $automaticDetail,
                     'decision_number' => null,
                     'created_by' => Auth::id(),
                     'updated_by' => Auth::id(),
-                ]
-            );
+                ]);
+                $created++;
+            }
 
-            $reward->wasRecentlyCreated ? $created++ : $updated++;
             $qualified++;
         }
 

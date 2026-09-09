@@ -189,8 +189,12 @@ class AttendanceController extends Controller
 
             if ($selectedClass && $selectedSemester) {
                 $allowedSessionTypes = $this->allowedSessionTypes($user, $selectedClass);
+                if (! $isSubjectTeacherOnlyAttendance && $attendanceViewMode === 'day') {
+                    $scheduledSessionTypes = $this->scheduledMainSessionTypes($selectedClass, $selectedSemester->id, $date);
+                    $allowedSessionTypes = array_intersect_key($allowedSessionTypes, $scheduledSessionTypes);
+                }
                 if ($selectedSessionType && ! array_key_exists((string) $selectedSessionType, $allowedSessionTypes)) {
-                    $selectedSessionType = array_key_first($allowedSessionTypes) ?: AttendanceRecord::SESSION_DAILY;
+                    $selectedSessionType = array_key_first($allowedSessionTypes) ?: null;
                 }
 
                 $availableTimetableEntries = $isSubjectTeacherOnlyAttendance
@@ -443,6 +447,7 @@ class AttendanceController extends Controller
         $timetableEntry = null;
 
         $this->ensureSelectionMatchesYear($data['school_year_id'], $class, $semester);
+        $this->ensureMainSessionIsScheduled($class, $semester, $data['attendance_date'], $data['attendance_type'], $data['timetable_entry_id'] ?? null);
         $this->authorizeAttendanceMutation($request->user(), $class, $semester, $data['attendance_date'], $data['attendance_type'], $data['timetable_entry_id'] ?? null);
 
         if (! $semester->isActive()) {
@@ -669,6 +674,56 @@ class AttendanceController extends Controller
             AttendanceRecord::SESSION_MORNING => AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_MORNING],
             AttendanceRecord::SESSION_AFTERNOON => AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_AFTERNOON],
         ];
+    }
+
+    private function scheduledMainSessionTypes(SchoolClass $class, string $semesterId, string $attendanceDate): array
+    {
+        $dayOfWeek = Carbon::parse($attendanceDate)->isoWeekday();
+
+        if ($dayOfWeek < 1 || $dayOfWeek > 6) {
+            return [];
+        }
+
+        $timetableIds = Timetable::where('class_id', $class->id)
+            ->where('semester_id', $semesterId)
+            ->pluck('id');
+
+        if ($timetableIds->isEmpty()) {
+            return [];
+        }
+
+        $periods = TimetableEntry::whereIn('timetable_id', $timetableIds)
+            ->where('day_of_week', $dayOfWeek)
+            ->where('status', TimetableEntry::STATUS_ACTIVE)
+            ->pluck('period')
+            ->map(fn ($period) => (int) $period);
+
+        $types = [];
+        if ($periods->contains(fn (int $period) => $period >= 1 && $period <= 5)) {
+            $types[AttendanceRecord::SESSION_MORNING] = AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_MORNING];
+        }
+        if ($periods->contains(fn (int $period) => $period > 5)) {
+            $types[AttendanceRecord::SESSION_AFTERNOON] = AttendanceRecord::SESSION_TYPES[AttendanceRecord::SESSION_AFTERNOON];
+        }
+
+        return $types;
+    }
+
+    private function ensureMainSessionIsScheduled(SchoolClass $class, Semester $semester, string $attendanceDate, string $sessionType, ?string $timetableEntryId): void
+    {
+        if (! in_array($sessionType, [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON], true)) {
+            return;
+        }
+
+        if ($this->attendanceSessionRecords($class, $semester, $attendanceDate, $sessionType, $timetableEntryId)->isNotEmpty()) {
+            return;
+        }
+
+        if (! array_key_exists($sessionType, $this->scheduledMainSessionTypes($class, $semester->id, $attendanceDate))) {
+            throw ValidationException::withMessages([
+                'attendance_type' => 'Không có lịch học trong buổi đã chọn nên không cần tạo phiên điểm danh.',
+            ]);
+        }
     }
 
     private function approvedLeaveRequestsFor(?SchoolClass $class, ?string $date)

@@ -92,7 +92,7 @@
     $attendanceViewTabs = [
         'day' => '📅 Xem theo Ngày',
         'week' => '📆 Xem theo Tuần',
-        'all' => '📊 Tất cả các phiên',
+        'all' => '📊 Nhật ký điểm danh',
     ];
 @endphp
 
@@ -105,14 +105,14 @@
     }
 
     .table-responsive {
-        overflow-x: hidden !important;
+        overflow-x: auto !important;
     }
 
     .attendance-toolbar {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-start;
         gap: .75rem;
         width: 100%;
         max-width: 100%;
@@ -121,7 +121,7 @@
         border-radius: 12px;
         background: #fff;
         box-shadow: 0 1px 1px rgba(15, 23, 42, .035);
-        overflow: hidden;
+        overflow: visible;
         text-align: left;
     }
 
@@ -139,9 +139,10 @@
 
     .attendance-toolbar-field.search {
         min-width: 180px;
-        flex: 1 1 240px;
-        max-width: 280px;
-        margin-left: auto;
+        flex: 1 1 280px;
+        max-width: 340px;
+        margin-left: 0;
+        margin-right: auto;
     }
 
     .attendance-toolbar-field.period {
@@ -150,13 +151,15 @@
         max-width: 260px;
     }
 
-    .attendance-toolbar-field.mode { order: 1; }
+    .attendance-toolbar-field.search { order: 1; }
+    .attendance-toolbar-field.mode { order: 2; }
+    .attendance-toolbar-field.date-filter { order: 3; }
+    .attendance-filter-dropdown { order: 4; }
+    .attendance-excel-actions { order: 5; }
     .attendance-toolbar-field.semester-filter { order: 2; }
     .attendance-toolbar-field.class-filter { order: 3; }
     .attendance-toolbar-field.session-filter { order: 4; }
-    .attendance-toolbar-field.date-filter { order: 5; }
     .attendance-toolbar-field.period { order: 6; }
-    .attendance-toolbar-field.search { order: 7; }
     .attendance-toolbar-field.submit-filter { order: 8; }
 
     .attendance-toolbar.homeroom-toolbar {
@@ -166,6 +169,71 @@
     .attendance-toolbar.homeroom-toolbar .attendance-toolbar-field {
         flex: 0 1 190px;
         max-width: 220px;
+    }
+
+    .attendance-filter-dropdown {
+        flex: 0 0 auto;
+        order: 4;
+        position: relative;
+    }
+
+    .attendance-filter-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: .4rem;
+        width: 2.35rem;
+        height: 2.35rem;
+        padding: 0;
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        color: #c2410c;
+        background: #fff7ed;
+        font-size: .875rem;
+        font-weight: 400;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+
+    .attendance-filter-button:hover,
+    .attendance-filter-button:focus {
+        color: #9a3412;
+        background: #ffedd5;
+    }
+
+    .attendance-filter-menu {
+        min-width: 18rem;
+        border: 1px solid #fed7aa;
+        border-radius: 10px;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, .14);
+        z-index: 1080;
+        overflow: visible;
+    }
+
+    .attendance-filter-menu .attendance-toolbar-field {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .attendance-filter-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .5rem;
+        padding-top: .25rem;
+    }
+
+    .attendance-filter-actions .btn {
+        width: auto;
+        min-width: 6.25rem;
+        white-space: nowrap;
+    }
+
+    .attendance-excel-actions {
+        display: flex;
+        align-items: center;
+        flex: 0 0 auto;
+        margin-left: 0;
     }
 
     .attendance-leave-ribbon-card {
@@ -542,6 +610,7 @@
     .attendance-session-table {
         width: 100%;
         table-layout: fixed;
+        min-width: 980px;
     }
 
     .attendance-session-table th,
@@ -560,6 +629,28 @@
         background: #fff7ed;
     }
 
+    .attendance-weekly-card .card-header {
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        text-align: left;
+    }
+
+    .attendance-weekly-card .card-header > div:first-child {
+        margin-left: 0;
+        padding-left: 0;
+        text-align: left;
+    }
+
+    .attendance-weekly-card .attendance-weekly-legend {
+        margin-left: auto;
+    }
+
+    @media (max-width: 991.98px) {
+        .attendance-weekly-card .attendance-weekly-legend {
+            margin-left: 0;
+        }
+    }
+
     .attendance-session-subtext {
         color: #6b7280;
         font-size: .88rem;
@@ -567,7 +658,7 @@
     }
 
     .attendance-session-stats-cell {
-        white-space: nowrap !important;
+        white-space: normal !important;
     }
 
     .attendance-session-stats {
@@ -645,11 +736,14 @@
         align-items: center;
         gap: .35rem;
         width: fit-content;
+        max-width: 100%;
         padding: .34rem .68rem;
         border-radius: 999px;
         font-size: .9rem;
         font-weight: 400;
-        white-space: nowrap;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.25;
     }
 
     .attendance-session-badge.morning {
@@ -665,6 +759,9 @@
     }
 
     .attendance-session-badge.period {
+        display: inline-flex;
+        align-items: flex-start;
+        text-align: left;
         color: #ea580c;
         background: #fff7ed;
         border: 1px solid #fed7aa;
@@ -841,25 +938,7 @@
         : (auth()->user()->isParent()
             ? 'Theo dõi tình trạng chuyên cần của học sinh đang chọn theo năm học và học kỳ.'
             : 'Ghi nhận và theo dõi tình trạng chuyên cần của học sinh theo từng lớp.')"
->
-    @if($canViewAttendanceRoster && ! $isSubjectTeacherAttendanceView)
-        <x-bulk-excel-actions
-            module="attendance"
-            :context="[
-                'school_year_id' => $selectedYearId,
-                'class_id' => $selectedClassId,
-                'semester_id' => $selectedSemesterId,
-                'attendance_date' => $date,
-                'attendance_type' => $selectedSessionType,
-            ]"
-            :allow-import="$canEditAttendanceRoster"
-            :show-template-button="false"
-            template-button-label="Tải file mẫu Excel"
-            export-button-label="Xuất Excel"
-            import-button-label="Nhập Excel"
-        />
-    @endif
-</x-page-header>
+/>
 
 @if(auth()->user()->isStudent() || auth()->user()->isParent())
     <div class="student-stat-grid mb-3">
@@ -1084,6 +1163,25 @@
                 </button>
             </div>
         @endif
+        @if($canViewAttendanceRoster && ! $isSubjectTeacherAttendanceView)
+            <div class="attendance-excel-actions">
+                <x-bulk-excel-actions
+                    module="attendance"
+                    :context="[
+                        'school_year_id' => $selectedYearId,
+                        'class_id' => $selectedClassId,
+                        'semester_id' => $selectedSemesterId,
+                        'attendance_date' => $date,
+                        'attendance_type' => $selectedSessionType,
+                    ]"
+                    :allow-import="$canEditAttendanceRoster"
+                    :show-template-button="false"
+                    template-button-label="Tải file mẫu Excel"
+                    export-button-label="Xuất Excel"
+                    import-button-label="Nhập Excel"
+                />
+            </div>
+        @endif
     </form>
 
     @if($attendanceViewMode === 'day' && ! $isAdminAttendanceView && ! $isSubjectTeacherAttendanceView && $isHomeroomForSelectedClass)
@@ -1103,7 +1201,17 @@
         </div>
     @endif
 
-    @if($attendanceViewMode === 'day' && $selectedClassId && $selectedSemesterId && $date)
+    @if($attendanceViewMode === 'day' && ! $isSubjectTeacherAttendanceView && $selectedClassId && $selectedSemesterId && $date && empty($allowedSessionTypes))
+        <div class="card border-0 shadow-xs mb-3">
+            <div class="card-body text-left">
+                <div class="text-sm font-normal text-orange-700 bg-orange-50/60 border border-orange-100 rounded-lg px-3 py-2">
+                    Không có lịch học trong ngày đã chọn nên không cần tạo phiên điểm danh.
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if($attendanceViewMode === 'day' && $selectedClassId && $selectedSemesterId && $date && ($isSubjectTeacherAttendanceView || $selectedSessionType))
         <div class="card mb-3 attendance-register-card" id="attendance-register">
             <div class="card-header d-flex flex-column flex-md-row justify-content-between gap-2">
                 <div>
@@ -1428,24 +1536,24 @@
     @endif
 
     @if($attendanceViewMode === 'week' && ! $isSubjectTeacherAttendanceView && ($weeklyMatrix['enabled'] ?? false))
-        <div class="card mb-3">
-            <div class="card-header d-flex flex-column flex-lg-row justify-content-between gap-2">
+        <div class="card mb-3 attendance-weekly-card">
+            <div class="card-header d-flex flex-column flex-lg-row justify-content-between align-items-start gap-2">
                 <div>
-                    <div class="fw-semibold">Ma trận chuyên cần theo tuần</div>
+                    <div class="fw-semibold">Chuyên cần theo tuần</div>
                     <div class="text-muted small">
                         {{ $selectedClass?->name ?? 'Tất cả các lớp' }} • Tuần
                         {{ ($weeklyMatrix['days'] ?? collect())->first()?->format('d/m/Y') }}
                         - {{ ($weeklyMatrix['days'] ?? collect())->last()?->format('d/m/Y') }}
                     </div>
                 </div>
-                <div class="d-flex flex-wrap gap-2 small">
+                <div class="d-flex flex-wrap gap-2 small attendance-weekly-legend">
                     <span class="attendance-mini-badge orange">S: Vắng sáng</span>
                     <span class="attendance-mini-badge orange">C: Vắng chiều</span>
                     <span class="attendance-mini-badge red">V2: Vắng tiết 2</span>
                 </div>
             </div>
             <div class="table-responsive">
-                <table class="table align-middle w-full table-fixed max-w-full overflow-hidden font-sans mb-0">
+                <table class="table align-middle w-full table-fixed max-w-full overflow-hidden font-sans mb-0" data-admin-table-skip>
                     <thead>
                         <tr>
                             <th style="width: 28%;">Học sinh</th>
@@ -1459,7 +1567,14 @@
                     </thead>
                     <tbody>
                     @forelse(($weeklyMatrix['rows'] ?? collect()) as $row)
-                        <tr>
+                        @php
+                            $weeklySearchText = \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii(trim(
+                                ($row['student']->student_code ?? '') . ' ' .
+                                ($row['student']->name ?? '') . ' ' .
+                                ($row['student']->classRoom?->name ?? '')
+                            )));
+                        @endphp
+                        <tr data-attendance-search-text="{{ $weeklySearchText }}">
                             <td>
                                 <div class="fw-semibold">{{ $row['student']->student_code }}</div>
                                 <div class="text-muted small">{{ $row['student']->name }}</div>
@@ -1553,21 +1668,27 @@
 @if($canViewAttendanceRoster && $isAdminAttendanceView && $attendanceViewMode === 'day' && ! $selectedClassId)
 <div class="card border-0 shadow-xs">
     <div class="card-header bg-white border-bottom border-orange-100">
-        <div class="fw-semibold text-gray-900">Ma trận thanh tra chuyên cần toàn trường</div>
+        <div class="fw-semibold text-gray-900">Tổng hợp chuyên cần theo ngày</div>
         <div class="text-muted small">{{ $selectedSemester?->name ?? 'Học kỳ' }} • {{ \Illuminate\Support\Carbon::parse($date)->format('d/m/Y') }}</div>
     </div>
     <div class="table-responsive overflow-hidden">
-        <table class="table attendance-session-table w-full table-fixed max-w-full overflow-hidden font-sans mb-0">
+        <table class="table attendance-session-table w-full table-fixed max-w-full overflow-hidden font-sans mb-0" data-admin-table-skip>
             <thead>
                 <tr>
-                    <th style="width: 42%;">Tên Lớp lớp</th>
-                    <th style="width: 28%;">Vắng cả ngày (GVCN chốt)</th>
-                    <th style="width: 30%;">Vắng tiết bộ môn (GVBM tích)</th>
+                    <th style="width: 42%;">Lớp</th>
+                    <th style="width: 28%;">Nghỉ theo buổi</th>
+                    <th style="width: 30%;">Vắng tiết</th>
                 </tr>
             </thead>
             <tbody>
             @forelse(($adminAttendanceMatrix ?? collect()) as $matrixRow)
-                <tr>
+                @php
+                    $matrixSearchText = \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii(trim(
+                        ($matrixRow->class->name ?? '') . ' ' .
+                        ($matrixRow->class->homeroomTeacher?->name ?? '')
+                    )));
+                @endphp
+                <tr data-attendance-search-text="{{ $matrixSearchText }}">
                     <td class="text-left">
                         <div class="text-sm font-semibold text-gray-900">{{ $matrixRow->class->name }}</div>
                         <div class="text-xs font-normal text-gray-500">Sĩ số {{ $matrixRow->class->students_count ?? $matrixRow->class->students->count() }} học sinh</div>
@@ -1633,18 +1754,17 @@
 @if($canViewAttendanceRoster && ! $isSubjectTeacherAttendanceView && $attendanceViewMode === 'all')
 <div class="card">
     <div class="card-header">
-        <div class="fw-semibold">Nhật ký điểm danh theo phiên</div>
-        <div class="text-muted small">Mỗi lớp trong một ngày chỉ hiển thị tối đa hai dòng: Buổi Sáng và Buổi Chiều.</div>
+        <div class="fw-semibold">Nhật ký điểm danh</div>
     </div>
     <div class="table-responsive">
         <table class="table attendance-session-table w-full table-fixed max-w-full overflow-hidden mb-0" data-admin-table-skip>
             <thead>
                 <tr>
-                    <th style="width: 28%;">Lớp & Thời gian</th>
-                    <th style="width: 17%;">Phiên điểm danh</th>
-                    <th style="width: 35%;">Thống kê nề nếp</th>
-                    <th style="width: 14%;">Trạng thái</th>
-                    <th style="width: 10%;" class="text-left">Chi tiết</th>
+                    <th style="width: 22%;">Lớp / Ngày</th>
+                    <th style="width: 28%;">Phiên điểm danh</th>
+                    <th style="width: 26%;">Thống kê</th>
+                    <th style="width: 12%;">Trạng thái</th>
+                    <th style="width: 12%;" class="text-right">Thao tác</th>
                 </tr>
             </thead>
             <tbody>
@@ -1652,8 +1772,14 @@
                 @php
                     $isMorningSession = $session->session_type === \App\Models\AttendanceRecord::SESSION_MORNING;
                     $isPeriodSession = $session->session_type === \App\Models\AttendanceRecord::SESSION_PERIOD;
+                    $sessionSearchText = \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii(trim(
+                        ($session->class_name ?? '') . ' ' .
+                        ($session->semester_name ?? '') . ' ' .
+                        ($session->session_label ?? '') . ' ' .
+                        optional($session->date)->format('d/m/Y')
+                    )));
                 @endphp
-                <tr>
+                <tr data-attendance-search-text="{{ $sessionSearchText }}">
                     <td>
                         <div class="fw-semibold text-gray-900">Lớp {{ $session->class_name }}</div>
                         <div class="attendance-session-subtext">{{ $session->semester_name }} • {{ optional($session->date)->format('d/m/Y') }}</div>
@@ -1663,7 +1789,7 @@
                             {{ $isPeriodSession ? $session->session_label : ($isMorningSession ? '🌅 Buổi Sáng' : '🌆 Buổi Chiều') }}
                         </span>
                     </td>
-                    <td class="whitespace-nowrap text-left attendance-session-stats-cell">
+                    <td class="text-left attendance-session-stats-cell">
                         <div class="d-inline-flex align-items-center flex-wrap gap-1.5" aria-label="Thống kê phiên điểm danh">
                             <span class="attendance-mini-badge">{{ $session->total }} tổng</span>
                             <span class="attendance-mini-badge">{{ $session->present }} có mặt</span>
@@ -1679,8 +1805,8 @@
                             <span class="attendance-status-badge pending">🟡 Chưa điểm danh</span>
                         @endif
                     </td>
-                    <td class="text-left whitespace-nowrap">
-                        <div class="d-inline-flex align-items-center gap-1 justify-content-start">
+                    <td class="text-right whitespace-nowrap">
+                        <div class="d-inline-flex align-items-center gap-1 justify-content-end">
                             <button
                                 type="button"
                                 class="text-gray-500 bg-gray-50 p-2 rounded-md hover:bg-orange-50 hover:text-orange-600 transition-all border-0 shadow-xs inline-flex items-center justify-center cursor-pointer"
@@ -1881,8 +2007,59 @@
         window.location.href = `${targetUrl}?${params.toString()}#attendance-register`;
     };
 
+    document.querySelectorAll('.attendance-toolbar').forEach((form) => {
+        if (form.dataset.attendanceFilterReady === '1') {
+            return;
+        }
+
+        const fields = Array.from(form.querySelectorAll('.semester-filter, .class-filter, .session-filter, .period'));
+        if (fields.length === 0) {
+            return;
+        }
+
+        form.dataset.attendanceFilterReady = '1';
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'dropdown attendance-filter-dropdown';
+        dropdown.innerHTML = `
+            <button type="button" class="attendance-filter-button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Bộ lọc điểm danh" aria-label="Bộ lọc điểm danh">
+                <i class="bi bi-funnel"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end p-3 attendance-filter-menu">
+                <div class="d-grid gap-3" data-attendance-filter-fields></div>
+            </div>
+        `;
+
+        const grid = dropdown.querySelector('[data-attendance-filter-fields]');
+        fields.forEach((field) => grid.appendChild(field));
+
+        const actions = document.createElement('div');
+        actions.className = 'attendance-filter-actions';
+        const reset = document.createElement('a');
+        reset.href = form.getAttribute('action') || window.location.pathname;
+        reset.className = 'btn btn-outline-warning btn-sm';
+        reset.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Đặt lại lọc';
+        const apply = document.createElement('button');
+        apply.type = 'submit';
+        apply.className = 'btn btn-primary btn-sm';
+        apply.innerHTML = '<i class="bi bi-check2"></i> Áp dụng';
+        actions.append(reset, apply);
+        grid.appendChild(actions);
+
+        const searchAnchor = form.querySelector('.attendance-toolbar-field.search');
+        const submitAnchor = form.querySelector('.attendance-toolbar-field.submit-filter');
+
+        if (searchAnchor) {
+            searchAnchor.insertAdjacentElement('afterend', dropdown);
+        } else if (submitAnchor) {
+            form.insertBefore(dropdown, submitAnchor);
+        } else {
+            form.appendChild(dropdown);
+        }
+    });
+
     document.querySelectorAll('[data-attendance-search]').forEach((input) => {
-        const rows = Array.from(document.querySelectorAll('[data-attendance-roster-row]'));
+        const rows = Array.from(document.querySelectorAll('[data-attendance-search-text]'));
         const countLabel = document.querySelector('[data-attendance-visible-count]');
         let debounceTimer = null;
 

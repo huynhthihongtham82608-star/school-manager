@@ -684,8 +684,10 @@ class BulkExcelController extends Controller
             $student = $this->findImportedStudentByStableKey($code);
 
             if (! $student && $code === '' && $name !== '' && $dob) {
+                $student = $this->findImportedStudentByIdentity($name, $dob, (string) $class->id);
                 $sameIdentityDifferentClass = Student::where('name', $name)
                     ->whereDate('dob', $dob)
+                    ->where('class_id', '!=', $class->id)
                     ->first();
 
                 if ($sameIdentityDifferentClass) {
@@ -2156,6 +2158,20 @@ class BulkExcelController extends Controller
         return Student::where('student_code', $studentCode)->first();
     }
 
+    private function findImportedStudentByIdentity(string $name, string $dob, string $classId): ?Student
+    {
+        $name = trim($name);
+
+        if ($name === '' || $dob === '' || $classId === '') {
+            return null;
+        }
+
+        return Student::where('name', $name)
+            ->whereDate('dob', $dob)
+            ->where('class_id', $classId)
+            ->first();
+    }
+
     private function nextTeacherCode(): string
     {
         $max = Teacher::where('teacher_code', 'like', 'GV%')
@@ -2357,18 +2373,34 @@ class BulkExcelController extends Controller
             ]);
         }
 
-        User::updateOrCreate(
-            ['username' => $parent->phone],
-            [
-                'full_name' => $parent->name,
-                'email' => $parent->email,
-                'phone' => $parent->phone,
-                'role' => 'parent',
-                'parent_id' => $parent->id,
-                'password_hash' => Hash::make('12345678'),
-                'is_active' => true,
-            ]
-        );
+        $user = $parent->user ?: User::where(function ($query) use ($parent) {
+                $query->where('username', $parent->phone)
+                    ->orWhere('phone', $parent->phone);
+            })
+            ->where('role', 'parent')
+            ->first();
+
+        if ($user && $user->parent_id && (string) $user->parent_id !== (string) $parent->id) {
+            throw ValidationException::withMessages([
+                'phone' => 'Số điện thoại phụ huynh đang trùng tài khoản phụ huynh khác.',
+            ]);
+        }
+
+        $user ??= new User([
+            'password_hash' => Hash::make('12345678'),
+            'force_change_password' => true,
+            'is_active' => true,
+        ]);
+
+        $user->forceFill([
+            'username' => $parent->phone,
+            'full_name' => $parent->name,
+            'email' => $parent->email,
+            'phone' => $parent->phone,
+            'role' => 'parent',
+            'parent_id' => $parent->id,
+            'is_active' => true,
+        ])->save();
     }
 
     private function moduleRedirect(string $module, array $context): string

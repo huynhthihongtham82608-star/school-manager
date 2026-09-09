@@ -4,7 +4,7 @@
 @section('content')
 @include('messages._filters', ['action' => route('messages.trash'), 'filters' => $filters])
 
-<div class="card">
+<div class="card message-card">
     <div class="table-responsive">
         <table class="table message-table" data-no-auto-toolbar>
             <thead>
@@ -156,4 +156,5 @@
         </div>
     </div>
 @endforeach
+@include('messages._dropdown_positioning')
 @endsection

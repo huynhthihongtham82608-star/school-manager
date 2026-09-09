@@ -88,13 +88,26 @@ class TuitionFee extends Model
         return collect($items)
             ->map(fn (array $item) => [
                 'key' => (string) ($item['key'] ?? ''),
-                'label' => trim((string) ($item['label'] ?? 'Khoản thu')),
+                'label' => self::displayFeeLabel($item['label'] ?? 'Khoản thu', $item['key'] ?? ''),
                 'amount' => round((float) ($item['amount'] ?? 0), 2),
                 'status' => self::STATUS_UNPAID,
             ])
             ->filter(fn (array $item) => $item['key'] !== '')
             ->values()
             ->all();
+    }
+
+    public static function displayFeeLabel(?string $label, ?string $key = null): string
+    {
+        $normalizedLabel = trim((string) $label);
+        $normalizedKey = trim((string) $key);
+
+        return match (true) {
+            $normalizedKey === 'tuition_hk1' || strcasecmp($normalizedLabel, 'Hoc phi') === 0 => 'Học phí',
+            $normalizedKey === 'health_insurance' || strcasecmp($normalizedLabel, 'Bao hiem Y te') === 0 => 'Bảo hiểm y tế',
+            $normalizedKey === 'accident_insurance' || strcasecmp($normalizedLabel, 'Bao hiem Tai nan') === 0 => 'Bảo hiểm tai nạn',
+            default => $normalizedLabel !== '' ? $normalizedLabel : 'Khoản thu',
+        };
     }
 
     public static function applyExemptionToItems(array $items, string $exemptionType): array

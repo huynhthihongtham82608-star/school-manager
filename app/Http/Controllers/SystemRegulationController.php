@@ -33,6 +33,7 @@ class SystemRegulationController extends Controller
 
     public function updateAcademicLevels(Request $request)
     {
+        $this->denyHistoricalWrite('mốc điểm học lực');
         $this->ensureSettingsTable();
 
         $data = $request->validate([
@@ -83,6 +84,7 @@ class SystemRegulationController extends Controller
 
     public function updateConductLevels(Request $request)
     {
+        $this->denyHistoricalWrite('định mức hạnh kiểm');
         $this->ensureSettingsTable();
 
         $data = $request->validate([
@@ -242,5 +244,14 @@ class SystemRegulationController extends Controller
             500,
             'Chưa có bảng settings. Vui lòng chạy migration trước khi lưu cấu hình.'
         );
+    }
+
+    private function denyHistoricalWrite(string $label): void
+    {
+        if ($this->isHistoricalReadOnly()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'history_readonly' => 'Đang xem dữ liệu lịch sử, không thể thay đổi ' . $label . '.',
+            ]);
+        }
     }
 }

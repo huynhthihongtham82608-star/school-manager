@@ -131,10 +131,14 @@ class StudentController extends Controller
             return back()->withErrors(['file' => 'File import không có dữ liệu hợp lệ.']);
         }
 
-        $newRowCount = collect($rows)->filter(function (array $row) {
+        $newRowCount = collect($rows)->filter(function (array $row) use ($class) {
             $studentCode = trim((string) ($row['ma_hs'] ?? ''));
+            $phone = trim((string) ($row['sdt_phu_huynh'] ?? ''));
+            $name = trim((string) ($row['ho_ten'] ?? ''));
+            $dob = $this->parseDateValue($row['ngay_sinh'] ?? null);
 
-            return ! $this->findImportedStudentByStableKey($studentCode);
+            return ! $this->findImportedStudentByStableKey($studentCode)
+                && ! ($phone === '' && $dob && $this->findImportedStudentByIdentity($name, $dob, (string) $class->id));
         })->count();
 
         if ($class->currentStudentCount() + $newRowCount > $class->maxCapacity()) {
@@ -169,6 +173,7 @@ class StudentController extends Controller
                 $matchedStudent = $this->findImportedStudentByStableKey($studentCode);
 
                 if (! $matchedStudent && $phone === '' && $dob) {
+                    $matchedStudent = $this->findImportedStudentByIdentity($name, $dob, (string) $class->id);
                     $sameIdentityDifferentClass = Student::where('name', $name)
                         ->whereDate('dob', $dob)
                         ->where('class_id', '!=', $class->id)
@@ -666,7 +671,12 @@ class StudentController extends Controller
             ]);
         }
 
-        $user = $parent->user ?: User::where('username', $parent->phone)->where('role', 'parent')->first();
+        $user = $parent->user ?: User::where(function ($query) use ($parent) {
+                $query->where('username', $parent->phone)
+                    ->orWhere('phone', $parent->phone);
+            })
+            ->where('role', 'parent')
+            ->first();
 
         if (! $user) {
             User::create([
@@ -684,7 +694,7 @@ class StudentController extends Controller
             return;
         }
 
-        if ((string) $user->parent_id !== (string) $parent->id) {
+        if ($user->parent_id && (string) $user->parent_id !== (string) $parent->id) {
             return;
         }
 
@@ -787,6 +797,20 @@ class StudentController extends Controller
         }
 
         return Student::where('student_code', $studentCode)->first();
+    }
+
+    private function findImportedStudentByIdentity(string $name, string $dob, string $classId): ?Student
+    {
+        $name = trim($name);
+
+        if ($name === '' || $dob === '' || $classId === '') {
+            return null;
+        }
+
+        return Student::where('name', $name)
+            ->whereDate('dob', $dob)
+            ->where('class_id', $classId)
+            ->first();
     }
 
     private function generateStudentCode(string $enrollmentDate): string

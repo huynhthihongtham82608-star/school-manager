@@ -6933,6 +6933,42 @@ body.role-menu-open .role-menu-overlay {
     width: 100%;
 }
 
+.message-card,
+.message-card .table-responsive {
+    overflow: visible !important;
+}
+
+.message-card {
+    position: relative;
+    z-index: 1;
+}
+
+.message-card .table-responsive {
+    min-height: 8rem;
+}
+
+.message-card .dropdown,
+.message-card .content-action-group {
+    position: relative;
+    z-index: 20;
+}
+
+.message-card .dropdown-menu.content-action-menu {
+    z-index: 1085;
+}
+
+@media (max-width: 991.98px) {
+    .message-card .table-responsive {
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        padding-bottom: 4.5rem;
+    }
+
+    .message-card .message-table {
+        min-width: 760px;
+    }
+}
+
 .message-compose-grid {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
@@ -15597,6 +15633,42 @@ body.role-student .content td.text-right .content-action-group,
 body.role-parent .content td.text-right .content-action-group {
     margin-left: auto !important;
     justify-content: flex-end !important;
+}
+
+body.role-admin .content .message-card,
+body.role-staff .content .message-card,
+body.role-teacher .content .message-card,
+body.role-homeroom .content .message-card,
+body.role-student .content .message-card,
+body.role-parent .content .message-card,
+body.role-admin .content .message-card .table-responsive,
+body.role-staff .content .message-card .table-responsive,
+body.role-teacher .content .message-card .table-responsive,
+body.role-homeroom .content .message-card .table-responsive,
+body.role-student .content .message-card .table-responsive,
+body.role-parent .content .message-card .table-responsive,
+body.role-admin .content .message-card table.message-table,
+body.role-staff .content .message-card table.message-table,
+body.role-teacher .content .message-card table.message-table,
+body.role-homeroom .content .message-card table.message-table,
+body.role-student .content .message-card table.message-table,
+body.role-parent .content .message-card table.message-table,
+body.role-admin .content .message-card table.message-table td,
+body.role-staff .content .message-card table.message-table td,
+body.role-teacher .content .message-card table.message-table td,
+body.role-homeroom .content .message-card table.message-table td,
+body.role-student .content .message-card table.message-table td,
+body.role-parent .content .message-card table.message-table td {
+    overflow: visible !important;
+}
+
+body.role-admin .content .message-card .dropdown-menu.content-action-menu,
+body.role-staff .content .message-card .dropdown-menu.content-action-menu,
+body.role-teacher .content .message-card .dropdown-menu.content-action-menu,
+body.role-homeroom .content .message-card .dropdown-menu.content-action-menu,
+body.role-student .content .message-card .dropdown-menu.content-action-menu,
+body.role-parent .content .message-card .dropdown-menu.content-action-menu {
+    z-index: 9999 !important;
 }
 
 body.role-teacher .content .content-action-btn,

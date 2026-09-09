@@ -159,9 +159,6 @@ class ParentController extends Controller
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('users', 'phone')
-                    ->where('role_type', 'parent')
-                    ->ignore($parent?->getKey()),
                 function (string $attribute, mixed $value, \Closure $fail) use ($parent) {
                     if ($this->userPhoneConflictForParent((string) $value, $parent)) {
                         $fail('Thông tin này đã tồn tại trong hệ thống, vui lòng kiểm tra lại!');
@@ -242,11 +239,26 @@ class ParentController extends Controller
             ]);
         }
 
-        $user = $parent->user ?: new User([
-            'role' => 'parent',
-            'parent_id' => $parent->id,
-            'is_active' => true,
-        ]);
+        $user = $parent->user ?: User::where(function ($query) use ($parent) {
+                $query->where('username', $parent->phone)
+                    ->orWhere('phone', $parent->phone);
+            })
+            ->where('role', 'parent')
+            ->first();
+
+        if (! $user) {
+            $user = new User([
+                'role' => 'parent',
+                'parent_id' => $parent->id,
+                'is_active' => true,
+            ]);
+        }
+
+        if ($user->parent_id && (string) $user->parent_id !== (string) $parent->id) {
+            throw ValidationException::withMessages([
+                'phone' => 'Số điện thoại này đang được dùng làm tài khoản phụ huynh khác.',
+            ]);
+        }
 
         $user->username = $parent->phone;
         $user->full_name = $parent->name;

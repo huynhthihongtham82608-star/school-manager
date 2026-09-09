@@ -337,6 +337,7 @@
         border-radius: 8px;
         background: #fff;
         box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+        overflow: visible;
     }
 
     @media (min-width: 992px) {
@@ -415,6 +416,53 @@
     .admin-score-reset-btn:hover {
         color: #9a3412;
         background: #ffedd5;
+    }
+
+    .admin-score-filter-menu {
+        min-width: 18rem;
+        border: 1px solid #fed7aa;
+        border-radius: 10px;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, .14);
+        z-index: 1080;
+        overflow: visible;
+    }
+
+    .admin-score-filter-menu .form-select,
+    .admin-score-filter-menu .admin-score-reset-btn {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .admin-score-filter-trigger {
+        justify-content: center;
+        width: 2.35rem;
+        height: 2.35rem;
+        padding: 0;
+    }
+
+    .admin-score-filter-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .5rem;
+        padding-top: .25rem;
+    }
+
+    .admin-score-filter-actions .admin-score-reset-btn {
+        width: auto;
+        min-width: 6.25rem;
+        max-width: none;
+        white-space: nowrap;
+    }
+
+    .admin-score-filter-dropdown {
+        flex: 0 0 auto;
+        order: 3;
+    }
+
+    .admin-score-toolbar [data-admin-eval-toggle] {
+        order: 2;
+        margin-left: auto;
     }
 
     .admin-score-context {
@@ -947,6 +995,20 @@
                     value="{{ $adminMatrix['filters']['q'] ?? '' }}"
                 >
                 <input type="hidden" data-admin-score-year value="{{ $adminMatrix['filters']['school_year_id'] ?? $selectedYearId }}">
+                <div class="admin-eval-toggle d-inline-flex align-items-center gap-1 ms-auto" data-admin-eval-toggle style="display: none;">
+                    <button type="button" class="btn text-sm font-normal text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs" data-eval-tab="GRADE_10">
+                        📊 Môn chấm điểm
+                    </button>
+                    <button type="button" class="btn text-sm font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all" data-eval-tab="ASSESSMENT">
+                        📝 Môn nhận xét
+                    </button>
+                </div>
+                <div class="dropdown admin-score-filter-dropdown">
+                    <button type="button" class="admin-score-reset-btn admin-score-filter-trigger" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Bộ lọc điểm số" aria-label="Bộ lọc điểm số">
+                        <i class="bi bi-funnel"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end p-3 admin-score-filter-menu">
+                        <div class="d-grid gap-3">
                 <select class="form-select" data-admin-score-grade>
                     <option value="">Chọn Khối</option>
                     @foreach([10, 11, 12] as $grade)
@@ -962,7 +1024,7 @@
                 <select class="form-select" data-admin-score-subject>
                     <option value="">Tất cả môn học</option>
                     @foreach(($adminMatrix['subjects'] ?? []) as $subjectOption)
-                        <option value="{{ $subjectOption['id'] }}">{{ $subjectOption['name'] }}</option>
+                                    <option value="{{ $subjectOption['id'] }}" @selected((string) ($adminMatrix['filters']['subject_id'] ?? '') === (string) $subjectOption['id'])>{{ $subjectOption['name'] }}</option>
                     @endforeach
                 </select>
                 <select class="form-select" data-admin-score-semester>
@@ -970,17 +1032,17 @@
                         <option value="{{ $semesterOption['id'] }}" @selected((string) ($adminMatrix['filters']['semester_id'] ?? '') === (string) $semesterOption['id'])>{{ $semesterOption['name'] }}</option>
                     @endforeach
                 </select>
-                <div class="admin-eval-toggle d-inline-flex align-items-center gap-1 ms-auto" data-admin-eval-toggle style="display: none;">
-                    <button type="button" class="btn text-sm font-normal text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs" data-eval-tab="GRADE_10">
-                        📊 Môn chấm điểm
+                <div class="admin-score-filter-actions">
+                    <button type="button" class="admin-score-reset-btn" data-admin-score-reset>
+                        <i class="bi bi-arrow-counterclockwise"></i>Đặt lại lọc
                     </button>
-                    <button type="button" class="btn text-sm font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-all" data-eval-tab="ASSESSMENT">
-                        📝 Môn nhận xét
+                    <button type="button" class="admin-score-reset-btn" data-admin-score-apply>
+                        <i class="bi bi-check2"></i>Áp dụng
                     </button>
                 </div>
-                <button type="button" class="admin-score-reset-btn" data-admin-score-reset>
-                    <i class="bi bi-arrow-counterclockwise"></i>Đặt lại lọc
-                </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="admin-score-context" data-admin-score-context>
@@ -1047,6 +1109,10 @@
                         cascade: app.dataset.cascadeUrl,
                         matrix: app.dataset.matrixUrl,
                     };
+
+                    app.querySelectorAll('.admin-score-filter-menu').forEach((menu) => {
+                        menu.addEventListener('click', (event) => event.stopPropagation());
+                    });
                     const controls = {
                         year: app.querySelector('[data-admin-score-year]'),
                         grade: app.querySelector('[data-admin-score-grade]'),
@@ -1055,6 +1121,7 @@
                         semester: app.querySelector('[data-admin-score-semester]'),
                         search: app.querySelector('[data-admin-score-search]'),
                         reset: app.querySelector('[data-admin-score-reset]'),
+                        apply: app.querySelector('[data-admin-score-apply]'),
                     };
                     const head = app.querySelector('[data-admin-score-head]');
                     const body = app.querySelector('[data-admin-score-body]');
@@ -1177,7 +1244,7 @@
 
                     const renderFilters = (payload) => {
                         setOptions(controls.classRoom, payload.classes || [], 'Tất cả lớp', payload.filters?.class_id || controls.classRoom?.value || '');
-                        setOptions(controls.subject, payload.subjects || [], 'Tất cả môn học', controls.subject?.value || '');
+                        setOptions(controls.subject, payload.subjects || [], 'Tất cả môn học', payload.filters?.subject_id || controls.subject?.value || '');
                         if (payload.semesters) {
                             setOptions(controls.semester, payload.semesters, null, payload.filters?.semester_id || controls.semester?.value || '');
                         }
@@ -1198,6 +1265,10 @@
                         const lockYearColumns = termIndex === 1;
                         const mode = payload.mode || 'empty';
                         const allHeaders = payload.headers || [];
+                        const selectedSubjectId = payload.filters?.subject_id || controls.subject?.value || '';
+                        const selectedSubjectMeta = (payload.subjects || []).find((subject) => String(subject.id).trim() == String(selectedSubjectId).trim());
+                        const isAssessmentSubjectDetail = mode === 'subject_details'
+                            && String(selectedSubjectMeta?.assessment_type || '').trim().toUpperCase() === 'ASSESSMENT';
 
                         let visibleHeaderIndices = [];
                         let visibleHeaders = [];
@@ -1230,8 +1301,8 @@
                             const iconSpan = document.createElement('span');
                             const isActive = currentSortColumn === columnKey;
 
-                            iconSpan.className = 'text-orange-400/80 font-normal ml-1 cursor-pointer hover:text-orange-600 transition-colors select-none text-sm';
-                            iconSpan.textContent = '?';
+                            iconSpan.className = 'text-orange-500 font-normal ml-1 cursor-pointer hover:text-orange-700 transition-colors select-none text-sm';
+                            iconSpan.textContent = isActive ? (currentSortDirection === 'desc' ? '↓' : '↑') : '↕';
 
                             th.appendChild(iconSpan);
 
@@ -1267,8 +1338,9 @@
                         };
                         const scoreText = (value) => {
                             const span = document.createElement('span');
-                            span.className = value ? 'admin-score-value' : 'admin-score-empty';
-                            span.textContent = value || '–';
+                            const hasValue = value !== null && value !== undefined && value !== '';
+                            span.className = hasValue ? 'admin-score-value' : 'admin-score-empty';
+                            span.textContent = hasValue ? value : '–';
                             return span;
                         };
 
@@ -1282,6 +1354,11 @@
                                 appendTermHeaders(tr);
                                 break;
                             case 'subject_details': {
+                                if (isAssessmentSubjectDetail) {
+                                    tr.appendChild(createSortableTh('Đánh giá', 'assessment', (r) => r.detail_cells?.average));
+                                    break;
+                                }
+
                                 const detailKeyMap = [
                                     { label: 'Điểm Miệng', key: 'oral' },
                                     { label: '15 phút (1)', key: 'fifteen_1' },
@@ -1316,7 +1393,7 @@
                                 : 'Không có học sinh phù hợp bộ lọc.';
                             const emptyCell = cell('td', emptyMessage, 'text-muted');
                             emptyCell.colSpan = mode === 'subject_details'
-                                ? 9
+                                ? (isAssessmentSubjectDetail ? 4 : 9)
                                 : (allHeaders.length + (mode === 'grade_summary' ? 7 : 6));
                             empty.appendChild(emptyCell);
                             body.appendChild(empty);
@@ -1337,6 +1414,13 @@
                                         break;
                                     case 'subject_details': {
                                         const detail = row.detail_cells || {};
+                                        if (isAssessmentSubjectDetail) {
+                                            const td = document.createElement('td');
+                                            td.appendChild(scoreText(detail.average));
+                                            rowEl.appendChild(td);
+                                            break;
+                                        }
+
                                         ['oral', 'fifteen_1', 'fifteen_2', 'midterm', 'final', 'average'].forEach((key) => {
                                             const td = document.createElement('td');
                                             td.appendChild(scoreText(detail[key]));
@@ -1564,9 +1648,18 @@
                             });
                     });
 
+                    controls.apply?.addEventListener('click', () => {
+                        refreshCascade()
+                            .then(refreshMatrix)
+                            .catch(console.error);
+                    });
+
                     const switchEvalTab = async (targetTab) => {
                         const normTab = String(targetTab).trim().toUpperCase();
                         activeEvaluationType = normTab === 'ASSESSMENT' || normTab === 'PASS_FAIL' ? 'ASSESSMENT' : 'GRADE_10';
+                        if (controls.subject) {
+                            controls.subject.value = '';
+                        }
 
                         if (grade10TabBtn && assessmentTabBtn) {
                             const activeClass = 'btn text-sm font-normal text-orange-800 bg-orange-100 border border-orange-200 rounded px-2.5 py-1 cursor-pointer shadow-xs';

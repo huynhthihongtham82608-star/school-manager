@@ -112,6 +112,8 @@ class AuditLog extends Model
             str_contains($action, 'score') || $basename === 'ScoreHeader' || $basename === 'ScoreDetail' || $basename === 'ScoreColumn' => 'Điểm số',
             str_contains($action, 'attendance') || $basename === 'AttendanceRecord' => 'Điểm danh',
             str_contains($action, 'conduct') || $basename === 'Conduct' => 'Hạnh kiểm',
+            str_contains($action, 'tuition') || $basename === 'TuitionFee' => 'Học phí',
+            str_contains($action, 'substitute') || $basename === 'SubstituteTeaching' => 'Lịch dạy thay',
             str_contains($action, 'subject') || $basename === 'Subject' => 'Môn học',
             str_contains($action, 'class') || $basename === 'SchoolClass' => 'Lớp học',
             str_contains($action, 'assignment') || $basename === 'TeachingAssignment' => 'Phân công',
