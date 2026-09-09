@@ -324,13 +324,19 @@ class TeachingOrganizationUiTest extends TestCase
             $this->markTestSkipped('No active semester is available.');
         }
 
-        $class = \App\Models\SchoolClass::where('school_year_id', $semester->school_year_id)
-            ->whereHas('students', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
+        $entry = TimetableEntry::with('timetable.classRoom')
+            ->where('status', TimetableEntry::STATUS_ACTIVE)
+            ->whereHas('timetable', fn ($query) => $query->where('semester_id', $semester->getKey()))
+            ->whereBetween('period', [1, 5])
+            ->whereHas('timetable.classRoom.students', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
             ->first();
 
-        if (! $class) {
-            $this->markTestSkipped('No class with students is available for the active semester.');
+        if (! $entry || ! $entry->timetable?->classRoom) {
+            $this->markTestSkipped('No class with a scheduled morning session and students is available for the active semester.');
         }
+
+        $class = $entry->timetable->classRoom;
+        $attendanceDate = now()->startOfWeek()->addDays(((int) $entry->day_of_week) - 1)->format('Y-m-d');
 
         $studentStatuses = Student::where('class_id', $class->getKey())
             ->where('status', Student::STATUS_STUDYING)
@@ -344,7 +350,7 @@ class TeachingOrganizationUiTest extends TestCase
             'school_year_id' => $semester->school_year_id,
             'class_id' => $class->getKey(),
             'semester_id' => $semester->getKey(),
-            'attendance_date' => now()->format('Y-m-d'),
+            'attendance_date' => $attendanceDate,
             'attendance_type' => AttendanceRecord::SESSION_MORNING,
             'status' => $studentStatuses,
         ]);

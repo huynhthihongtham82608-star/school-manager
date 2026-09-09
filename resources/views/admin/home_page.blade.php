@@ -184,6 +184,11 @@
             });
 
             const showHomepageToast = (message, type = 'success') => {
+                if (window.SchoolToast) {
+                    window.SchoolToast(type === 'success' ? 'success' : 'error', message);
+                    return;
+                }
+
                 const toast = document.createElement('div');
                 toast.className = `homepage-config-toast ${type === 'success' ? 'success' : 'error'}`;
                 const icon = document.createElement('span');

@@ -36,6 +36,9 @@ class AttendanceController extends Controller
         $readOnly = $this->isHistoricalReadOnly();
         $rawSessionType = $request->query('attendance_type', $request->query('session_type'));
         $selectedSessionType = in_array((string) $rawSessionType, ['', 'all'], true) ? null : $rawSessionType;
+        $requestedMainSessionType = in_array((string) $rawSessionType, [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON], true)
+            ? (string) $rawSessionType
+            : null;
         $selectedTimetableEntryId = $request->query('timetable_entry_id');
         $selectedPeriod = $request->query('period', $request->query('slot'));
         $selectedTeachingSession = $request->query('teaching_session');
@@ -170,6 +173,8 @@ class AttendanceController extends Controller
         $approvedLeaveRequests = collect();
         $approvedLeaveStudentIds = collect();
         $allowedSessionTypes = $this->mainAttendanceSessionTypes();
+        $sessionTypeOptions = $allowedSessionTypes;
+        $sessionRequiresScheduleButUnavailable = false;
         $isEditingSession = false;
         $attendanceHistory = collect();
         $parentLeaveChildren = collect();
@@ -189,11 +194,27 @@ class AttendanceController extends Controller
 
             if ($selectedClass && $selectedSemester) {
                 $allowedSessionTypes = $this->allowedSessionTypes($user, $selectedClass);
+                $sessionTypeOptions = $allowedSessionTypes;
                 if (! $isSubjectTeacherOnlyAttendance && $attendanceViewMode === 'day') {
                     $scheduledSessionTypes = $this->scheduledMainSessionTypes($selectedClass, $selectedSemester->id, $date);
+                    $roleAllowedSessionTypes = $allowedSessionTypes;
+                    $sessionTypeOptions = $roleAllowedSessionTypes;
                     $allowedSessionTypes = array_intersect_key($allowedSessionTypes, $scheduledSessionTypes);
+
+                    if (
+                        $requestedMainSessionType
+                        && array_key_exists($requestedMainSessionType, $roleAllowedSessionTypes)
+                        && ! array_key_exists($requestedMainSessionType, $scheduledSessionTypes)
+                    ) {
+                        $selectedSessionType = $requestedMainSessionType;
+                        $sessionRequiresScheduleButUnavailable = true;
+                    }
                 }
-                if ($selectedSessionType && ! array_key_exists((string) $selectedSessionType, $allowedSessionTypes)) {
+                if (
+                    $selectedSessionType
+                    && ! $sessionRequiresScheduleButUnavailable
+                    && ! array_key_exists((string) $selectedSessionType, $allowedSessionTypes)
+                ) {
                     $selectedSessionType = array_key_first($allowedSessionTypes) ?: null;
                 }
 
@@ -397,6 +418,8 @@ class AttendanceController extends Controller
             'selectedTeachingSession',
             'availableTimetableEntries',
             'allowedSessionTypes',
+            'sessionTypeOptions',
+            'sessionRequiresScheduleButUnavailable',
             'isEditingSession',
             'date',
             'readOnly',
@@ -959,8 +982,16 @@ class AttendanceController extends Controller
                     ->filter(fn (AttendanceRecord $record) => $record->isUnexcusedAbsent()
                         && $record->isPeriodSession())
                     ->values();
-                $subjectAbsent = $subjectAbsentItems->count();
-                $suspiciousSubjectAbsent = $subjectAbsentItems
+                $displayableSubjectAbsentItems = $subjectAbsentItems
+                    ->reject(function (AttendanceRecord $record) use ($morningAbsent, $afternoonAbsent) {
+                        $period = (int) ($record->timetableEntry?->period ?? $record->session_order ?: 0);
+
+                        return ($morningAbsent && $period >= 1 && $period <= 5)
+                            || ($afternoonAbsent && $period > 5);
+                    })
+                    ->values();
+                $subjectAbsent = $displayableSubjectAbsentItems->count();
+                $suspiciousSubjectAbsent = $displayableSubjectAbsentItems
                     ->filter(fn (AttendanceRecord $record) => $record->isSuspiciousPeriodAbsence())
                     ->count();
                 $markers = collect();
@@ -973,7 +1004,7 @@ class AttendanceController extends Controller
                     $markers->push('C');
                 }
 
-                $subjectAbsentItems
+                $displayableSubjectAbsentItems
                     ->map(fn (AttendanceRecord $record) => 'V' . (string) ($record->timetableEntry?->periodInSession() ?? $record->session_order ?: ''))
                     ->filter()
                     ->unique()

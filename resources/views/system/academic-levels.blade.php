@@ -249,9 +249,17 @@
 
         const bindRow = (row) => {
             row.querySelector('[data-edit-academic-row]')?.addEventListener('click', () => openModal(row));
-            row.querySelector('[data-delete-academic-row]')?.addEventListener('click', () => {
+            row.querySelector('[data-delete-academic-row]')?.addEventListener('click', async () => {
                 const label = row.dataset.label || 'mức học lực này';
-                if (!window.confirm(`Bạn có chắc chắn muốn xóa "${label}" khỏi cấu hình mốc điểm học lực?`)) {
+                const confirmed = window.SchoolConfirm
+                    ? await window.SchoolConfirm(`Bạn có chắc chắn muốn xóa "${label}" khỏi cấu hình mốc điểm học lực?`, {
+                        isDelete: true,
+                        title: 'Xác nhận xóa mốc điểm',
+                        submitText: 'Xóa',
+                    })
+                    : false;
+
+                if (!confirmed) {
                     return;
                 }
 

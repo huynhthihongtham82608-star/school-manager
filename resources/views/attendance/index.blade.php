@@ -1059,7 +1059,7 @@
                 <div class="attendance-toolbar-field session-filter">
                     <label class="form-label">Buổi</label>
                     <select name="attendance_type" class="form-select text-sm font-normal text-gray-700 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-md focus:border-orange-500 focus:outline-none cursor-pointer text-left" data-attendance-type-select onchange="this.form.submit()">
-                        @foreach($allowedSessionTypes as $typeValue => $typeLabel)
+                        @foreach(($sessionTypeOptions ?? $allowedSessionTypes) as $typeValue => $typeLabel)
                             <option value="{{ $typeValue }}" @selected($selectedSessionType === $typeValue)>{{ $typeLabel }}</option>
                         @endforeach
                     </select>
@@ -1103,7 +1103,7 @@
             <label class="form-label">Buổi</label>
             <select name="attendance_type" class="form-select" data-attendance-type-select onchange="this.form.submit()">
                 <option value="all" @selected(! $selectedSessionType)>Tất cả buổi</option>
-                @foreach($allowedSessionTypes as $typeValue => $typeLabel)
+                @foreach(($sessionTypeOptions ?? $allowedSessionTypes) as $typeValue => $typeLabel)
                     <option value="{{ $typeValue }}" @selected($selectedSessionType === $typeValue)>{{ $typeLabel }}</option>
                 @endforeach
             </select>
@@ -1201,17 +1201,17 @@
         </div>
     @endif
 
-    @if($attendanceViewMode === 'day' && ! $isSubjectTeacherAttendanceView && $selectedClassId && $selectedSemesterId && $date && empty($allowedSessionTypes))
+    @if($attendanceViewMode === 'day' && ! $isSubjectTeacherAttendanceView && $selectedClassId && $selectedSemesterId && $date && (($sessionRequiresScheduleButUnavailable ?? false) || empty($allowedSessionTypes)))
         <div class="card border-0 shadow-xs mb-3">
             <div class="card-body text-left">
                 <div class="text-sm font-normal text-orange-700 bg-orange-50/60 border border-orange-100 rounded-lg px-3 py-2">
-                    Không có lịch học trong ngày đã chọn nên không cần tạo phiên điểm danh.
+                    {{ ($sessionRequiresScheduleButUnavailable ?? false) ? 'Không có lịch học trong buổi đã chọn nên không cần tạo phiên điểm danh.' : 'Không có lịch học trong ngày đã chọn nên không cần tạo phiên điểm danh.' }}
                 </div>
             </div>
         </div>
     @endif
 
-    @if($attendanceViewMode === 'day' && $selectedClassId && $selectedSemesterId && $date && ($isSubjectTeacherAttendanceView || $selectedSessionType))
+    @if($attendanceViewMode === 'day' && empty($sessionRequiresScheduleButUnavailable) && $selectedClassId && $selectedSemesterId && $date && ($isSubjectTeacherAttendanceView || $selectedSessionType))
         <div class="card mb-3 attendance-register-card" id="attendance-register">
             <div class="card-header d-flex flex-column flex-md-row justify-content-between gap-2">
                 <div>

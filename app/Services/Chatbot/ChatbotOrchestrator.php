@@ -81,7 +81,7 @@ class ChatbotOrchestrator
             ]);
         }
 
-        $history = $this->recentMessages($user, 8);
+        $history = $this->recentMessages($user, 4);
         $systemInstruction = $this->systemInstruction($user);
         $toolDeclarations = $this->registry->declarations();
         $choice = $this->gemini->chooseTool($systemInstruction, $history, $question, $toolDeclarations);
@@ -133,6 +133,11 @@ class ChatbotOrchestrator
             'tool_result_summary' => $this->summarizeToolResult($toolResult),
             'model' => $final['model'] ?? $choice['model'] ?? null,
             'latency_ms' => $this->duration($startedAt),
+            'gemini_choice_ms' => $choice['duration_ms'] ?? null,
+            'tool_duration_ms' => $toolResult['duration_ms'] ?? null,
+            'gemini_final_ms' => $final['duration_ms'] ?? null,
+            'tool_call_count' => 1,
+            'gemini_rounds' => 2,
             'error' => $error,
         ]);
     }

@@ -1295,19 +1295,19 @@
         <div class="modal-content">
             <div class="modal-header">
                 <div>
-                    <div class="modal-kicker">Xác nhận xóa</div>
-                    <h5 class="modal-title">Bạn có chắc chắn muốn xóa dữ liệu này?</h5>
+                    <div class="modal-kicker" data-confirm-modal-kicker>Xác nhận thao tác</div>
+                    <h5 class="modal-title" data-confirm-modal-title>Bạn có chắc chắn muốn tiếp tục?</h5>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-0 text-muted">Hành động này không thể hoàn tác!</p>
+                <p class="mb-0 text-muted" data-confirm-modal-message>Hành động này sẽ được thực hiện ngay sau khi xác nhận.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
                 <button type="button" class="btn btn-danger" data-confirm-delete-submit>
                     <i class="bi bi-trash"></i>
-                    Xác nhận xóa
+                    <span data-confirm-modal-submit-text>Xác nhận</span>
                 </button>
             </div>
         </div>
@@ -1813,7 +1813,7 @@
             setBusy(true);
 
             const controller = new AbortController();
-            const timeoutId = window.setTimeout(() => controller.abort(), 45000);
+            const timeoutId = window.setTimeout(() => controller.abort(), 30000);
 
             try {
                 const response = await fetch(chatbotUrl, {
@@ -2450,8 +2450,8 @@
                     if (button) {
                         makeMenuItem(button, 'danger');
                         button.innerHTML = '<i class="bi bi-trash"></i>Xóa bỏ';
-                        if (!form.getAttribute('onsubmit')) {
-                            form.setAttribute('onsubmit', "return confirm('Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!')");
+                        if (!form.dataset.confirmMessage) {
+                            form.dataset.confirmMessage = 'Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!';
                         }
                     }
                     menu.appendChild(form);
@@ -2889,13 +2889,24 @@
                         return;
                     }
 
-                    const accepted = window.confirm(`Đang có năm học hiện hành. Bạn có muốn chuyển sang năm học mới không?`);
-                    if (accepted && confirmInput) {
-                        confirmInput.value = '1';
-                        return;
-                    }
-
                     event.preventDefault();
+                    event.stopImmediatePropagation();
+
+                    const confirmWithModal = window.SchoolConfirm
+                        ? window.SchoolConfirm('Đang có năm học hiện hành. Bạn có muốn chuyển sang năm học mới không?', {
+                            title: 'Xác nhận chuyển năm học',
+                            submitText: 'Xác nhận',
+                        })
+                        : Promise.resolve(false);
+
+                    confirmWithModal.then((accepted) => {
+                        if (!accepted || !confirmInput) {
+                            return;
+                        }
+
+                        confirmInput.value = '1';
+                        HTMLFormElement.prototype.submit.call(form);
+                    });
                 });
 
                 syncDates();
@@ -3196,6 +3207,10 @@
     (() => {
         const modalElement = document.getElementById('deleteConfirmModal');
         const confirmButton = document.querySelector('[data-confirm-delete-submit]');
+        const kickerElement = modalElement?.querySelector('[data-confirm-modal-kicker]');
+        const titleElement = modalElement?.querySelector('[data-confirm-modal-title]');
+        const messageElement = modalElement?.querySelector('[data-confirm-modal-message]');
+        const submitTextElement = modalElement?.querySelector('[data-confirm-modal-submit-text]');
 
         if (!modalElement || !confirmButton) {
             return;
@@ -3203,6 +3218,78 @@
 
         const modal = new bootstrap.Modal(modalElement);
         let pendingForm = null;
+        let pendingResolver = null;
+
+        const extractLegacyConfirmMessage = (handler) => {
+            const match = String(handler || '').match(/confirm\((['"`])([\s\S]*?)\1\)/);
+
+            if (!match) {
+                return '';
+            }
+
+            return match[2]
+                .replace(/\\'/g, "'")
+                .replace(/\\"/g, '"')
+                .replace(/\\n/g, '\n');
+        };
+
+        document.querySelectorAll('form[onsubmit]').forEach((form) => {
+            const message = extractLegacyConfirmMessage(form.getAttribute('onsubmit'));
+
+            if (message) {
+                form.dataset.confirmMessage = message;
+                form.removeAttribute('onsubmit');
+            }
+        });
+
+        const configureConfirmModal = ({ isDelete = false, message = '', title = '', submitText = '', kicker = '' } = {}) => {
+            if (kickerElement) {
+                kickerElement.textContent = kicker || (isDelete ? 'Xác nhận xóa' : 'Xác nhận thao tác');
+            }
+
+            if (titleElement) {
+                titleElement.textContent = title || (isDelete ? 'Bạn có chắc chắn muốn xóa dữ liệu này?' : 'Bạn có chắc chắn muốn tiếp tục?');
+            }
+
+            if (messageElement) {
+                messageElement.textContent = message || (isDelete
+                    ? 'Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!'
+                    : 'Bạn có chắc chắn muốn thực hiện thao tác này?');
+            }
+
+            if (submitTextElement) {
+                submitTextElement.textContent = submitText || (isDelete ? 'Xác nhận xóa' : 'Xác nhận');
+            }
+
+            confirmButton.classList.toggle('btn-danger', isDelete);
+            confirmButton.classList.toggle('btn-primary', !isDelete);
+        };
+
+        const showConfirmModal = (form, method) => {
+            const isDelete = method === 'DELETE';
+            const message = form.dataset.confirmMessage
+                || (isDelete
+                    ? 'Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!'
+                    : 'Bạn có chắc chắn muốn thực hiện thao tác này?');
+
+            pendingForm = form;
+            pendingResolver = null;
+            configureConfirmModal({ isDelete, message });
+            modal.show();
+        };
+
+        window.SchoolConfirm = (message, options = {}) => new Promise((resolve) => {
+            pendingForm = null;
+            pendingResolver = resolve;
+            configureConfirmModal({
+                isDelete: Boolean(options.isDelete),
+                message,
+                title: options.title || '',
+                submitText: options.submitText || '',
+                kicker: options.kicker || '',
+            });
+            modal.show();
+        });
 
         document.addEventListener('submit', (event) => {
             const form = event.target;
@@ -3212,22 +3299,36 @@
             }
 
             const methodInput = form.querySelector('input[name="_method"]');
+            const method = String(methodInput?.value || form.method || 'GET').toUpperCase();
+            const needsConfirmation = method === 'DELETE' || Boolean(form.dataset.confirmMessage);
 
-            if (!methodInput || methodInput.value.toUpperCase() !== 'DELETE') {
+            if (!needsConfirmation) {
                 return;
             }
 
             event.preventDefault();
             event.stopImmediatePropagation();
-            pendingForm = form;
-            modal.show();
+            showConfirmModal(form, method);
         }, true);
 
         modalElement.addEventListener('hidden.bs.modal', () => {
             pendingForm = null;
+            if (pendingResolver) {
+                const resolve = pendingResolver;
+                pendingResolver = null;
+                resolve(false);
+            }
         });
 
         confirmButton.addEventListener('click', () => {
+            if (pendingResolver) {
+                const resolve = pendingResolver;
+                pendingResolver = null;
+                modal.hide();
+                resolve(true);
+                return;
+            }
+
             if (!pendingForm) {
                 return;
             }

@@ -11,6 +11,11 @@ use Throwable;
 
 class GeminiClient
 {
+    private const HISTORY_LIMIT = 4;
+    private const TOOL_SELECTION_MAX_TOKENS = 420;
+    private const FINAL_ANSWER_MAX_TOKENS = 520;
+    private const FALLBACK_HTTP_STATUSES = [404];
+
     public function chooseTool(string $systemInstruction, Collection $history, string $message, array $toolDeclarations): array
     {
         return $this->requestWithFallback(function (string $model) use ($systemInstruction, $history, $message, $toolDeclarations) {
@@ -30,7 +35,7 @@ class GeminiClient
                 'generationConfig' => [
                     'temperature' => 0.15,
                     'topP' => 0.85,
-                    'maxOutputTokens' => 700,
+                    'maxOutputTokens' => self::TOOL_SELECTION_MAX_TOKENS,
                 ],
             ]);
         });
@@ -92,7 +97,7 @@ class GeminiClient
                 'generationConfig' => [
                     'temperature' => 0.25,
                     'topP' => 0.9,
-                    'maxOutputTokens' => 800,
+                    'maxOutputTokens' => self::FINAL_ANSWER_MAX_TOKENS,
                 ],
             ]);
         });
@@ -153,6 +158,10 @@ class GeminiClient
                         'error_message' => Str::limit($lastFailure['message'], 800),
                     ]);
 
+                    if (! $this->shouldTryFallbackForHttpStatus($response->status())) {
+                        break;
+                    }
+
                     continue;
                 }
 
@@ -169,8 +178,10 @@ class GeminiClient
                 ];
             } catch (ConnectionException $exception) {
                 $lastFailure = $this->exceptionFailure('connection', $model, $startedAt, $exception);
+                break;
             } catch (Throwable $exception) {
                 $lastFailure = $this->exceptionFailure('exception', $model, $startedAt, $exception);
+                break;
             }
         }
 
@@ -198,31 +209,36 @@ class GeminiClient
     {
         $contents = [];
 
-        foreach ($history->take(-6) as $item) {
+        foreach ($history->take(-self::HISTORY_LIMIT) as $item) {
             $question = trim((string) ($item->question ?? ''));
             $answer = trim((string) ($item->answer ?? ''));
 
             if ($question !== '') {
                 $contents[] = [
                     'role' => 'user',
-                    'parts' => [['text' => Str::limit($question, 1000, '')]],
+                    'parts' => [['text' => Str::limit($question, 700, '')]],
                 ];
             }
 
             if ($answer !== '') {
                 $contents[] = [
                     'role' => 'model',
-                    'parts' => [['text' => Str::limit($answer, 1200, '')]],
+                    'parts' => [['text' => Str::limit($answer, 900, '')]],
                 ];
             }
         }
 
         $contents[] = [
             'role' => 'user',
-            'parts' => [['text' => $message]],
+            'parts' => [['text' => Str::limit($message, 1200, '')]],
         ];
 
         return $contents;
+    }
+
+    private function shouldTryFallbackForHttpStatus(int $status): bool
+    {
+        return in_array($status, self::FALLBACK_HTTP_STATUSES, true);
     }
 
     private function extractFunctionCall(array $payload): ?array

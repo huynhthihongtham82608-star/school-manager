@@ -218,7 +218,7 @@
                                         @endif
                                         @if($class->canActivate())
                                             <li>
-                                                <form action="{{ route('classes.activate', $class) }}" method="POST" onsubmit="return confirm('{{ $class->isLocked() ? 'Bạn có chắc chắn muốn mở khóa lớp học này?' : 'Bạn có chắc chắn muốn kích hoạt lớp học này?' }}');">
+                                                <form action="{{ route('classes.activate', $class) }}" method="POST" data-confirm-message="{{ $class->isLocked() ? 'Bạn có chắc chắn muốn mở khóa lớp học này?' : 'Bạn có chắc chắn muốn kích hoạt lớp học này?' }}">
                                                     @csrf
                                                     @method('PATCH')
                                                     <button type="submit" class="dropdown-item">
@@ -229,7 +229,7 @@
                                         @endif
                                         @if($class->canLock())
                                             <li>
-                                                <form action="{{ route('classes.lock', $class) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn khóa lớp học này? Sau khi khóa, lớp chỉ được xem cho đến khi mở khóa lại.');">
+                                                <form action="{{ route('classes.lock', $class) }}" method="POST" data-confirm-message="Bạn có chắc chắn muốn khóa lớp học này? Sau khi khóa, lớp chỉ được xem cho đến khi mở khóa lại.">
                                                     @csrf
                                                     @method('PATCH')
                                                     <button type="submit" class="dropdown-item">
@@ -240,7 +240,7 @@
                                         @endif
                                         @if($class->canArchive())
                                             <li>
-                                                <form action="{{ route('classes.archive', $class) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn lưu trữ lớp học này?');">
+                                                <form action="{{ route('classes.archive', $class) }}" method="POST" data-confirm-message="Bạn có chắc chắn muốn lưu trữ lớp học này?">
                                                     @csrf
                                                     @method('PATCH')
                                                     <button type="submit" class="dropdown-item">
@@ -251,7 +251,7 @@
                                         @endif
                                         @if($deleteCheck['allowed'])
                                             <li>
-                                                <form action="{{ route('classes.destroy', $class) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn xóa lớp học này? Hành động này không thể hoàn tác.');">
+                                                <form action="{{ route('classes.destroy', $class) }}" method="POST" data-confirm-message="Bạn có chắc chắn muốn xóa lớp học này? Hành động này không thể hoàn tác.">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item danger">
@@ -261,7 +261,7 @@
                                             </li>
                                         @else
                                             <li>
-                                                <form action="{{ route('classes.destroy', $class) }}" method="POST" onsubmit="return confirm('{{ $deleteCheck['message'] ?? 'Không thể xóa lớp này vì đã có dữ liệu liên quan.' }}');">
+                                                <form action="{{ route('classes.destroy', $class) }}" method="POST" data-confirm-message="{{ $deleteCheck['message'] ?? 'Không thể xóa lớp này vì đã có dữ liệu liên quan.' }}">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item danger">

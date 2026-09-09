@@ -86,7 +86,7 @@
                                         </li>
                                         @if($department->teachers_count === 0)
                                             <li>
-                                                <form action="{{ route('departments.destroy', $department) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa tổ chuyên môn này?');">
+                                                <form action="{{ route('departments.destroy', $department) }}" method="POST" data-confirm-message="Bạn có chắc muốn xóa tổ chuyên môn này?">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item text-danger">

@@ -1,50 +1,116 @@
-# Quản lý trường THPT (Laravel + Bootstrap 5)
+# School Manager
 
-Website quản lý trường THPT: phân quyền Admin/Giáo viên/GVCN/Học sinh, CRUD danh mục, phân công, nhập điểm hệ số, hạnh kiểm và báo cáo thống kê.
+School Manager là hệ thống quản lý trường THPT xây bằng Laravel, Bootstrap 5 và MySQL/MariaDB. Ứng dụng phục vụ các vai trò Admin, nhân viên, giáo viên bộ môn, giáo viên chủ nhiệm, học sinh và phụ huynh.
 
 ## Yêu cầu môi trường
-- PHP 8.2+ (XAMPP/Laragon ok) + Composer
-- MySQL 5.7/8.0 (database: `school_manager`)
-- PHP `openssl`, `pdo_mysql`, `mbstring`
 
-## Cài đặt nhanh (localhost)
+- PHP 8.2 trở lên.
+- Composer.
+- MySQL hoặc MariaDB, phù hợp với XAMPP/Laragon.
+- Các extension PHP thường dùng: `pdo_mysql`, `openssl`, `mbstring`, `fileinfo`.
+- Trình duyệt hiện đại để dùng giao diện quản trị.
+
+## Cài đặt local
+
 ```bash
-cd school-manager
-composer install   # nếu chưa chạy
-cp .env.example .env
-# chỉnh DB_* trong .env theo MySQL của bạn (root, password…)
+cd C:\xampp\htdocs\school-manager
+composer install
+copy .env.example .env
 php artisan key:generate
-php artisan migrate --seed
-# hoặc import file SQL: database/school_manager.sql
-php artisan serve   # hoặc cấu hình vhost XAMPP/Laragon trỏ vào public/
 ```
 
-## Tài khoản demo
-- Admin: `admin / admin123`
-- GV Toán: `gvtoan / gv123`
-- GVCN 10A1: `gvcn10a1 / gv123`
-- HS001: `hs001 / hs123`
+Cấu hình database trong `.env`:
 
-## Chức năng chính
-- Đăng nhập phiên (Auth::attempt), phân quyền middleware `role`.
-- CRUD: năm học, học kỳ (mở/khóa nhập điểm), lớp (GVCN, sĩ số), môn (hệ số 2), giáo viên, học sinh.
-- Phân công giảng dạy GV–Lớp–Môn–Năm học.
-- Khóa/mở kỳ nhập điểm theo lớp/môn/học kỳ (grade window).
-- Nhập điểm dạng bảng (miệng/15p/1 tiết/giữa kỳ/cuối kỳ) bằng chuỗi nhiều giá trị, tự tính TB theo hệ số HS1=1, HS2=2, HS3=3.
-- GVCN nhập hạnh kiểm + nhận xét theo học kỳ.
-- Báo cáo tổng kết lớp: TB, xếp loại học lực (>=8 Giỏi, >=6.5 Khá, >=5 TB), hạnh kiểm, tỷ lệ Giỏi/Khá/TB/Yếu.
-- Dashboard theo role, sidebar Bootstrap 5 responsive.
+```dotenv
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=school_manager
+DB_USERNAME=root
+DB_PASSWORD=
+```
 
-## Cấu trúc chính
-- Migrations: `database/migrations/` (users, school_years, semesters, classes, students, teachers, subjects, teaching_assignments, score_headers/details, conducts, grade_windows).
-- Models: `app/Models/*` (SchoolClass, SchoolYear, Semester, Subject, Teacher, Student, TeachingAssignment, ScoreHeader/Detail, Conduct, GradeWindow).
-- Controllers/Views: `app/Http/Controllers`, `resources/views` (layout + các trang CRUD, nhập điểm, báo cáo).
-- Seed + SQL mẫu: `database/seeders/DatabaseSeeder.php`, `database/school_manager.sql`.
+Sau đó tạo database `school_manager` trong MySQL/MariaDB rồi chọn một trong hai cách:
 
-## Ghi chú vận hành
-- Mặc định session dùng database (`sessions` table). Kiểm tra `SESSION_DRIVER=database` trong .env.
-- Khi cần mở/khóa nhập điểm: trang `grade-windows` hoặc bật/tắt nhanh ở Học kỳ (`is_score_input_open`).
-- Nếu chạy artisan không kết nối MySQL, kiểm tra lại DB host/port và quyền user.
+- Cài mới bằng migration/seed:
 
-## Phần mở rộng gợi ý
-- Import/Export Excel/PDF, lịch sử điểm, phân quyền chi tiết hơn, gửi SMS/Email phụ huynh, audit log.
+```bash
+php artisan migrate --seed
+```
+
+- Hoặc import file SQL mẫu nếu cần khôi phục đúng dữ liệu demo:
+
+```bash
+mysql -u root school_manager < database/school_manager.sql
+```
+
+Chạy ứng dụng:
+
+```bash
+php artisan serve
+```
+
+Khi dùng XAMPP trực tiếp, trỏ trình duyệt tới thư mục `public/` hoặc cấu hình virtual host về `public`.
+
+## Cấu hình kiểm thử
+
+Project dùng database test riêng:
+
+```dotenv
+APP_ENV=testing
+DB_CONNECTION=mysql
+DB_DATABASE=school_manager_testing
+SESSION_DRIVER=array
+GEMINI_API_KEY=
+```
+
+Không chạy test trực tiếp trên database `school_manager`. Trước khi test, cần bảo đảm MySQL/MariaDB đang chạy và `school_manager_testing` đã được chuẩn bị.
+
+Chạy test:
+
+```bash
+php artisan test --env=testing
+```
+
+## Gemini Chatbot
+
+Chatbot dùng cấu hình qua biến môi trường, không hardcode API key trong source:
+
+```dotenv
+GEMINI_API_KEY=
+GEMINI_ENDPOINT=https://generativelanguage.googleapis.com/v1beta
+GEMINI_MODEL=gemini-flash-lite-latest
+GEMINI_MODEL_PRIMARY=gemini-flash-lite-latest
+GEMINI_MODEL_FALLBACK=gemini-3.7-flash
+GEMINI_CONNECT_TIMEOUT=5
+GEMINI_TIMEOUT=12
+GEMINI_CA_BUNDLE=
+```
+
+Nếu chạy trên localhost bị lỗi chứng chỉ, cấu hình `GEMINI_CA_BUNDLE` tới file CA hợp lệ của PHP/XAMPP.
+
+## Nhóm chức năng chính
+
+- Quản lý năm học, học kỳ, lớp học và chuyển lớp.
+- Quản lý học sinh, giáo viên, phụ huynh, tài khoản và phân quyền RBAC.
+- Quản lý tổ chuyên môn, môn học, phòng học, phân công giảng dạy.
+- Quản lý thời khóa biểu, lịch kiểm tra, điểm số, điểm danh, hạnh kiểm.
+- Quản lý khen thưởng, học phí, lịch dạy thay.
+- Quản lý thông báo, sự kiện, tài liệu học tập, tin nhắn nội bộ.
+- Báo cáo tổng hợp và chatbot học vụ.
+
+## Ghi chú an toàn
+
+- Không commit file `.env`, file SQL backup riêng, API key hoặc mật khẩu thật.
+- Không chạy `migrate:fresh`, `db:wipe`, restore hoặc seed trên database thật khi chưa backup.
+- Database thật mặc định là `school_manager`; database kiểm thử là `school_manager_testing`.
+
+## Tài liệu phục vụ tiểu luận
+
+Các tài liệu phân tích hệ thống được đặt tại `docs/thesis/`:
+
+- `system-overview.md`
+- `roles-and-usecases.md`
+- `database-design.md`
+- `business-flows.md`
+- `testing-and-limitations.md`

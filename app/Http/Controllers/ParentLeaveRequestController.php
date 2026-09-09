@@ -227,10 +227,22 @@ class ParentLeaveRequestController extends Controller
                 ->get()
             : collect();
 
+        $scheduledSessionTypes = [];
+        if ($entries->contains(fn (TimetableEntry $entry) => (int) $entry->period >= 1 && (int) $entry->period <= 5)) {
+            $scheduledSessionTypes[] = \App\Models\AttendanceRecord::SESSION_MORNING;
+        }
+        if ($entries->contains(fn (TimetableEntry $entry) => (int) $entry->period > 5)) {
+            $scheduledSessionTypes[] = \App\Models\AttendanceRecord::SESSION_AFTERNOON;
+        }
+
         foreach ([
             \App\Models\AttendanceRecord::SESSION_MORNING => ['label' => 'Điểm danh Buổi Sáng', 'order' => 1],
             \App\Models\AttendanceRecord::SESSION_AFTERNOON => ['label' => 'Điểm danh Buổi Chiều', 'order' => 2],
         ] as $sessionType => $sessionMeta) {
+            if (! in_array($sessionType, $scheduledSessionTypes, true)) {
+                continue;
+            }
+
             \App\Models\AttendanceRecord::updateOrCreate(
                 [
                     'student_id' => $student->id,
@@ -249,10 +261,6 @@ class ParentLeaveRequestController extends Controller
                     'recorded_by' => $recordedBy,
                 ]
             );
-        }
-
-        if ($entries->isEmpty()) {
-            return;
         }
 
         foreach ($entries as $entry) {

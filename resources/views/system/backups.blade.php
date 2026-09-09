@@ -8,9 +8,9 @@
     subtitle="Tạo và tải bản sao lưu database. Chức năng khôi phục đang được khóa để bảo vệ dữ liệu."
 >
     <div class="backup-header-actions">
-        <form method="POST" action="{{ route('system.backups.store') }}">
+        <form method="POST" action="{{ route('system.backups.store') }}" data-confirm-message="Tạo bản sao lưu database hiện tại?">
             @csrf
-            <button class="btn btn-primary backup-create-btn" onclick="return confirm('Tạo bản sao lưu database hiện tại?')">
+            <button class="btn btn-primary backup-create-btn">
                 <i class="bi bi-rocket-takeoff me-2"></i>Tạo bản sao lưu mới
             </button>
         </form>
@@ -249,7 +249,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const confirmed = confirm(`Bạn có chắc chắn muốn khôi phục dữ liệu từ ${selectedBackupName}? Hành động này sẽ ghi đè dữ liệu hiện tại và không thể hoàn tác.`);
+            const confirmed = window.SchoolConfirm
+                ? await window.SchoolConfirm(`Bạn có chắc chắn muốn khôi phục dữ liệu từ ${selectedBackupName}? Hành động này sẽ ghi đè dữ liệu hiện tại và không thể hoàn tác.`, {
+                    isDelete: true,
+                    title: 'Xác nhận khôi phục dữ liệu',
+                    submitText: 'Khôi phục',
+                })
+                : false;
 
             if (!confirmed) {
                 return;
@@ -278,10 +284,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 restoreToken = null;
-                alert(payload.message || 'Đã khôi phục dữ liệu thành công.');
+                window.SchoolToast?.('success', payload.message || 'Đã khôi phục dữ liệu thành công.');
                 window.location.reload();
             } catch (error) {
-                alert(error.message);
+                window.SchoolToast?.('error', error.message);
                 if (error.message.includes('đã khóa') || error.message.includes('hết hạn') || error.message.includes('không hợp lệ')) {
                     restoreToken = null;
                     setStep(1);

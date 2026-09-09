@@ -880,6 +880,11 @@
         const lockedLabel = '🔒 Đã khóa';
 
         const showToast = (message, type = 'success') => {
+            if (window.SchoolToast) {
+                window.SchoolToast(type === 'success' ? 'success' : 'error', message);
+                return;
+            }
+
             const toast = document.createElement('div');
             toast.className = `score-column-toast ${type === 'success' ? 'success' : 'error'}`;
             const icon = document.createElement('span');

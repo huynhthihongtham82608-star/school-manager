@@ -929,7 +929,9 @@
                 const gpaRow = document.createElement('tr'); gpaRow.className = 'student-report-gpa-row'; gpaRow.dataset.reportGpaRow = 'true'; const gpaLabel = createCell('td', 'Điểm trung bình học kỳ (Tất cả các môn)'); gpaLabel.colSpan = Math.max(1, colspan - 1); gpaRow.appendChild(gpaLabel); gpaRow.appendChild(createCell('td', payload.global_gpa || '-')); tableBody.appendChild(gpaRow); applyScoreColumnFilter(activeColumnFilter);
             };
             const fetchReport = async () => { const params = new URLSearchParams({ school_year_id: yearSelect.value, semester_id: semesterSelect.value }); const response = await fetch(`${form.dataset.url}?${params.toString()}`, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } }); const payload = await response.json().catch(() => ({})); if (! response.ok) throw new Error(payload.message || 'Không thể tải phiếu điểm.'); renderReport(payload); };
-            [yearSelect, semesterSelect].forEach((select) => select.addEventListener('change', () => fetchReport().catch((error) => console.error(error))));
+            [yearSelect, semesterSelect].forEach((select) => select.addEventListener('change', () => fetchReport().catch((error) => {
+                window.SchoolToast?.('error', error.message || 'Không thể tải phiếu điểm.');
+            })));
             filterButtons.forEach((button) => button.addEventListener('click', () => applyScoreColumnFilter(button.dataset.reportColumnFilter || 'all')));
             applyScoreColumnFilter('all');
         })();
@@ -1492,6 +1494,10 @@
                         return payload;
                     };
 
+                    const handleScoreError = (error) => {
+                        window.SchoolToast?.('error', error.message || 'Không thể tải dữ liệu điểm số.');
+                    };
+
                     const refreshCascade = async () => {
                         const payload = await requestJson(urls.cascade, params());
                         const hadSubject = Boolean(controls.subject?.value);
@@ -1510,7 +1516,7 @@
                         const payload = await requestJson(urls.matrix, params());
                         renderMatrix(payload);
                         if (controls.subject?.value) {
-                            refreshCascade().catch(console.error);
+                            refreshCascade().catch(handleScoreError);
                         }
                     };
 
@@ -1614,21 +1620,21 @@
 
                     controls.search?.addEventListener('input', () => {
                         clearTimeout(debounceTimer);
-                        debounceTimer = setTimeout(() => refreshMatrix().catch(console.error), 300);
+                        debounceTimer = setTimeout(() => refreshMatrix().catch(handleScoreError), 300);
                     });
 
                     [controls.year, controls.grade, controls.classRoom, controls.semester].filter(Boolean).forEach((control) => {
                         control.addEventListener('change', () => {
                             refreshCascade()
                                 .then(refreshMatrix)
-                                .catch(console.error);
+                                .catch(handleScoreError);
                         });
                     });
 
                     controls.subject?.addEventListener('change', () => {
                         refreshCascade()
                             .then(refreshMatrix)
-                            .catch(console.error);
+                            .catch(handleScoreError);
                     });
 
                     controls.reset?.addEventListener('click', () => {
@@ -1642,7 +1648,7 @@
                         isResettingFilters = true;
                         refreshCascade()
                             .then(refreshMatrix)
-                            .catch(console.error)
+                            .catch(handleScoreError)
                             .finally(() => {
                                 isResettingFilters = false;
                             });
@@ -1651,7 +1657,7 @@
                     controls.apply?.addEventListener('click', () => {
                         refreshCascade()
                             .then(refreshMatrix)
-                            .catch(console.error);
+                            .catch(handleScoreError);
                     });
 
                     const switchEvalTab = async (targetTab) => {
@@ -1675,14 +1681,14 @@
                     if (grade10TabBtn) {
                         grade10TabBtn.addEventListener('click', (e) => {
                             e.preventDefault();
-                            switchEvalTab('GRADE_10').catch(console.error);
+                            switchEvalTab('GRADE_10').catch(handleScoreError);
                         });
                     }
 
                     if (assessmentTabBtn) {
                         assessmentTabBtn.addEventListener('click', (e) => {
                             e.preventDefault();
-                            switchEvalTab('ASSESSMENT').catch(console.error);
+                            switchEvalTab('ASSESSMENT').catch(handleScoreError);
                         });
                     }
 
@@ -1692,13 +1698,13 @@
                             if (!btn) return;
                             e.preventDefault();
                             const targetTab = String(btn.dataset.evalTab).trim().toUpperCase();
-                            switchEvalTab(targetTab).catch(console.error);
+                            switchEvalTab(targetTab).catch(handleScoreError);
                         });
                     }
 
                     renderMatrix(initial);
                     if (controls.classRoom?.value) {
-                        refreshCascade().catch(console.error);
+                        refreshCascade().catch(handleScoreError);
                     }
                 })();
             </script>

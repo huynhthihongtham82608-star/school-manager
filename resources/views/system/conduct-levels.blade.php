@@ -261,9 +261,17 @@
 
         const bindRow = (row) => {
             row.querySelector('[data-edit-conduct-row]')?.addEventListener('click', () => openModal(row));
-            row.querySelector('[data-delete-conduct-row]')?.addEventListener('click', () => {
+            row.querySelector('[data-delete-conduct-row]')?.addEventListener('click', async () => {
                 const label = row.dataset.label || 'mức hạnh kiểm này';
-                if (!window.confirm(`Bạn có chắc chắn muốn xóa "${label}" khỏi cấu hình định mức hạnh kiểm?`)) {
+                const confirmed = window.SchoolConfirm
+                    ? await window.SchoolConfirm(`Bạn có chắc chắn muốn xóa "${label}" khỏi cấu hình định mức hạnh kiểm?`, {
+                        isDelete: true,
+                        title: 'Xác nhận xóa định mức',
+                        submitText: 'Xóa',
+                    })
+                    : false;
+
+                if (!confirmed) {
                     return;
                 }
 

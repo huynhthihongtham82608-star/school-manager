@@ -460,7 +460,9 @@
                         .then(data => {
                             renderTableData(data);
                         })
-                        .catch(err => console.error(err));
+                        .catch(err => {
+                            window.SchoolToast?.('error', err.message || 'Không thể tải dữ liệu điểm số.');
+                        });
                 };
 
                 const syncEvalButtons = () => {

@@ -147,7 +147,7 @@
                                             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $editId }}">
                                                 <i class="bi bi-pencil-square"></i>Sửa thông tin
                                             </button>
-                                            <form method="POST" action="{{ route('announcements.destroy', $post) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!')">
+                                            <form method="POST" action="{{ route('announcements.destroy', $post) }}" data-confirm-message="Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="dropdown-item danger">
@@ -401,7 +401,7 @@
                                             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $editId }}">
                                                 <i class="bi bi-pencil-square"></i>Sửa thông tin
                                             </button>
-                                            <form method="POST" action="{{ route('events.destroy', $event) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!')">
+                                            <form method="POST" action="{{ route('events.destroy', $event) }}" data-confirm-message="Bạn có chắc chắn muốn xóa dữ liệu này? Hành động này không thể hoàn tác!">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="dropdown-item danger">

@@ -94,13 +94,13 @@
                                     <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#teacherEdit{{ $teacher->id }}">
                                         <i class="bi bi-pencil-square me-2"></i>Sửa thông tin
                                     </button>
-                                    <form action="{{ route('teachers.reset-password', $teacher) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn đặt lại mật khẩu cho giáo viên này về 12345678?');">
+                                    <form action="{{ route('teachers.reset-password', $teacher) }}" method="POST" data-confirm-message="Bạn có chắc muốn đặt lại mật khẩu cho giáo viên này về 12345678?">
                                         @csrf
                                         <button type="submit" class="dropdown-item text-left">
                                             <i class="bi bi-key me-2"></i>Đặt lại mật khẩu
                                         </button>
                                     </form>
-                                    <form action="{{ route('teachers.toggle-login', $teacher) }}" method="POST" onsubmit="return confirm('{{ $loginLocked ? 'Bạn có chắc muốn mở khóa tài khoản đăng nhập giáo viên này?' : 'Bạn có chắc muốn khóa tài khoản đăng nhập giáo viên này?' }}');">
+                                    <form action="{{ route('teachers.toggle-login', $teacher) }}" method="POST" data-confirm-message="{{ $loginLocked ? 'Bạn có chắc muốn mở khóa tài khoản đăng nhập giáo viên này?' : 'Bạn có chắc muốn khóa tài khoản đăng nhập giáo viên này?' }}">
                                         @csrf
                                         @method('PATCH')
                                         <button type="submit" class="dropdown-item text-left {{ $loginLocked ? 'text-success' : 'text-orange-700' }}">
@@ -108,7 +108,7 @@
                                         </button>
                                     </form>
                                     <div class="dropdown-divider"></div>
-                                    <form action="{{ route('teachers.destroy', $teacher) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa giáo viên này? Hành động này không thể hoàn tác.');">
+                                    <form action="{{ route('teachers.destroy', $teacher) }}" method="POST" data-confirm-message="Bạn có chắc muốn xóa giáo viên này? Hành động này không thể hoàn tác.">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="dropdown-item text-danger">

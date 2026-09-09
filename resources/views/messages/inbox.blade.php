@@ -55,7 +55,7 @@
                                     <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}" data-message-open-read data-message-read-url="{{ route('messages.show', $message) }}">
                                         <i class="bi bi-eye"></i>Xem chi tiết
                                     </button>
-                                    <form method="POST" action="{{ route('messages.destroy', $message) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa tin nhắn này vào thùng rác?')">
+                                    <form method="POST" action="{{ route('messages.destroy', $message) }}" data-confirm-message="Bạn có chắc chắn muốn xóa tin nhắn này vào thùng rác?">
                                         @csrf
                                         @method('DELETE')
                                         <input type="hidden" name="box" value="inbox">

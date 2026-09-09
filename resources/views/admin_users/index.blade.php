@@ -104,13 +104,13 @@
                                     <i class="bi bi-three-dots-vertical"></i>
                                 </button>
                                 <div class="dropdown-menu dropdown-menu-end">
-                                    <form action="{{ route('admin-users.reset-password', $adminUser) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn đặt lại mật khẩu tài khoản này về 12345678?');">
+                                    <form action="{{ route('admin-users.reset-password', $adminUser) }}" method="POST" data-confirm-message="Bạn có chắc muốn đặt lại mật khẩu tài khoản này về 12345678?">
                                         @csrf
                                         <button type="submit" class="dropdown-item" @disabled($adminUser->isSuperAdmin())>
                                             <i class="bi bi-key me-2"></i>Đặt lại mật khẩu
                                         </button>
                                     </form>
-                                    <form action="{{ route('admin-users.toggle', $adminUser) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn đổi trạng thái tài khoản này?');">
+                                    <form action="{{ route('admin-users.toggle', $adminUser) }}" method="POST" data-confirm-message="Bạn có chắc muốn đổi trạng thái tài khoản này?">
                                         @csrf
                                         @method('PATCH')
                                         <button type="submit" class="dropdown-item" @disabled($adminUser->isSuperAdmin())>
@@ -118,7 +118,7 @@
                                         </button>
                                     </form>
                                     <div class="dropdown-divider"></div>
-                                    <form action="{{ route('admin-users.destroy', $adminUser) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa tài khoản quản trị này?');">
+                                    <form action="{{ route('admin-users.destroy', $adminUser) }}" method="POST" data-confirm-message="Bạn có chắc muốn xóa tài khoản quản trị này?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="dropdown-item text-danger" @disabled($adminUser->isSuperAdmin())>

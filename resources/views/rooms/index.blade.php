@@ -95,7 +95,7 @@
                                         </li>
                                         @if($room->canDelete())
                                             <li>
-                                                <form action="{{ route('rooms.destroy', $room) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn xóa phòng học này? Hành động này không thể hoàn tác.');">
+                                                <form action="{{ route('rooms.destroy', $room) }}" method="POST" data-confirm-message="Bạn có chắc chắn muốn xóa phòng học này? Hành động này không thể hoàn tác.">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item danger">

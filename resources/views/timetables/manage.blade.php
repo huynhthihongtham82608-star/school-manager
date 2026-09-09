@@ -757,6 +757,11 @@
             }[character]));
 
             const showToast = (message, isError = false) => {
+                if (window.SchoolToast) {
+                    window.SchoolToast(isError ? 'error' : 'info', message);
+                    return;
+                }
+
                 const oldToast = document.querySelector('.scheduler-toast');
                 oldToast?.remove();
                 const toast = document.createElement('div');
@@ -1060,8 +1065,16 @@
                 validateAllSlots();
             });
 
-            document.querySelector('[data-reset-scheduler]')?.addEventListener('click', () => {
-                if (!window.confirm('Cảnh báo: thao tác này sẽ xóa sạch bảng lịch biểu hiện tại trên màn hình để xếp lại từ đầu. Bạn có chắc chắn muốn tiếp tục?')) {
+            document.querySelector('[data-reset-scheduler]')?.addEventListener('click', async () => {
+                const confirmed = window.SchoolConfirm
+                    ? await window.SchoolConfirm('Cảnh báo: thao tác này sẽ xóa sạch bảng lịch biểu hiện tại trên màn hình để xếp lại từ đầu. Bạn có chắc chắn muốn tiếp tục?', {
+                        isDelete: true,
+                        title: 'Xác nhận reset thời khóa biểu',
+                        submitText: 'Reset',
+                    })
+                    : false;
+
+                if (!confirmed) {
                     return;
                 }
 

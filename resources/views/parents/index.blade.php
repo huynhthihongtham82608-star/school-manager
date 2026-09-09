@@ -86,7 +86,7 @@
                                         </button>
                                     </li>
                                     <li>
-                                        <form method="POST" action="{{ route('parents.reset-password', $parent) }}" onsubmit="return confirm('Bạn có chắc muốn đặt lại mật khẩu cho phụ huynh này?');">
+                                        <form method="POST" action="{{ route('parents.reset-password', $parent) }}" data-confirm-message="Bạn có chắc muốn đặt lại mật khẩu cho phụ huynh này?">
                                             @csrf
                                             <button type="submit" class="dropdown-item">
                                                 <i class="bi bi-key me-2"></i>Đặt lại mật khẩu
@@ -94,7 +94,7 @@
                                         </form>
                                     </li>
                                     <li>
-                                        <form method="POST" action="{{ route('parents.toggle-login', $parent) }}" onsubmit="return confirm('{{ $loginLocked ? 'Bạn có chắc muốn mở khóa tài khoản đăng nhập phụ huynh này?' : 'Bạn có chắc muốn khóa tài khoản đăng nhập phụ huynh này?' }}');">
+                                        <form method="POST" action="{{ route('parents.toggle-login', $parent) }}" data-confirm-message="{{ $loginLocked ? 'Bạn có chắc muốn mở khóa tài khoản đăng nhập phụ huynh này?' : 'Bạn có chắc muốn khóa tài khoản đăng nhập phụ huynh này?' }}">
                                             @csrf
                                             @method('PATCH')
                                             <button type="submit" class="dropdown-item text-left {{ $loginLocked ? 'text-success' : 'text-orange-700' }}">
@@ -104,7 +104,7 @@
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
-                                        <form method="POST" action="{{ route('parents.destroy', $parent) }}" onsubmit="return confirm('Bạn có chắc muốn xóa phụ huynh này? Hành động này không thể hoàn tác.');">
+                                        <form method="POST" action="{{ route('parents.destroy', $parent) }}" data-confirm-message="Bạn có chắc muốn xóa phụ huynh này? Hành động này không thể hoàn tác.">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="dropdown-item text-danger">

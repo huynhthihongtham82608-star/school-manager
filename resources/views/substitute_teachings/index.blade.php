@@ -335,7 +335,7 @@
                                     >
                                         <i class="bi bi-pencil-square"></i><span>Sửa</span>
                                     </button>
-                                    <form method="POST" action="{{ route('substitute-teachings.destroy', $substitute) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa lịch dạy thay này?');">
+                                    <form method="POST" action="{{ route('substitute-teachings.destroy', $substitute) }}" data-confirm-message="Bạn có chắc chắn muốn xóa lịch dạy thay này?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="substitute-action-btn delete">

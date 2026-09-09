@@ -340,6 +340,28 @@ class User extends Authenticatable
         }
     }
 
+    public function refreshPermissionSnapshotFromAssignedRoles(): void
+    {
+        $roleIds = collect($this->rbacRoleIds())
+            ->map(fn ($id) => (string) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $permissionKeys = RbacRole::whereIn('id', $roleIds)
+            ->where('is_active', true)
+            ->get()
+            ->flatMap(fn (RbacRole $role) => $role->permissionKeys())
+            ->unique()
+            ->sort()
+            ->values();
+
+        $this->forceFill([
+            'rbac_role_ids' => $roleIds->all(),
+            'permissions_map' => $permissionKeys->all(),
+        ])->save();
+    }
+
     public static function refreshPermissionSnapshotsForRole(string $roleId): void
     {
         if (\Illuminate\Support\Facades\Schema::hasTable('rbac_role_user')) {
@@ -355,7 +377,7 @@ class User extends Authenticatable
                 $userIds = $userIds->merge($jsonUserIds)->unique()->values();
             }
 
-            static::whereIn('id', $userIds)->get()->each(fn (User $user) => $user->syncRbacRoleIds($user->rbacRoleIds()));
+            static::whereIn('id', $userIds)->get()->each(fn (User $user) => $user->refreshPermissionSnapshotFromAssignedRoles());
 
             return;
         }
@@ -369,7 +391,7 @@ class User extends Authenticatable
             ->where('role_id', $roleId)
             ->pluck('user_id');
 
-        static::whereIn('id', $userIds)->get()->each(fn (User $user) => $user->syncRbacRoleIds($user->rbacRoleIds()));
+        static::whereIn('id', $userIds)->get()->each(fn (User $user) => $user->refreshPermissionSnapshotFromAssignedRoles());
     }
 
     public function hasAnyPermission(array $permissions): bool

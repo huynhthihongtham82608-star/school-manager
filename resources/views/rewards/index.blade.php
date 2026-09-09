@@ -272,7 +272,7 @@
                                     >
                                         <i class="bi bi-pencil-square"></i><span>Sửa</span>
                                     </button>
-                                    <form method="POST" action="{{ route('rewards.destroy', $reward) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa quyết định khen thưởng này?');">
+                                    <form method="POST" action="{{ route('rewards.destroy', $reward) }}" data-confirm-message="Bạn có chắc chắn muốn xóa quyết định khen thưởng này?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="content-action-btn delete">
@@ -510,7 +510,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 nextUrl.searchParams.set('reward_type', 'all');
                 window.setTimeout(() => window.location.href = nextUrl.toString(), 650);
             } catch (error) {
-                window.alert(error.message || 'Không thể quét danh hiệu.');
+                if (window.SchoolToast) {
+                    window.SchoolToast('error', error.message || 'Không thể quét danh hiệu.');
+                }
                 button.disabled = false;
                 button.textContent = originalText;
             }

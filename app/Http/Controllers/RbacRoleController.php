@@ -6,6 +6,7 @@ use App\Http\Requests\StoreRbacRoleRequest;
 use App\Http\Requests\UpdateRbacRoleRequest;
 use App\Models\RbacPermission;
 use App\Models\RbacRole;
+use App\Models\User;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -106,10 +107,11 @@ class RbacRoleController extends Controller
 
         DB::transaction(function () use ($rbacRole) {
             $rbacRole->update(['is_active' => ! $rbacRole->is_active]);
+            User::refreshPermissionSnapshotsForRole((string) $rbacRole->getKey());
             AuditLogger::log('rbac_role_status_changed', RbacRole::class, (string) $rbacRole->getKey(), 'Đổi trạng thái vai trò ' . $rbacRole->name);
         });
 
-        return back()->with('success', 'Đã cập nhật trạng thái vai trò.');
+        return back()->with('success', $rbacRole->is_active ? 'Đã bật vai trò.' : 'Đã tắt vai trò.');
     }
 
     public function destroy(RbacRole $rbacRole)

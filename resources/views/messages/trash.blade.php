@@ -49,7 +49,7 @@
                                     <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}">
                                         <i class="bi bi-eye"></i>Xem chi tiết
                                     </button>
-                                    <form method="POST" action="{{ route('messages.force-destroy', $message) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa vĩnh viễn tin nhắn này? Hành động này không thể hoàn tác!')">
+                                    <form method="POST" action="{{ route('messages.force-destroy', $message) }}" data-confirm-message="Bạn có chắc chắn muốn xóa vĩnh viễn tin nhắn này? Hành động này không thể hoàn tác!">
                                         @csrf
                                         @method('DELETE')
                                         <input type="hidden" name="box" value="{{ $item['type'] === 'sent' ? 'sent' : 'inbox' }}">
@@ -142,7 +142,7 @@
                             <i class="bi bi-archive"></i>Khôi phục về Hộp thư
                         </button>
                     </form>
-                    <form method="POST" action="{{ route('messages.force-destroy', $message) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa vĩnh viễn tin nhắn này? Hành động này không thể hoàn tác!')">
+                    <form method="POST" action="{{ route('messages.force-destroy', $message) }}" data-confirm-message="Bạn có chắc chắn muốn xóa vĩnh viễn tin nhắn này? Hành động này không thể hoàn tác!">
                         @csrf
                         @method('DELETE')
                         <input type="hidden" name="box" value="{{ $boxValue }}">

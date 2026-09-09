@@ -411,11 +411,16 @@
                 || document.querySelector('input[name="_token"]')?.value
                 || '';
 
-            const toast = (message) => {
+            const toast = (message, type = 'info') => {
+                if (window.SchoolToast) {
+                    window.SchoolToast(type, message);
+                    return;
+                }
+
                 const element = document.createElement('div');
                 element.className = 'bulk-excel-toast';
                 const icon = document.createElement('span');
-                icon.textContent = '🟢';
+                icon.textContent = type === 'error' ? '🔴' : '🟢';
                 icon.className = 'shrink-0';
                 const text = document.createElement('span');
                 text.textContent = message;
@@ -638,7 +643,7 @@
                     }
                     renderPreview(root, payload);
                 } catch (error) {
-                    toast(error.message);
+                    toast(error.message, 'error');
                     clearInput(root);
                 }
             });
@@ -749,7 +754,7 @@
                     if (! response.ok) {
                         throw new Error(payload.message || 'Không thể nạp dữ liệu.');
                     }
-                    toast(payload.message || 'Đã nạp dữ liệu Excel.');
+                    toast(payload.message || 'Đã nạp dữ liệu Excel.', 'success');
                     modal.classList.remove('active');
                     setTimeout(() => {
                         window.location.href = payload.redirect || window.location.href;
