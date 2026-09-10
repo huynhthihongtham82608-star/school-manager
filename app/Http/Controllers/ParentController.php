@@ -14,16 +14,29 @@ use Illuminate\Validation\ValidationException;
 
 class ParentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $keyword = trim((string) $request->query('q', ''));
+
         $parents = ParentProfile::with(['students.classRoom', 'user'])
+            ->when($keyword !== '', function ($query) use ($keyword) {
+                $query->where(function ($inner) use ($keyword) {
+                    $inner->where('parent_code', 'like', '%' . $keyword . '%')
+                        ->orWhere('name', 'like', '%' . $keyword . '%')
+                        ->orWhere('phone', 'like', '%' . $keyword . '%')
+                        ->orWhereHas('students', function ($studentQuery) use ($keyword) {
+                            $studentQuery->where('student_code', 'like', '%' . $keyword . '%')
+                                ->orWhere('name', 'like', '%' . $keyword . '%');
+                        });
+                });
+            })
             ->orderBy('parent_code')
             ->orderBy('name')
             ->get();
         $students = Student::with('classRoom')->orderBy('student_code')->get();
         $nextParentCode = $this->generateParentCode();
 
-        return view('parents.index', compact('parents', 'students', 'nextParentCode'));
+        return view('parents.index', compact('parents', 'students', 'nextParentCode', 'keyword'));
     }
 
     public function create()
@@ -58,6 +71,7 @@ class ParentController extends Controller
 
             $this->syncStudentLinks($parent, $data['student_ids'] ?? [], $data['relation'], replace: false);
             $this->ensureParentUser($parent, resetPassword: ! $parent->user);
+            $this->syncParentContactToLinkedStudents($parent);
 
             AuditLogger::log('parent_saved', ParentProfile::class, (string) $parent->getKey(), 'Lưu phụ huynh ' . $parent->name);
         });
@@ -92,6 +106,7 @@ class ParentController extends Controller
 
             $this->syncStudentLinks($parent, $data['student_ids'] ?? [], $data['relation'], replace: true);
             $this->ensureParentUser($parent);
+            $this->syncParentContactToLinkedStudents($parent);
 
             AuditLogger::log('parent_updated', ParentProfile::class, (string) $parent->getKey(), 'Cập nhật phụ huynh ' . $parent->name);
         });
@@ -192,6 +207,23 @@ class ParentController extends Controller
         }
 
         $parent->students()->syncWithoutDetaching($sync);
+    }
+
+    private function syncParentContactToLinkedStudents(ParentProfile $parent): void
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasColumn((new Student())->getTable(), 'parent_phone')) {
+            return;
+        }
+
+        $studentIds = DB::table('parent_student')
+            ->where('parent_id', $parent->id)
+            ->pluck('student_id');
+
+        if ($studentIds->isEmpty()) {
+            return;
+        }
+
+        Student::whereIn('id', $studentIds)->update(['parent_phone' => $parent->phone]);
     }
 
     private function denyHistoricalParentLinkMutation(array $studentIds, ?ParentProfile $parent = null): void

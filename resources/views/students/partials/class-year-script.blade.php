@@ -45,8 +45,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const parentPhone = scope.querySelector('[data-parent-phone]');
         const parentName = scope.querySelector('[data-parent-name]');
+        const parentId = scope.querySelector('[data-parent-id]');
         const parentStatus = scope.querySelector('[data-parent-lookup-status]');
         const lookupUrl = scope.dataset.parentLookupUrl;
+        const originalParentId = parentId?.dataset.originalParentId || parentId?.value || '';
         let parentLookupTimer = null;
         let parentLookupController = null;
 
@@ -112,11 +114,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const payload = await response.json();
 
                 if (payload.exists) {
+                    if (parentId) {
+                        parentId.value = payload.id || '';
+                    }
                     lockParentName(payload.name || '');
+                    const isReplacement = originalParentId && payload.id && String(payload.id) !== String(originalParentId);
                     setParentStatus('🟢 Phụ huynh đã có sẵn', 'success');
+                    setParentStatus(isReplacement ? 'Phụ huynh đã có sẵn; lưu form sẽ thay phụ huynh cho học sinh này.' : 'Phụ huynh đã có sẵn; lưu form sẽ dùng hồ sơ phụ huynh này.', 'success');
                     return;
                 }
 
+                if (parentId) {
+                    parentId.value = originalParentId;
+                }
                 unlockParentName();
                 setParentStatus('Số điện thoại mới, nhập họ tên phụ huynh để tạo liên kết.', 'neutral');
             } catch (error) {

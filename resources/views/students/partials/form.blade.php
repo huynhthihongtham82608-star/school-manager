@@ -5,7 +5,7 @@
     $ethnicityChoice = old('ethnicity_choice', in_array($studentModel?->ethnicity, [null, '', 'Kinh'], true) ? 'Kinh' : 'Khác');
     $religionChoice = old('religion_choice', in_array($studentModel?->religion, [null, '', 'Không'], true) ? 'Không' : 'Khác');
     $parentRelation = old('parent_relation', $primaryParent?->pivot?->relation ?? \App\Models\ParentProfile::RELATION_GUARDIAN);
-    $parentPhone = old('parent_phone', $studentModel?->parent_phone ?: $primaryParent?->phone);
+    $parentPhone = old('parent_phone', $primaryParent?->phone ?: $studentModel?->parent_phone);
     $parentRequired = ! $isEdit;
 @endphp
 
@@ -25,6 +25,7 @@
         </div>
 
         <div class="student-form-grid">
+            <input type="hidden" name="parent_id" value="{{ old('parent_id', $primaryParent?->id) }}" data-parent-id data-original-parent-id="{{ $primaryParent?->id }}">
             <div class="student-form-field">
                 <label class="form-label">Mã học sinh</label>
                 <div class="form-control bg-light text-muted">{{ $studentModel?->student_code ?: 'Tự sinh khi lưu' }}</div>

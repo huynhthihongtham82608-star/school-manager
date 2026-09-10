@@ -440,6 +440,51 @@ class TeachingOrganizationUiTest extends TestCase
         app(SubstituteTeachingController::class)->store($request);
     }
 
+    public function test_substitute_teaching_index_renders_saved_note(): void
+    {
+        $entry = TimetableEntry::with(['timetable.semester', 'assignment.teacher'])
+            ->where('status', TimetableEntry::STATUS_ACTIVE)
+            ->whereNotNull('assignment_id')
+            ->first();
+
+        if (! $entry || ! $entry->timetable?->semester || ! $entry->assignment?->teacher_id) {
+            $this->markTestSkipped('No active timetable entry with assignment is available.');
+        }
+
+        $teacher = Teacher::where('work_status', Teacher::STATUS_WORKING)
+            ->whereKeyNot($entry->assignment->teacher_id)
+            ->first();
+
+        if (! $teacher) {
+            $this->markTestSkipped('No replacement teacher is available.');
+        }
+
+        $note = 'Ghi chu day thay render ' . \Illuminate\Support\Str::random(6);
+        SubstituteTeaching::create([
+            'scope_type' => SubstituteTeaching::SCOPE_PERIOD,
+            'substitute_date' => now()->startOfWeek()->addDays(((int) $entry->day_of_week) - 1)->toDateString(),
+            'timetable_entry_id' => $entry->getKey(),
+            'class_id' => $entry->timetable->class_id,
+            'semester_id' => $entry->timetable->semester_id,
+            'school_year_id' => $entry->timetable->school_year_id,
+            'original_teacher_id' => $entry->assignment->teacher_id,
+            'substitute_teacher_id' => $teacher->getKey(),
+            'status' => SubstituteTeaching::STATUS_PENDING,
+            'note' => $note,
+            'created_by' => $this->adminUser()->getKey(),
+        ]);
+
+        $admin = $this->adminUser();
+        $this->actingAs($admin);
+
+        $view = app(SubstituteTeachingController::class)->index($this->requestFor('/substitute-teachings', [
+            'school_year_id' => $entry->timetable->school_year_id,
+            'semester_id' => $entry->timetable->semester_id,
+        ], $admin));
+
+        $this->assertStringContainsString($note, $view->render());
+    }
+
     public function test_evaluation_level_delete_requires_explicit_confirmation(): void
     {
         $levels = collect(app(\App\Services\AcademicEvaluationService::class)->levels());

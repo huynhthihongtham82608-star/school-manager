@@ -70,6 +70,25 @@ class ResultManagementBatchTest extends TestCase
         $this->assertStringContainsString('Áp dụng', $html);
     }
 
+    public function test_attendance_page_blocks_auto_table_search_toolbar_inside_attendance_summary_cards(): void
+    {
+        $admin = $this->adminUser();
+        $semester = $this->semesterWithClass();
+        $this->actingAs($admin);
+
+        $view = app(AttendanceController::class)->index($this->requestFor('/attendance', [
+            'school_year_id' => $semester->school_year_id,
+            'semester_id' => $semester->getKey(),
+            'attendance_view' => 'week',
+        ], $admin));
+
+        $html = $view->render();
+
+        $this->assertStringContainsString('[data-attendance-card-no-toolbar] > .admin-table-tools', $html);
+        $this->assertStringContainsString('attendance-weekly-title', $html);
+        $this->assertStringContainsString('toolbar.remove()', $html);
+    }
+
     public function test_score_admin_page_renders_compact_filter_clear_sort_icons_and_zero_safe_cells(): void
     {
         $admin = $this->adminUser();

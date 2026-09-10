@@ -38,7 +38,8 @@ class AuditLog extends Model
     public function moduleLabel(): string
     {
         if ($this->module) {
-            return $this->module;
+            return self::normalizeModuleLabel($this->module)
+                ?? self::moduleLabelFor($this->module, $this->action);
         }
 
         if ($this->entity_type) {
@@ -103,10 +104,35 @@ class AuditLog extends Model
         };
     }
 
+    public static function normalizeModuleLabel(?string $module): ?string
+    {
+        $module = trim((string) $module);
+
+        if ($module === '') {
+            return null;
+        }
+
+        return match ($module) {
+            'ScoreHeader', 'ScoreDetail', 'ScoreColumn', 'student_scores', 'score_headers', 'score_details', 'score_columns', 'App\\Models\\ScoreHeader', 'App\\Models\\ScoreDetail', 'App\\Models\\ScoreColumn' => 'Điểm số',
+            'AttendanceRecord', 'attendance_records', 'App\\Models\\AttendanceRecord' => 'Điểm danh',
+            'Conduct', 'conducts', 'App\\Models\\Conduct' => 'Hạnh kiểm',
+            'TuitionFee', 'tuition_fee', 'tuition_fees', 'tuition', 'App\\Models\\TuitionFee' => 'Học phí',
+            'SubstituteTeaching', 'substitute_teaching', 'substitute_teachings', 'substitute', 'App\\Models\\SubstituteTeaching' => 'Lịch dạy thay',
+            'SchoolClass', 'classes', 'App\\Models\\SchoolClass' => 'Lớp học',
+            'TeacherDepartment', 'teacher_departments', 'App\\Models\\TeacherDepartment' => 'Tổ chuyên môn',
+            'Subject', 'subjects', 'App\\Models\\Subject' => 'Môn học',
+            'Room', 'rooms', 'App\\Models\\Room' => 'Phòng học',
+            'ExamSchedule', 'exam_schedules', 'App\\Models\\ExamSchedule' => 'Lịch kiểm tra',
+            'TimetableEntry', 'timetables', 'timetable_entries', 'App\\Models\\TimetableEntry' => 'Thời khóa biểu',
+            'Message', 'messages', 'App\\Models\\Message' => 'Tin nhắn',
+            default => null,
+        };
+    }
+
     public static function moduleLabelFor(?string $entityType, ?string $action = null): string
     {
         $basename = $entityType ? class_basename($entityType) : '';
-        $action = (string) $action;
+        $action = strtolower((string) $action);
 
         return match (true) {
             str_contains($action, 'score') || $basename === 'ScoreHeader' || $basename === 'ScoreDetail' || $basename === 'ScoreColumn' => 'Điểm số',

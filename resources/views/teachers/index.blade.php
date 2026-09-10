@@ -19,7 +19,7 @@
                 <form method="GET" action="{{ route('teachers.index') }}" class="d-grid gap-3">
                     <div>
                         <label class="form-label small">Tìm kiếm</label>
-                        <input type="search" name="q" class="form-control" value="{{ $filters['q'] }}" placeholder="Mã, họ tên, môn, tổ chuyên môn">
+                        <input type="search" name="q" class="form-control" value="{{ $filters['q'] }}" placeholder="Mã, họ tên, số điện thoại, email, môn, tổ chuyên môn">
                     </div>
                     <div>
                         <label class="form-label small">Tổ chuyên môn</label>

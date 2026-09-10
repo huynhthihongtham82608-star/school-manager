@@ -110,6 +110,7 @@ class ReportController extends Controller
         $user = $request->user();
         $teacherClassIds = null;
         $teacherSubjectIds = null;
+        $graduationClassScopeIds = null;
 
         if ($user?->isTeacher() && ! $user->isAdmin() && $user->teacher) {
             $teacherAssignments = TeachingAssignment::where('teacher_id', $user->teacher->id)
@@ -131,6 +132,13 @@ class ReportController extends Controller
             }
 
             $filters['teacher_id'] = $user->teacher->id;
+
+            $graduationClassScopeIds = TeachingAssignment::where('teacher_id', $user->teacher->id)
+                ->pluck('class_id')
+                ->merge(SchoolClass::where('homeroom_teacher_id', $user->teacher->id)->pluck('id'))
+                ->filter()
+                ->unique()
+                ->values();
         }
 
         $semesters = Semester::with('schoolYear')
@@ -199,6 +207,12 @@ class ReportController extends Controller
         $conductDistribution = $this->conductDistribution($conducts, $students);
         $attendanceDistribution = $this->attendanceDistribution($attendanceRecords);
         $graduation = $this->graduationStats($students);
+        $graduatedStudents = Student::with(['classRoom.schoolYear', 'schoolYear'])
+            ->where('status', Student::STATUS_GRADUATED)
+            ->whereHas('classRoom', fn ($query) => $query->where('grade_level', 12))
+            ->when($graduationClassScopeIds !== null, fn ($query) => $query->whereIn('class_id', $graduationClassScopeIds))
+            ->orderBy('student_code')
+            ->get();
         $gradeSummary = $this->groupSummary($students, $studentRows, $attendanceRecords, fn (Student $student) => 'Khối ' . ($student->classRoom?->grade_level ?: 'Chưa rõ'));
         $classSummary = $this->groupSummary($students, $studentRows, $attendanceRecords, fn (Student $student) => $student->classRoom?->name ?: 'Chưa có lớp');
         $subjectSummary = $this->subjectSummary($scoreHeaders);
@@ -263,11 +277,13 @@ class ReportController extends Controller
             'conductDistribution',
             'attendanceDistribution',
             'graduation',
+            'graduatedStudents',
             'gradeSummary',
             'classSummary',
             'subjectSummary',
             'teacherSummary',
             'studentRows',
+            'scoreHeaders',
             'yearComparison',
             'studentReport',
             'teacherReport',
@@ -451,6 +467,10 @@ class ReportController extends Controller
 
                 return [
                     'label' => $label,
+                    'grade_level' => $groupStudents->first()?->classRoom?->grade_level,
+                    'class_id' => $groupStudents->pluck('class_id')->filter()->unique()->count() === 1
+                        ? $groupStudents->first()?->class_id
+                        : null,
                     'student_count' => $groupStudents->count(),
                     'average' => $rowsWithAverage->isNotEmpty() ? round($rowsWithAverage->avg('average'), 2) : null,
                     'excellent_count' => $rows->where('study_rank', 'excellent')->count(),
@@ -469,6 +489,7 @@ class ReportController extends Controller
             ->map(function (Collection $headers) {
                 return [
                     'label' => $headers->first()->subject?->name ?: 'Chưa rõ môn',
+                    'subject_id' => $headers->first()->subject_id,
                     'student_count' => $headers->pluck('student_id')->unique()->count(),
                     'average' => round($headers->avg('average'), 2),
                 ];
@@ -495,6 +516,8 @@ class ReportController extends Controller
             ->map(function (Collection $items) {
                 return [
                     'label' => $items->first()->teacher?->name ?: 'Chưa rõ giáo viên',
+                    'teacher_id' => $items->first()->teacher_id,
+                    'class_ids' => $items->pluck('class_id')->filter()->unique()->values()->all(),
                     'class_count' => $items->pluck('class_id')->unique()->count(),
                     'subject_count' => $items->pluck('subject_id')->unique()->count(),
                     'weekly_periods' => $items->sum(fn (TeachingAssignment $assignment) => (int) ($assignment->effectiveWeeklyPeriods() ?: 0)),

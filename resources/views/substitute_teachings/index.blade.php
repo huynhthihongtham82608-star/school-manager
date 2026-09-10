@@ -306,6 +306,11 @@
                             <div class="d-flex flex-column gap-1 text-left">
                                 <span class="text-sm font-normal text-gray-700">{{ $slotLabel }}</span>
                                 <span class="text-sm font-normal text-gray-500">{{ $subjectLabel }}</span>
+                                @if(trim((string) $substitute->note) !== '')
+                                    <span class="text-xs font-normal text-orange-700 bg-orange-50 border border-orange-100 rounded px-2 py-1">
+                                        {{ $substitute->note }}
+                                    </span>
+                                @endif
                             </div>
                         </td>
                         <td>{{ $substitute->originalTeacher->name ?? '-' }}</td>

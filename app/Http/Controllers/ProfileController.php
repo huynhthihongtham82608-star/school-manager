@@ -95,6 +95,12 @@ class ProfileController extends Controller
             
             if ($user->teacher) {
                 $user->teacher->update($validated);
+                $user->forceFill([
+                    'full_name' => $user->teacher->name,
+                    'name' => $user->teacher->name,
+                    'email' => $user->teacher->email,
+                    'phone' => $user->teacher->phone,
+                ])->save();
             }
         }
         elseif ($user->isStudent()) {
@@ -103,7 +109,6 @@ class ProfileController extends Controller
                 'gender' => 'required|in:nam,nu',
                 'dob' => 'nullable|date',
                 'address' => 'nullable|string|max:500',
-                'parent_phone' => 'nullable|string|max:20',
                 'class_id' => 'nullable|exists:school_classes,id',
             ]);
             
@@ -120,6 +125,22 @@ class ProfileController extends Controller
             
             if ($user->parentProfile) {
                 $user->parentProfile->update($validated);
+                $user->forceFill([
+                    'username' => $user->parentProfile->phone ?: $user->username,
+                    'full_name' => $user->parentProfile->name,
+                    'name' => $user->parentProfile->name,
+                    'phone' => $user->parentProfile->phone,
+                    'email' => $user->parentProfile->email,
+                ])->save();
+
+                if (\Illuminate\Support\Facades\Schema::hasColumn((new Student())->getTable(), 'parent_phone')) {
+                    $studentIds = \Illuminate\Support\Facades\DB::table('parent_student')
+                        ->where('parent_id', $user->parentProfile->id)
+                        ->pluck('student_id');
+                    if ($studentIds->isNotEmpty()) {
+                        Student::whereIn('id', $studentIds)->update(['parent_phone' => $user->parentProfile->phone]);
+                    }
+                }
             }
         }
 

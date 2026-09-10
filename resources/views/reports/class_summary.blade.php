@@ -113,15 +113,26 @@
         'department' => 'teacher',
         default => null,
     };
-    $activeReportTableTab = $showFullReportTabs ? 'grade' : $singleReportTable;
-    $showReportTables = $showFullReportTabs || $singleReportTable;
+    $requestedReportTableTab = request('table_tab', request('report_table_tab'));
+    $allReportTableTabs = ['grade', 'class', 'subject', 'teacher', 'student', 'graduation'];
+    $activeReportTableTab = in_array($requestedReportTableTab, $allReportTableTabs, true)
+        ? $requestedReportTableTab
+        : ($showFullReportTabs ? 'grade' : $singleReportTable);
+    $showReportTables = $showFullReportTabs || $singleReportTable || $activeReportTableTab === 'graduation';
     $reportTableTabs = [
         'grade' => ['label' => 'Khối', 'title' => 'Tổng kết theo khối'],
         'class' => ['label' => 'Lớp', 'title' => 'Tổng kết theo lớp'],
         'subject' => ['label' => 'Môn học', 'title' => 'Tổng kết theo môn học'],
         'teacher' => ['label' => 'Giáo viên', 'title' => 'Tổng kết theo giáo viên'],
         'student' => ['label' => 'Học sinh', 'title' => 'Danh sách học sinh trong phạm vi báo cáo'],
+        'graduation' => ['label' => 'Tốt nghiệp', 'title' => 'Danh sách học sinh tốt nghiệp'],
     ];
+    $reportTableTabsToShow = $showFullReportTabs || $activeReportTableTab === 'graduation'
+        ? $reportTableTabs
+        : collect($reportTableTabs)->only(array_filter([$singleReportTable, 'graduation']))->all();
+    $defaultGraduationYearId = (string) ($selectedYear?->id ?: $schoolYears->first()?->id);
+    $studentReportRowsById = $studentRows->keyBy(fn ($row) => (string) $row['student']->id);
+    $detailStudents = $studentRows->pluck('student')->merge($graduatedStudents ?? collect())->unique('id')->values();
 @endphp
 
 <div class="page-heading w-full !text-left !items-start flex flex-col justify-start text-left items-start gap-1 mb-4 px-1" style="width: 100% !important; text-align: left !important; align-items: flex-start !important; justify-content: flex-start !important; margin-left: 0 !important; margin-right: auto !important;">
@@ -143,6 +154,7 @@
 
 <div class="report-page">
 <form method="GET" class="management-card report-filter-card report-filter-horizontal mb-3" data-report-form>
+    <input type="hidden" name="table_tab" value="{{ $activeReportTableTab }}" data-report-table-tab-input>
     <div class="report-filter-row">
         <div class="report-filter-control report-filter-mode">
             <label class="form-label">Chế độ báo cáo</label>
@@ -313,7 +325,7 @@
 
     @if($cards->isNotEmpty())
         <div class="report-summary-grid">
-            @foreach($cards->take(8) as $card)
+            @foreach($cards->take(9) as $card)
                 @php
                     $rawValue = trim((string) ($card['value'] ?? ''));
                     $displayValue = in_array($rawValue, ['', 'Chưa có dữ liệu'], true) ? '—' : $rawValue;
@@ -492,11 +504,11 @@
             </div>
         </div>
 
-        @if($showFullReportTabs)
+        @if(count($reportTableTabsToShow) > 1)
         <ul class="nav report-data-tabs" role="tablist">
-            @foreach($reportTableTabs as $tabKey => $tabInfo)
+            @foreach($reportTableTabsToShow as $tabKey => $tabInfo)
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeReportTableTab === $tabKey ? 'active' : '' }}" type="button" data-bs-toggle="tab" data-bs-target="#report-tab-{{ $tabKey }}" role="tab" aria-selected="{{ $activeReportTableTab === $tabKey ? 'true' : 'false' }}">{{ $tabInfo['label'] }}</button>
+                    <button class="nav-link {{ $activeReportTableTab === $tabKey ? 'active' : '' }}" type="button" data-bs-toggle="tab" data-bs-target="#report-tab-{{ $tabKey }}" data-report-table-tab="{{ $tabKey }}" role="tab" aria-selected="{{ $activeReportTableTab === $tabKey ? 'true' : 'false' }}">{{ $tabInfo['label'] }}</button>
                 </li>
             @endforeach
         </ul>
@@ -514,6 +526,7 @@
                                 <th data-tab-sort>Điểm trung bình</th>
                                 <th data-tab-sort>Học sinh giỏi</th>
                                 <th data-tab-sort>Chuyên cần</th>
+                                <th>Chi tiết</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -524,9 +537,14 @@
                                 <td>{{ $row['average'] ?? 'Chưa có dữ liệu' }}</td>
                                 <td>{{ $row['excellent_count'] }}</td>
                                 <td>{{ $row['attendance_rate'] === null ? 'Chưa có dữ liệu' : $row['attendance_rate'] . '%' }}</td>
+                                <td>
+                                    @if(! empty($row['grade_level']))
+                                        <button type="button" class="btn btn-sm btn-outline-primary report-drill-link" data-report-detail-title="Chi tiết {{ $row['label'] }}" data-report-detail-template="report-detail-grade-{{ $row['grade_level'] }}">Chi tiết</button>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5"><div class="empty-state">Chưa có dữ liệu.</div></td></tr>
+                            <tr><td colspan="6"><div class="empty-state">Chưa có dữ liệu.</div></td></tr>
                         @endforelse
                         </tbody>
                     </table>
@@ -545,6 +563,7 @@
                                 <th data-tab-sort>Điểm trung bình</th>
                                 <th data-tab-sort>Học sinh giỏi</th>
                                 <th data-tab-sort>Chuyên cần</th>
+                                <th>Chi tiết</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -555,9 +574,14 @@
                                 <td>{{ $row['average'] ?? 'Chưa có dữ liệu' }}</td>
                                 <td>{{ $row['excellent_count'] }}</td>
                                 <td>{{ $row['attendance_rate'] === null ? 'Chưa có dữ liệu' : $row['attendance_rate'] . '%' }}</td>
+                                <td>
+                                    @if(! empty($row['class_id']))
+                                        <button type="button" class="btn btn-sm btn-outline-primary report-drill-link" data-report-detail-title="Chi tiết lớp {{ $row['label'] }}" data-report-detail-template="report-detail-class-{{ $row['class_id'] }}">Chi tiết</button>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5"><div class="empty-state">Chưa có dữ liệu.</div></td></tr>
+                            <tr><td colspan="6"><div class="empty-state">Chưa có dữ liệu.</div></td></tr>
                         @endforelse
                         </tbody>
                     </table>
@@ -574,6 +598,7 @@
                                 <th data-tab-sort>Môn học</th>
                                 <th data-tab-sort>Số học sinh có điểm</th>
                                 <th data-tab-sort>Điểm trung bình</th>
+                                <th>Chi tiết</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -582,9 +607,14 @@
                                 <td class="fw-semibold">{{ $row['label'] }}</td>
                                 <td>{{ $row['student_count'] }}</td>
                                 <td>{{ $row['average'] }}</td>
+                                <td>
+                                    @if(! empty($row['subject_id']))
+                                        <button type="button" class="btn btn-sm btn-outline-primary report-drill-link" data-report-detail-title="Chi tiết môn {{ $row['label'] }}" data-report-detail-template="report-detail-subject-{{ $row['subject_id'] }}">Chi tiết</button>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="3"><div class="empty-state">Chưa có dữ liệu điểm theo môn.</div></td></tr>
+                            <tr><td colspan="4"><div class="empty-state">Chưa có dữ liệu điểm theo môn.</div></td></tr>
                         @endforelse
                         </tbody>
                     </table>
@@ -602,6 +632,7 @@
                                 <th data-tab-sort>Lớp phụ trách</th>
                                 <th data-tab-sort>Môn</th>
                                 <th data-tab-sort>Tổng định mức tiết/tuần</th>
+                                <th>Chi tiết</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -611,9 +642,14 @@
                                 <td>{{ $row['class_count'] }}</td>
                                 <td>{{ $row['subject_count'] }}</td>
                                 <td>{{ $row['weekly_periods'] }}</td>
+                                <td>
+                                    @if(! empty($row['teacher_id']))
+                                        <button type="button" class="btn btn-sm btn-outline-primary report-drill-link" data-report-detail-title="Chi tiết giáo viên {{ $row['label'] }}" data-report-detail-template="report-detail-teacher-{{ $row['teacher_id'] }}">Chi tiết</button>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="4"><div class="empty-state">Chưa có dữ liệu phân công giảng dạy.</div></td></tr>
+                            <tr><td colspan="5"><div class="empty-state">Chưa có dữ liệu phân công giảng dạy.</div></td></tr>
                         @endforelse
                         </tbody>
                     </table>
@@ -634,6 +670,7 @@
                                 <th data-tab-sort>Học lực</th>
                                 <th data-tab-sort>Hạnh kiểm</th>
                                 <th data-tab-sort>Chuyên cần</th>
+                                <th>Chi tiết</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -646,10 +683,67 @@
                                 <td>{{ $studyLabels[$row['study_rank']] ?? 'Chưa có dữ liệu' }}</td>
                                 <td>{{ $conductLabels[$row['conduct']] ?? 'Chưa có dữ liệu' }}</td>
                                 <td>{{ $row['attendance_rate'] === null ? 'Chưa có dữ liệu' : $row['attendance_rate'] . '%' }}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-primary report-drill-link" data-report-detail-title="Chi tiết học sinh {{ $row['student']->name }}" data-report-detail-template="report-detail-student-{{ $row['student']->id }}">Chi tiết</button>
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="7"><div class="empty-state"><i class="bi bi-clipboard-data"></i>Không có dữ liệu phù hợp với bộ lọc.</div></td></tr>
+                            <tr><td colspan="8"><div class="empty-state"><i class="bi bi-clipboard-data"></i>Không có dữ liệu phù hợp với bộ lọc.</div></td></tr>
                         @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
+
+            @if($showFullReportTabs || $singleReportTable || $activeReportTableTab === 'graduation')
+            <div @class(['tab-pane fade', 'show active' => $activeReportTableTab === 'graduation']) id="report-tab-graduation" role="tabpanel" tabindex="0">
+                <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+                    <div class="report-filter-control mb-0">
+                        <label class="form-label">Năm học</label>
+                        <select class="form-select" data-graduation-year-filter>
+                            @foreach($schoolYears as $year)
+                                <option value="{{ $year->id }}" @selected((string) $year->id === $defaultGraduationYearId)>{{ $year->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="table-responsive report-table-wrap report-table-wrap-auto">
+                    <table class="table table-striped table-hover content-table align-middle mb-0" data-report-tab-table data-graduation-table>
+                        <thead>
+                            <tr>
+                                <th data-tab-sort>Mã học sinh</th>
+                                <th data-tab-sort>Họ tên</th>
+                                <th data-tab-sort>Lớp 12</th>
+                                <th data-tab-sort>Năm học</th>
+                                <th data-tab-sort>Trạng thái</th>
+                                <th>Chi tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($graduatedStudents as $student)
+                            @php
+                                $graduationYearId = (string) ($student->classRoom?->school_year_id ?: $student->school_year_id);
+                                $graduationYearName = $student->classRoom?->schoolYear?->name ?: ($student->schoolYear?->name ?: 'Chưa rõ năm học');
+                            @endphp
+                            <tr data-graduation-year="{{ $graduationYearId }}">
+                                <td class="fw-semibold">{{ $student->student_code }}</td>
+                                <td>{{ $student->name }}</td>
+                                <td>{{ $student->classRoom?->name ?? 'Chưa có lớp' }}</td>
+                                <td>{{ $graduationYearName }}</td>
+                                <td>{{ $student->statusLabel() }}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-primary report-drill-link" data-report-detail-title="Chi tiết học sinh {{ $student->name }}" data-report-detail-template="report-detail-student-{{ $student->id }}">Chi tiết</button>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr data-graduation-empty>
+                                <td colspan="6"><div class="empty-state">Chưa có học sinh tốt nghiệp.</div></td>
+                            </tr>
+                        @endforelse
+                            <tr data-graduation-filter-empty hidden>
+                                <td colspan="6"><div class="empty-state">Chưa có học sinh tốt nghiệp trong năm học này.</div></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -658,6 +752,278 @@
         </div>
     </div>
 @endif
+
+<div class="d-none" aria-hidden="true">
+    @foreach($gradeSummary as $row)
+        @if(! empty($row['grade_level']))
+            <template id="report-detail-grade-{{ $row['grade_level'] }}">
+                <div class="table-responsive report-table-wrap report-table-wrap-auto">
+                    <table class="table table-striped table-hover content-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Lớp</th>
+                                <th>Sĩ số</th>
+                                <th>Điểm trung bình</th>
+                                <th>Học sinh giỏi</th>
+                                <th>Chuyên cần</th>
+                                <th>Chi tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($classSummary->where('grade_level', (int) $row['grade_level']) as $classRow)
+                            <tr>
+                                <td>{{ $classRow['label'] }}</td>
+                                <td>{{ $classRow['student_count'] }}</td>
+                                <td>{{ $classRow['average'] ?? 'Chưa có dữ liệu' }}</td>
+                                <td>{{ $classRow['excellent_count'] }}</td>
+                                <td>{{ $classRow['attendance_rate'] === null ? 'Chưa có dữ liệu' : $classRow['attendance_rate'] . '%' }}</td>
+                                <td>
+                                    @if(! empty($classRow['class_id']))
+                                        <button type="button" class="btn btn-sm btn-outline-primary report-drill-link" data-report-detail-title="Chi tiết lớp {{ $classRow['label'] }}" data-report-detail-template="report-detail-class-{{ $classRow['class_id'] }}">Chi tiết</button>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6"><div class="empty-state">Chưa có lớp trong khối này.</div></td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+        @endif
+    @endforeach
+
+    @foreach($classSummary as $row)
+        @if(! empty($row['class_id']))
+            @php
+                $classStudents = $studentRows->filter(fn ($studentRow) => (string) $studentRow['student']->class_id === (string) $row['class_id']);
+            @endphp
+            <template id="report-detail-class-{{ $row['class_id'] }}">
+                <div class="table-responsive report-table-wrap">
+                    <table class="table table-striped table-hover content-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Mã học sinh</th>
+                                <th>Họ tên</th>
+                                <th>Điểm trung bình</th>
+                                <th>Học lực</th>
+                                <th>Hạnh kiểm</th>
+                                <th>Chuyên cần</th>
+                                <th>Chi tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($classStudents as $studentRow)
+                            <tr>
+                                <td>{{ $studentRow['student']->student_code }}</td>
+                                <td>{{ $studentRow['student']->name }}</td>
+                                <td>{{ $studentRow['average'] ?? 'Chưa có dữ liệu' }}</td>
+                                <td>{{ $studyLabels[$studentRow['study_rank']] ?? 'Chưa có dữ liệu' }}</td>
+                                <td>{{ $conductLabels[$studentRow['conduct']] ?? 'Chưa có dữ liệu' }}</td>
+                                <td>{{ $studentRow['attendance_rate'] === null ? 'Chưa có dữ liệu' : $studentRow['attendance_rate'] . '%' }}</td>
+                                <td><button type="button" class="btn btn-sm btn-outline-primary report-drill-link" data-report-detail-title="Chi tiết học sinh {{ $studentRow['student']->name }}" data-report-detail-template="report-detail-student-{{ $studentRow['student']->id }}">Chi tiết</button></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="7"><div class="empty-state">Chưa có học sinh trong lớp này.</div></td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+        @endif
+    @endforeach
+
+    @foreach($subjectSummary as $row)
+        @if(! empty($row['subject_id']))
+            @php
+                $subjectStudentIds = $scoreHeaders->where('subject_id', $row['subject_id'])->pluck('student_id')->unique();
+                $subjectRows = $studentRows->filter(fn ($studentRow) => $subjectStudentIds->contains($studentRow['student']->id));
+            @endphp
+            <template id="report-detail-subject-{{ $row['subject_id'] }}">
+                <div class="table-responsive report-table-wrap">
+                    <table class="table table-striped table-hover content-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Mã học sinh</th>
+                                <th>Họ tên</th>
+                                <th>Lớp</th>
+                                <th>Điểm môn</th>
+                                <th>Chi tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($subjectRows as $studentRow)
+                            @php
+                                $subjectHeader = $scoreHeaders->first(fn ($header) => (string) $header->subject_id === (string) $row['subject_id'] && (string) $header->student_id === (string) $studentRow['student']->id);
+                            @endphp
+                            <tr>
+                                <td>{{ $studentRow['student']->student_code }}</td>
+                                <td>{{ $studentRow['student']->name }}</td>
+                                <td>{{ $studentRow['student']->classRoom?->name ?? 'Chưa có lớp' }}</td>
+                                <td>{{ $subjectHeader?->average ?? 'Chưa có dữ liệu' }}</td>
+                                <td><button type="button" class="btn btn-sm btn-outline-primary report-drill-link" data-report-detail-title="Chi tiết học sinh {{ $studentRow['student']->name }}" data-report-detail-template="report-detail-student-{{ $studentRow['student']->id }}">Chi tiết</button></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5"><div class="empty-state">Chưa có học sinh có điểm môn này.</div></td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+        @endif
+    @endforeach
+
+    @foreach($teacherSummary as $row)
+        @if(! empty($row['teacher_id']))
+            @php
+                $teacherClassIds = collect($row['class_ids'] ?? [])->map(fn ($id) => (string) $id);
+                $teacherRows = $studentRows->filter(fn ($studentRow) => $teacherClassIds->contains((string) $studentRow['student']->class_id));
+            @endphp
+            <template id="report-detail-teacher-{{ $row['teacher_id'] }}">
+                <div class="table-responsive report-table-wrap">
+                    <table class="table table-striped table-hover content-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Mã học sinh</th>
+                                <th>Họ tên</th>
+                                <th>Lớp</th>
+                                <th>Điểm trung bình</th>
+                                <th>Chuyên cần</th>
+                                <th>Chi tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($teacherRows as $studentRow)
+                            <tr>
+                                <td>{{ $studentRow['student']->student_code }}</td>
+                                <td>{{ $studentRow['student']->name }}</td>
+                                <td>{{ $studentRow['student']->classRoom?->name ?? 'Chưa có lớp' }}</td>
+                                <td>{{ $studentRow['average'] ?? 'Chưa có dữ liệu' }}</td>
+                                <td>{{ $studentRow['attendance_rate'] === null ? 'Chưa có dữ liệu' : $studentRow['attendance_rate'] . '%' }}</td>
+                                <td><button type="button" class="btn btn-sm btn-outline-primary report-drill-link" data-report-detail-title="Chi tiết học sinh {{ $studentRow['student']->name }}" data-report-detail-template="report-detail-student-{{ $studentRow['student']->id }}">Chi tiết</button></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6"><div class="empty-state">Chưa có học sinh thuộc phạm vi giáo viên này.</div></td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+        @endif
+    @endforeach
+
+    @foreach($detailStudents as $student)
+        @php
+            $studentRow = $studentReportRowsById->get((string) $student->id);
+            $studentScores = $scoreHeaders->where('student_id', $student->id)->sortBy(fn ($header) => $header->subject?->name ?: '');
+        @endphp
+        <template id="report-detail-student-{{ $student->id }}">
+            <div class="report-student-overview mb-3">
+                <div class="row g-2">
+                    <div class="col-12 col-md-6">
+                        <div class="report-student-info-item">
+                            <span>Mã học sinh</span>
+                            <strong>{{ $student->student_code }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="report-student-info-item">
+                            <span>Lớp</span>
+                            <strong>{{ $student->classRoom?->name ?? 'Chưa có lớp' }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="report-student-info-item">
+                            <span>Họ tên</span>
+                            <strong>{{ $student->name }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="report-student-info-item">
+                            <span>Trạng thái</span>
+                            <strong>{{ $student->statusLabel() }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="report-student-info-item">
+                            <span>Điểm trung bình</span>
+                            <strong>{{ $studentRow['average'] ?? 'Chưa có dữ liệu' }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="report-student-info-item">
+                            <span>Học lực</span>
+                            <strong>{{ $studentRow ? ($studyLabels[$studentRow['study_rank']] ?? 'Chưa có dữ liệu') : 'Chưa có dữ liệu' }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="report-student-info-item">
+                            <span>Hạnh kiểm</span>
+                            <strong>{{ $studentRow ? ($conductLabels[$studentRow['conduct']] ?? 'Chưa có dữ liệu') : 'Chưa có dữ liệu' }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="report-student-info-item">
+                            <span>Chuyên cần</span>
+                            <strong>{{ $studentRow && $studentRow['attendance_rate'] !== null ? $studentRow['attendance_rate'] . '%' : 'Chưa có dữ liệu' }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="table-responsive report-table-wrap">
+                <table class="table table-striped table-hover content-table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Môn học</th>
+                            <th>Miệng</th>
+                            <th>15 phút</th>
+                            <th>Một tiết</th>
+                            <th>Giữa kỳ</th>
+                            <th>Cuối kỳ</th>
+                            <th>Trung bình</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @forelse($studentScores as $header)
+                        @php
+                            $oralScores = $header->details->where('type', 'oral')->pluck('value');
+                            $quizScores = $header->details->where('type', 'quiz')->pluck('value');
+                            $testScores = $header->details->where('type', 'test')->pluck('value');
+                            $midtermScores = $header->details->where('type', 'midterm')->pluck('value');
+                            $finalScores = $header->details->where('type', 'final')->pluck('value');
+                        @endphp
+                        <tr>
+                            <td>{{ $header->subject?->name ?? 'Chưa rõ môn' }}</td>
+                            <td>{{ $oralScores->isNotEmpty() ? $oralScores->implode(', ') : '-' }}</td>
+                            <td>{{ $quizScores->isNotEmpty() ? $quizScores->implode(', ') : '-' }}</td>
+                            <td>{{ $testScores->isNotEmpty() ? $testScores->implode(', ') : '-' }}</td>
+                            <td>{{ $midtermScores->isNotEmpty() ? $midtermScores->implode(', ') : '-' }}</td>
+                            <td>{{ $finalScores->isNotEmpty() ? $finalScores->implode(', ') : '-' }}</td>
+                            <td>{{ $header->average ?? 'Chưa có dữ liệu' }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="7"><div class="empty-state">Chưa có dữ liệu điểm của học sinh.</div></td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </template>
+    @endforeach
+</div>
+
+<div class="modal fade" id="reportDetailModal" tabindex="-1" aria-labelledby="reportDetailModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border border-orange-100 rounded-4">
+            <div class="modal-header bg-orange-50 border-orange-100">
+                <h5 class="modal-title font-normal" id="reportDetailModalTitle" data-report-detail-title>Chi tiết báo cáo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body text-left" data-report-detail-body>
+                <div class="empty-state">Chưa có dữ liệu chi tiết.</div>
+            </div>
+        </div>
+    </div>
+</div>
 
 @if($insights->isNotEmpty())
     <div class="management-card report-insight-card">
@@ -854,24 +1220,47 @@
 
         const tabSearch = document.querySelector('[data-report-tab-search]');
         const tabTables = [...document.querySelectorAll('[data-report-tab-table]')];
+        const tableTabInput = document.querySelector('[data-report-table-tab-input]');
 
+        const graduationYearFilter = document.querySelector('[data-graduation-year-filter]');
+        const graduationTable = document.querySelector('[data-graduation-table]');
         const getActiveTabTable = () => document.querySelector('.report-tabs-content .tab-pane.active [data-report-tab-table]');
 
         const renderActiveTabTable = () => {
             const activeTable = getActiveTabTable();
             const keyword = normalize(tabSearch?.value || '');
+            const graduationYear = graduationYearFilter?.value || '';
 
             tabTables.forEach((tabTable) => {
                 const rows = [...tabTable.querySelectorAll('tbody tr')].filter((row) => !row.querySelector('.empty-state'));
+                let visibleGraduationRows = 0;
+
                 rows.forEach((row) => {
-                    row.hidden = tabTable !== activeTable || !normalize(row.textContent).includes(keyword);
+                    const graduationMismatch = Boolean(row.dataset.graduationYear && graduationYear && row.dataset.graduationYear !== graduationYear);
+                    row.hidden = tabTable !== activeTable || !normalize(row.textContent).includes(keyword) || graduationMismatch;
+                    if (tabTable === activeTable && row.dataset.graduationYear && !row.hidden) {
+                        visibleGraduationRows += 1;
+                    }
                 });
+
+                const graduationFilterEmpty = tabTable.querySelector('[data-graduation-filter-empty]');
+                const graduationGlobalEmpty = tabTable.querySelector('[data-graduation-empty]');
+                if (graduationGlobalEmpty && rows.length > 0) {
+                    graduationGlobalEmpty.hidden = true;
+                }
+                if (graduationFilterEmpty) {
+                    graduationFilterEmpty.hidden = tabTable !== activeTable || tabTable !== graduationTable || rows.length === 0 || visibleGraduationRows > 0;
+                }
             });
         };
 
         tabSearch?.addEventListener('input', renderActiveTabTable);
+        graduationYearFilter?.addEventListener('change', renderActiveTabTable);
         document.querySelectorAll('[data-bs-toggle="tab"]').forEach((tabButton) => {
             tabButton.addEventListener('shown.bs.tab', () => {
+                if (tableTabInput && tabButton.dataset.reportTableTab) {
+                    tableTabInput.value = tabButton.dataset.reportTableTab;
+                }
                 if (tabSearch) {
                     tabSearch.value = '';
                 }
@@ -900,6 +1289,33 @@
             });
         });
         renderActiveTabTable();
+
+        const reportDetailModalElement = document.getElementById('reportDetailModal');
+        const reportDetailTitle = reportDetailModalElement?.querySelector('[data-report-detail-title]');
+        const reportDetailBody = document.querySelector('[data-report-detail-body]');
+        const reportDetailModal = reportDetailModalElement && window.bootstrap ? new bootstrap.Modal(reportDetailModalElement) : null;
+
+        document.addEventListener('click', (event) => {
+            const trigger = event.target.closest('[data-report-detail-template]');
+            if (!trigger || !reportDetailBody) {
+                return;
+            }
+
+            event.preventDefault();
+            const template = document.getElementById(trigger.dataset.reportDetailTemplate);
+            if (reportDetailTitle) {
+                reportDetailTitle.textContent = trigger.dataset.reportDetailTitle || 'Chi tiết báo cáo';
+            }
+            reportDetailBody.innerHTML = '';
+
+            if (template?.content) {
+                reportDetailBody.appendChild(template.content.cloneNode(true));
+            } else {
+                reportDetailBody.innerHTML = '<div class="empty-state">Chưa có dữ liệu chi tiết.</div>';
+            }
+
+            reportDetailModal?.show();
+        });
 
         document.querySelectorAll('[data-report-chart-toggle]').forEach((checkbox) => {
             checkbox.addEventListener('change', () => {

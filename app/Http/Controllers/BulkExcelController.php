@@ -139,6 +139,9 @@ class BulkExcelController extends Controller
 
         $this->authorizeCommit($module, $draft['context'] ?? []);
         $draftRows = $this->selectedDraftRows($draft['rows'] ?? [], $request->input('selected_rows'));
+        $studentImportDecisions = $module === 'students'
+            ? $this->studentImportDecisions($request)
+            : [];
         if ($draftRows === []) {
             return response()->json(['message' => 'Vui lòng chọn ít nhất một dòng dữ liệu để nạp.'], 422);
         }
@@ -160,7 +163,7 @@ class BulkExcelController extends Controller
         }
 
         $commitResult = DB::transaction(fn () => match ($module) {
-            'students' => $this->commitStudents($commitRows, $draft['context']),
+            'students' => $this->commitStudents($commitRows, $draft['context'], $studentImportDecisions),
             'teachers' => $this->commitTeachers($commitRows),
             'parents' => $this->commitParents($commitRows),
             'scores' => $this->commitScores($commitRows, $draft['context']),
@@ -366,7 +369,7 @@ class BulkExcelController extends Controller
         return preg_replace('/\.[A-Za-z0-9]+$/', '', $filename) . '.' . $extension;
     }
 
-    private function buildPreview(array $headers, array $rows, callable $validator): array
+    private function buildPreview(array $headers, array $rows, callable $validator, ?callable $classifier = null): array
     {
         $previewRows = [];
         $errorCount = 0;
@@ -375,21 +378,54 @@ class BulkExcelController extends Controller
         foreach ($rows as $rowIndex => $row) {
             $cells = [];
             $rowHasError = false;
+            $rowHasWarning = false;
+            $classification = $classifier ? (array) $classifier($row, $rowIndex) : [];
             foreach ($headers as $header) {
                 $key = $header['key'];
                 $value = trim((string) $this->rowValue($row, array_merge([$key], $header['aliases'] ?? [])));
-                $error = $validator($key, $value, $row, $rowIndex);
-                if ($error) {
+                $validation = $validator($key, $value, $row, $rowIndex);
+                $message = is_array($validation) ? ($validation['message'] ?? null) : $validation;
+                $severity = is_array($validation) ? ($validation['severity'] ?? 'error') : 'error';
+                if ($message && $severity === 'warning') {
+                    $rowHasWarning = true;
+                }
+                if ($message && $severity !== 'warning') {
                     $errorCount++;
                     $rowHasError = true;
                     $error = 'Lỗi dữ liệu';
                 }
-                $cells[] = ['key' => $key, 'value' => $value, 'error' => $error];
+                $cells[] = [
+                    'key' => $key,
+                    'value' => $value,
+                    'error' => $severity === 'warning' ? null : $message,
+                    'warning' => $severity === 'warning' ? $message : null,
+                ];
             }
-            if ($rowHasError) {
+            $classSeverity = $classification['severity'] ?? null;
+            if ($classSeverity === 'error') {
+                $errorCount++;
+                $rowHasError = true;
+            } elseif ($classSeverity === 'warning') {
+                $rowHasWarning = true;
+            }
+            if ($rowHasError || $rowHasWarning) {
                 $warningRowCount++;
             }
-            $previewRows[] = ['index' => $rowIndex + 2, 'position' => $rowIndex, 'cells' => $cells];
+            $previewRows[] = [
+                'index' => $rowIndex + 2,
+                'position' => $rowIndex,
+                'cells' => $cells,
+                'status' => $classification['status'] ?? ($rowHasError ? 'invalid' : 'new'),
+                'status_label' => $classification['status_label'] ?? ($rowHasError ? 'Không hợp lệ' : 'Mới'),
+                'planned_action' => $classification['planned_action'] ?? null,
+                'notes' => $classification['notes'] ?? [],
+                'candidate' => $classification['candidate'] ?? null,
+                'candidates' => $classification['candidates'] ?? [],
+                'requires_decision' => (bool) ($classification['requires_decision'] ?? false),
+                'allowed_actions' => $classification['allowed_actions'] ?? [],
+                'differences' => $classification['differences'] ?? [],
+                'blocking' => $rowHasError,
+            ];
         }
 
         return [
@@ -423,13 +459,16 @@ class BulkExcelController extends Controller
             }
 
             return null;
-        });
+        }, fn (array $row, int $rowIndex) => $this->classifyStudentImportRow($row, $context, $rowIndex));
     }
 
     private function selectedDraftRows(array $rows, mixed $selectedRows): array
     {
         if (! is_array($selectedRows)) {
-            return array_values($rows);
+            return collect($rows)
+                ->map(fn (array $row, int $index) => array_replace($row, ['__bulk_position' => $index]))
+                ->values()
+                ->all();
         }
 
         $selectedIndexes = collect($selectedRows)
@@ -448,8 +487,42 @@ class BulkExcelController extends Controller
 
         return collect($rows)
             ->filter(fn ($row, $index) => array_key_exists((int) $index, $allowed))
+            ->map(fn (array $row, int $index) => array_replace($row, ['__bulk_position' => (int) $index]))
             ->values()
             ->all();
+    }
+
+    private function studentImportDecisions(Request $request): array
+    {
+        $actions = $request->input('row_actions', []);
+        $studentIds = $request->input('row_student_ids', []);
+
+        if (! is_array($actions)) {
+            return [];
+        }
+
+        $decisions = [];
+        foreach ($actions as $position => $action) {
+            $rowPosition = filter_var($position, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+            if ($rowPosition === false) {
+                continue;
+            }
+
+            $action = trim((string) $action);
+            if (! in_array($action, ['update_existing', 'create_new', 'skip'], true)) {
+                continue;
+            }
+
+            $studentId = is_array($studentIds) ? ($studentIds[$position] ?? null) : null;
+            $decisions[(int) $rowPosition] = [
+                'action' => $action,
+                'student_id' => $studentId !== null && trim((string) $studentId) !== ''
+                    ? trim((string) $studentId)
+                    : null,
+            ];
+        }
+
+        return $decisions;
     }
 
     private function validateTeacherRows(array $rows): array
@@ -477,7 +550,7 @@ class BulkExcelController extends Controller
             }
 
             return null;
-        });
+        }, fn (array $row, int $rowIndex) => $this->classifyTeacherImportRow($row, $rowIndex));
     }
 
     private function validateParentRows(array $rows): array
@@ -510,7 +583,220 @@ class BulkExcelController extends Controller
             }
 
             return null;
-        });
+        }, fn (array $row, int $rowIndex) => $this->classifyParentImportRow($row, $rowIndex));
+    }
+
+    private function classifyStudentImportRow(array $row, array $context, int $rowIndex): array
+    {
+        $code = trim((string) $this->rowValue($row, ['ma_hs', 'ma_hoc_sinh', 'student_code']));
+        $name = trim((string) $this->rowValue($row, ['ho_ten', 'ho_va_ten', 'name']));
+        $dob = $this->safeParseDate($this->rowValue($row, ['ngay_sinh', 'dob']));
+        $class = $this->resolveClass((string) $this->rowValue($row, ['lop', 'class_id']), $context['class_id'] ?? null);
+
+        if ($code !== '') {
+            $student = Student::where('student_code', $code)->first();
+            if (! $student) {
+                return [
+                    'status' => 'new',
+                    'status_label' => 'Mới',
+                    'planned_action' => 'Tạo học sinh mới theo mã ' . $code,
+                ];
+            }
+
+            $differences = $this->studentImportDifferences($student, $name, $dob);
+            if ($differences !== []) {
+                return [
+                    'status' => 'need_confirmation',
+                    'status_label' => 'Cần xác nhận',
+                    'severity' => 'error',
+                    'planned_action' => 'Tạm dừng cập nhật vì mã học sinh trùng nhưng dữ liệu định danh khác.',
+                    'notes' => ['Có học sinh tương tự đã tồn tại.'],
+                    'candidate' => $this->studentCandidatePayload($student),
+                    'differences' => $differences,
+                ];
+            }
+
+            return [
+                'status' => 'update',
+                'status_label' => 'Cập nhật',
+                'planned_action' => 'Cập nhật học sinh hiện có theo student_code.',
+                'candidate' => $this->studentCandidatePayload($student),
+            ];
+        }
+
+        $similarCandidates = $this->similarStudentCandidates($name, $dob);
+
+        if ($similarCandidates->isNotEmpty()) {
+            return [
+                'status' => 'need_confirmation',
+                'status_label' => 'Cần xác nhận',
+                'severity' => 'warning',
+                'planned_action' => 'Chọn cập nhật học sinh hiện có, tạo học sinh mới hoặc bỏ qua dòng này.',
+                'notes' => ['File thiếu student_code và có học sinh tương tự. Hệ thống không tự gộp nếu chưa được xác nhận.'],
+                'candidate' => $this->studentCandidatePayload($similarCandidates->first()),
+                'candidates' => $similarCandidates->map(fn (Student $student) => $this->studentCandidatePayload($student))->values()->all(),
+                'requires_decision' => true,
+                'allowed_actions' => ['update_existing', 'create_new', 'skip'],
+                'differences' => $class && (string) $similarCandidates->first()->class_id !== (string) $class->id
+                    ? ['class_id' => ['current' => $similarCandidates->first()->classRoom?->name, 'import' => $class->name]]
+                    : [],
+            ];
+        }
+
+        return [
+            'status' => 'new',
+            'status_label' => 'Mới',
+            'planned_action' => 'Tạo học sinh mới, hệ thống tự sinh student_code nếu file để trống.',
+        ];
+    }
+
+    private function classifyTeacherImportRow(array $row, int $rowIndex): array
+    {
+        $code = trim((string) $this->rowValue($row, ['ma_gv', 'ma_giao_vien', 'teacher_code']));
+        $teacher = $code !== '' ? Teacher::where('teacher_code', $code)->first() : null;
+
+        return $teacher ? [
+            'status' => 'update',
+            'status_label' => 'Cập nhật',
+            'planned_action' => 'Cập nhật giáo viên hiện có theo teacher_code.',
+            'candidate' => [
+                'id' => $teacher->id,
+                'code' => $teacher->teacher_code,
+                'name' => $teacher->name,
+            ],
+        ] : [
+            'status' => 'new',
+            'status_label' => 'Mới',
+            'planned_action' => $code !== '' ? 'Tạo giáo viên mới theo teacher_code.' : 'Tạo giáo viên mới, hệ thống tự sinh teacher_code.',
+        ];
+    }
+
+    private function classifyParentImportRow(array $row, int $rowIndex): array
+    {
+        $code = trim((string) $this->rowValue($row, ['ma_phu_huynh', 'parent_code']));
+        $phone = trim((string) $this->rowValue($row, ['sdt', 'so_dien_thoai', 'phone']));
+        $parentByCode = $code !== '' ? ParentProfile::where('parent_code', $code)->first() : null;
+        $parentByPhone = $phone !== '' ? ParentProfile::where('phone', $phone)->first() : null;
+
+        if ($parentByCode) {
+            if ($parentByPhone && (string) $parentByPhone->id !== (string) $parentByCode->id) {
+                return [
+                    'status' => 'need_confirmation',
+                    'status_label' => 'Cần xác nhận',
+                    'severity' => 'error',
+                    'planned_action' => 'Tạm dừng vì parent_code và số điện thoại thuộc hai phụ huynh khác nhau.',
+                    'candidate' => $this->parentCandidatePayload($parentByCode),
+                    'differences' => ['phone' => ['current' => $parentByCode->phone, 'import' => $phone]],
+                ];
+            }
+
+            return [
+                'status' => 'update',
+                'status_label' => 'Cập nhật',
+                'planned_action' => 'Cập nhật phụ huynh hiện có theo parent_code.',
+                'candidate' => $this->parentCandidatePayload($parentByCode),
+            ];
+        }
+
+        if ($parentByPhone) {
+            return [
+                'status' => 'need_confirmation',
+                'status_label' => 'Cần xác nhận',
+                'severity' => 'error',
+                'planned_action' => 'Không tự gộp phụ huynh chỉ theo số điện thoại khi thiếu parent_code.',
+                'candidate' => $this->parentCandidatePayload($parentByPhone),
+            ];
+        }
+
+        return [
+            'status' => 'new',
+            'status_label' => 'Mới',
+            'planned_action' => $code !== '' ? 'Tạo phụ huynh mới theo parent_code.' : 'Tạo phụ huynh mới, hệ thống tự sinh parent_code.',
+        ];
+    }
+
+    private function studentImportDifferences(Student $student, string $name, ?string $dob): array
+    {
+        $differences = [];
+
+        if ($name !== '' && trim((string) $student->name) !== $name) {
+            $differences['name'] = [
+                'current' => $student->name,
+                'import' => $name,
+            ];
+        }
+
+        $currentDob = $student->dob?->format('Y-m-d');
+        if ($dob && $currentDob && $currentDob !== $dob) {
+            $differences['dob'] = [
+                'current' => $currentDob,
+                'import' => $dob,
+            ];
+        }
+
+        return $differences;
+    }
+
+    private function similarStudentCandidates(string $name, ?string $dob): Collection
+    {
+        if ($name === '' || ! $dob) {
+            return collect();
+        }
+
+        return Student::with('classRoom')
+            ->where('name', $name)
+            ->whereDate('dob', $dob)
+            ->orderBy('student_code')
+            ->get();
+    }
+
+    private function resolveConfirmedStudentCandidate(mixed $studentId, Collection $candidates): Student
+    {
+        $studentId = trim((string) $studentId);
+        if ($studentId === '') {
+            throw ValidationException::withMessages([
+                'file' => 'Vui lòng chọn chính xác học sinh hiện có trước khi cập nhật dòng thiếu student_code.',
+            ]);
+        }
+
+        $student = $candidates->first(fn (Student $candidate) => (string) $candidate->id === $studentId);
+        if (! $student) {
+            throw ValidationException::withMessages([
+                'file' => 'Học sinh được chọn không thuộc danh sách gợi ý hợp lệ của dòng import này.',
+            ]);
+        }
+
+        return $student;
+    }
+
+    private function studentCandidatePayload(Student $student): array
+    {
+        return [
+            'id' => $student->id,
+            'code' => $student->student_code,
+            'name' => $student->name,
+            'dob' => $student->dob?->format('Y-m-d'),
+            'class' => $student->classRoom?->name,
+        ];
+    }
+
+    private function parentCandidatePayload(ParentProfile $parent): array
+    {
+        return [
+            'id' => $parent->id,
+            'code' => $parent->parent_code,
+            'name' => $parent->name,
+            'phone' => $parent->phone,
+        ];
+    }
+
+    private function safeParseDate(mixed $value): ?string
+    {
+        try {
+            return $this->parseDate($value);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function validateScoreRows(array $rows, array $context): array
@@ -608,6 +894,8 @@ class BulkExcelController extends Controller
             'student_phone',
             'Họ tên phụ huynh',
             'parent_name',
+            'Mã phụ huynh',
+            'parent_code',
             'Quan hệ',
             'parent_relation',
             'Số điện thoại Phụ huynh',
@@ -657,6 +945,7 @@ class BulkExcelController extends Controller
             ->unique()
             ->flip()
             ->all();
+        $allowed['__bulk_position'] = true;
 
         return collect($rows)
             ->map(fn (array $row) => array_intersect_key($row, $allowed))
@@ -665,7 +954,7 @@ class BulkExcelController extends Controller
             ->all();
     }
 
-    private function commitStudents(array $rows, array $context): array
+    private function commitStudents(array $rows, array $context, array $decisions = []): array
     {
         $affected = 0;
         $created = 0;
@@ -677,26 +966,45 @@ class BulkExcelController extends Controller
                 continue;
             }
 
+            $position = (int) ($row['__bulk_position'] ?? -1);
+            $decision = $decisions[$position] ?? [];
+            $selectedAction = $decision['action'] ?? null;
             $code = trim((string) $this->rowValue($row, ['ma_hs', 'ma_hoc_sinh', 'student_code']));
             $name = trim((string) $this->rowValue($row, ['ho_ten', 'ho_va_ten', 'name']));
             $dob = $this->parseDate($this->rowValue($row, ['ngay_sinh', 'dob']));
             $parentPhone = trim((string) $this->rowValue($row, ['sdt_phu_huynh', 'parent_phone']));
             $student = $this->findImportedStudentByStableKey($code);
 
-            if (! $student && $code === '' && $name !== '' && $dob) {
-                $student = $this->findImportedStudentByIdentity($name, $dob, (string) $class->id);
-                $sameIdentityDifferentClass = Student::where('name', $name)
-                    ->whereDate('dob', $dob)
-                    ->where('class_id', '!=', $class->id)
-                    ->first();
+            if ($student && $this->studentImportDifferences($student, $name, $dob) !== []) {
+                throw ValidationException::withMessages([
+                    'file' => 'Dòng import mã ' . $code . ' cần xác nhận vì họ tên/ngày sinh khác hồ sơ hiện có.',
+                ]);
+            }
 
-                if ($sameIdentityDifferentClass) {
-                    Log::warning('Bulk Excel student duplicate warning', [
+            if (! $student && $code === '') {
+                $similarStudents = $this->similarStudentCandidates($name, $dob);
+                if ($similarStudents->isNotEmpty()) {
+                    if ($selectedAction === 'skip') {
+                        continue;
+                    }
+
+                    if ($selectedAction === 'update_existing') {
+                        $student = $this->resolveConfirmedStudentCandidate($decision['student_id'] ?? null, $similarStudents);
+                    } elseif ($selectedAction === 'create_new') {
+                        $student = null;
+                    } else {
+                        throw ValidationException::withMessages([
+                            'file' => 'Dòng import thiếu student_code và có học sinh tương tự. Vui lòng chọn Cập nhật học sinh hiện có, Tạo học sinh mới hoặc Bỏ qua trong màn hình xem trước.',
+                        ]);
+                    }
+
+                    Log::warning('Bulk Excel student similar record warning', [
                         'name' => $name,
                         'dob' => $dob,
                         'import_class_id' => $class->id,
-                        'matched_student_id' => $sameIdentityDifferentClass->id,
-                        'matched_class_id' => $sameIdentityDifferentClass->class_id,
+                        'matched_student_ids' => $similarStudents->pluck('id')->values()->all(),
+                        'selected_student_id' => $student?->id,
+                        'planned_action' => $selectedAction,
                     ]);
                 }
             }
@@ -833,7 +1141,12 @@ class BulkExcelController extends Controller
             $code = trim((string) $this->rowValue($row, ['ma_phu_huynh', 'parent_code']));
             $phone = trim((string) $this->rowValue($row, ['sdt', 'so_dien_thoai', 'phone']));
             $parent = $code !== '' ? ParentProfile::where('parent_code', $code)->first() : null;
-            $parent ??= $phone !== '' ? ParentProfile::where('phone', $phone)->first() : null;
+            $parentByPhone = $phone !== '' ? ParentProfile::where('phone', $phone)->first() : null;
+            if ($parentByPhone && (! $parent || (string) $parent->id !== (string) $parentByPhone->id)) {
+                throw ValidationException::withMessages([
+                    'file' => 'Dữ liệu phụ huynh cần xác nhận vì số điện thoại đã thuộc hồ sơ khác hoặc thiếu parent_code.',
+                ]);
+            }
             $parent ??= new ParentProfile(['parent_code' => $code !== '' ? $code : $this->nextParentCode()]);
 
             $parent->fill([
@@ -1018,6 +1331,7 @@ class BulkExcelController extends Controller
                 'dan_toc' => $student->ethnicity,
                 'ton_giao' => $student->religion,
                 'dia_chi' => $student->address,
+                'ma_phu_huynh' => $student->parents->pluck('parent_code')->filter()->join(', '),
                 'sdt_phu_huynh' => $student->parent_phone,
                 'lop' => $student->classRoom?->name ?? $class?->name,
                 'nien_khoa' => $student->schoolYear?->name ?? $class?->schoolYear?->name,
@@ -1030,6 +1344,7 @@ class BulkExcelController extends Controller
                 'place_of_birth' => $student->place_of_birth,
                 'ethnicity' => $student->ethnicity,
                 'religion' => $student->religion,
+                'parent_code' => $student->parents->pluck('parent_code')->filter()->join(', '),
                 'parent_phone' => $student->parent_phone,
                 'email' => $student->email,
                 'enrollment_date' => $student->enrollment_date?->format('d/m/Y'),
@@ -1851,6 +2166,7 @@ class BulkExcelController extends Controller
             'dia_chi' => $student->address,
             'sdt_hoc_sinh' => $student->getAttribute('student_phone'),
             'ho_ten_phu_huynh' => $student->parents->pluck('name')->filter()->join(', '),
+            'ma_phu_huynh' => $student->parents->pluck('parent_code')->filter()->join(', '),
             'sdt_phu_huynh' => $student->parent_phone,
             'lop' => $student->classRoom?->name,
             'nien_khoa' => $student->schoolYear?->name ?? $student->classRoom?->schoolYear?->name,
@@ -1863,6 +2179,7 @@ class BulkExcelController extends Controller
             'place_of_birth' => $student->place_of_birth,
             'ethnicity' => $student->ethnicity,
             'religion' => $student->religion,
+            'parent_code' => $student->parents->pluck('parent_code')->filter()->join(', '),
             'parent_phone' => $student->parent_phone,
             'email' => $student->email,
             'enrollment_date' => $student->enrollment_date?->format('d/m/Y'),
@@ -1946,6 +2263,7 @@ class BulkExcelController extends Controller
             ['key' => 'dia_chi', 'label' => 'Địa chỉ thường trú', 'aliases' => ['dia_chi_thuong_tru', 'address']],
             ['key' => 'sdt_hoc_sinh', 'label' => 'SĐT học sinh', 'aliases' => ['student_phone', 'phone']],
             ['key' => 'ho_ten_phu_huynh', 'label' => 'Họ tên phụ huynh', 'aliases' => ['parent_name']],
+            ['key' => 'ma_phu_huynh', 'label' => 'Mã phụ huynh', 'aliases' => ['parent_code']],
             ['key' => 'sdt_phu_huynh', 'label' => 'SĐT phụ huynh', 'aliases' => ['parent_phone']],
             ['key' => 'lop', 'label' => 'Lớp', 'aliases' => ['class_id']],
             ['key' => 'nien_khoa', 'label' => 'Niên khóa', 'aliases' => ['school_year_id', 'cohort']],
@@ -2075,6 +2393,16 @@ class BulkExcelController extends Controller
             : Student::ADMISSION_NEW;
     }
 
+    private function normalizeParentRelation(mixed $value, int $rowNumber = 0): string
+    {
+        return match ($this->normalizeText($value)) {
+            'cha', 'bo', 'father' => ParentProfile::RELATION_FATHER,
+            'me', 'mother' => ParentProfile::RELATION_MOTHER,
+            'nguoi_giam_ho', 'giam_ho', 'guardian' => ParentProfile::RELATION_GUARDIAN,
+            default => ParentProfile::RELATION_GUARDIAN,
+        };
+    }
+
     private function normalizeConductLevel(mixed $value): string
     {
         return match ($this->normalizeText($value)) {
@@ -2196,8 +2524,95 @@ class BulkExcelController extends Controller
 
     private function syncImportedParentForStudent(Student $student, array $row): void
     {
+        $parentCode = trim((string) $this->rowValue($row, ['ma_phu_huynh', 'parent_code']));
         $phone = trim((string) $this->rowValue($row, ['sdt_phu_huynh', 'parent_phone']));
-        if ($phone === '') {
+        if ($phone === '' && $parentCode === '') {
+            return;
+        }
+
+        $currentParent = $student->parents()->first();
+        $parentByCode = $parentCode !== '' ? ParentProfile::where('parent_code', $parentCode)->first() : null;
+        $parentWithPhone = $phone !== '' ? ParentProfile::where('phone', $phone)->first() : null;
+
+        if ($parentByCode) {
+            if ($parentWithPhone && (string) $parentWithPhone->id !== (string) $parentByCode->id) {
+                throw ValidationException::withMessages([
+                    'file' => 'Dữ liệu phụ huynh trong file cần xác nhận vì parent_code và số điện thoại thuộc hai hồ sơ khác nhau.',
+                ]);
+            }
+
+            if ($currentParent && (string) $currentParent->id !== (string) $parentByCode->id) {
+                throw ValidationException::withMessages([
+                    'file' => 'Dữ liệu phụ huynh trong file khác phụ huynh hiện tại của học sinh ' . $student->student_code . '. Vui lòng xác nhận thủ công trước khi thay phụ huynh.',
+                ]);
+            }
+
+            $parentByCode->fill([
+                'name' => trim((string) $this->rowValue($row, ['ho_ten_phu_huynh', 'parent_name'], $parentByCode->name)) ?: $parentByCode->name,
+                'phone' => $phone !== '' ? $phone : $parentByCode->phone,
+                'email' => trim((string) $this->rowValue($row, ['email_phu_huynh', 'parent_email'], $parentByCode->email)) ?: $parentByCode->email,
+                'address' => trim((string) $this->rowValue($row, ['dia_chi_phu_huynh', 'parent_address', 'dia_chi'], $parentByCode->address)) ?: $parentByCode->address,
+            ])->save();
+
+            $student->parents()->sync([
+                $parentByCode->id => ['relation' => $this->normalizeParentRelation($this->rowValue($row, ['quan_he', 'parent_relation']), 0)],
+            ]);
+            $this->ensureParentUser($parentByCode);
+            $this->syncParentContactToLinkedStudents($parentByCode);
+
+            return;
+        }
+
+        if (! $currentParent && $parentWithPhone) {
+            throw ValidationException::withMessages([
+                'file' => 'Dữ liệu phụ huynh cần xác nhận vì file thiếu parent_code và số điện thoại đã tồn tại.',
+            ]);
+        }
+
+        if ($parentCode !== '') {
+            if ($currentParent) {
+                throw ValidationException::withMessages([
+                    'file' => 'Dữ liệu phụ huynh trong file khác phụ huynh hiện tại của học sinh ' . $student->student_code . '. Vui lòng xác nhận thủ công trước khi thay phụ huynh.',
+                ]);
+            }
+
+            $parent = ParentProfile::create([
+                'parent_code' => $parentCode,
+                'name' => trim((string) $this->rowValue($row, ['ho_ten_phu_huynh', 'parent_name'])) ?: 'Phụ huynh của ' . $student->name,
+                'phone' => $phone !== '' ? $phone : null,
+                'email' => trim((string) $this->rowValue($row, ['email_phu_huynh', 'parent_email'])) ?: null,
+                'address' => trim((string) $this->rowValue($row, ['dia_chi_phu_huynh', 'parent_address', 'dia_chi'])) ?: null,
+            ]);
+
+            $student->parents()->sync([
+                $parent->id => ['relation' => $this->normalizeParentRelation($this->rowValue($row, ['quan_he', 'parent_relation']), 0)],
+            ]);
+            $this->ensureParentUser($parent);
+            $this->syncParentContactToLinkedStudents($parent);
+
+            return;
+        }
+
+        if ($currentParent && $parentWithPhone && (string) $currentParent->id !== (string) $parentWithPhone->id) {
+            throw ValidationException::withMessages([
+                'file' => 'Du lieu phu huynh trong file khac phu huynh hien tai cua hoc sinh ' . $student->student_code . '. Vui long xac nhan thu cong truoc khi thay phu huynh.',
+            ]);
+        }
+
+        if ($currentParent && ! $parentWithPhone) {
+            $currentParent->fill([
+                'name' => trim((string) $this->rowValue($row, ['ho_ten_phu_huynh', 'parent_name'], $currentParent->name)) ?: $currentParent->name,
+                'phone' => $phone,
+                'email' => trim((string) $this->rowValue($row, ['email_phu_huynh', 'parent_email'], $currentParent->email)) ?: $currentParent->email,
+                'address' => trim((string) $this->rowValue($row, ['dia_chi_phu_huynh', 'parent_address', 'dia_chi'], $currentParent->address)) ?: $currentParent->address,
+            ])->save();
+
+            $student->parents()->sync([
+                $currentParent->id => ['relation' => ParentProfile::RELATION_GUARDIAN],
+            ]);
+            $this->ensureParentUser($currentParent);
+            $this->syncParentContactToLinkedStudents($currentParent);
+
             return;
         }
 
@@ -2221,6 +2636,24 @@ class BulkExcelController extends Controller
             $parent->id => ['relation' => ParentProfile::RELATION_GUARDIAN],
         ]);
         $this->ensureParentUser($parent);
+        $this->syncParentContactToLinkedStudents($parent);
+    }
+
+    private function syncParentContactToLinkedStudents(ParentProfile $parent): void
+    {
+        if (! Schema::hasColumn((new Student())->getTable(), 'parent_phone')) {
+            return;
+        }
+
+        $studentIds = DB::table('parent_student')
+            ->where('parent_id', $parent->id)
+            ->pluck('student_id');
+
+        if ($studentIds->isEmpty()) {
+            return;
+        }
+
+        Student::whereIn('id', $studentIds)->update(['parent_phone' => $parent->phone]);
     }
 
     private function linkedStudentCodes(string $value): array

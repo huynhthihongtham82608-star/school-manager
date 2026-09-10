@@ -328,6 +328,44 @@
             white-space: nowrap;
         }
 
+        .bulk-excel-warning-text,
+        .bulk-excel-status-note {
+            display: block;
+            margin-top: .22rem;
+            color: #c2410c;
+            font-size: .75rem;
+            font-weight: 400;
+            line-height: 1.25;
+            white-space: normal;
+            max-width: 18rem;
+        }
+
+        .bulk-excel-status-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            color: #c2410c;
+            padding: .18rem .55rem;
+            font-size: .75rem;
+            font-weight: 400;
+            white-space: nowrap;
+        }
+
+        .bulk-excel-status-badge[data-status="update"] {
+            border-color: #bbf7d0;
+            background: #f0fdf4;
+            color: #15803d;
+        }
+
+        .bulk-excel-status-badge[data-status="need_confirmation"],
+        .bulk-excel-status-badge[data-status="invalid"] {
+            border-color: #fecaca;
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
         .text-red-650 {
             color: #b91c1c !important;
         }
@@ -551,6 +589,12 @@
                 selectAll.setAttribute('aria-label', 'Chọn tất cả dòng import');
                 selectHeader.appendChild(selectAll);
                 headerRow.appendChild(selectHeader);
+                const hasStatusColumn = (payload.rows || []).some((row) => row.status_label || row.planned_action || (row.notes || []).length);
+                if (hasStatusColumn) {
+                    const statusTh = document.createElement('th');
+                    statusTh.textContent = 'Trạng thái';
+                    headerRow.appendChild(statusTh);
+                }
                 (payload.headers || []).forEach((header) => {
                     const th = document.createElement('th');
                     th.textContent = header.label;
@@ -560,7 +604,7 @@
 
                 (payload.rows || []).forEach((row) => {
                     const tr = document.createElement('tr');
-                    const rowHasError = (row.cells || []).some((cell) => Boolean(cell.error));
+                    const rowHasError = Boolean(row.blocking) || (row.cells || []).some((cell) => Boolean(cell.error));
                     tr.dataset.hasError = rowHasError ? '1' : '0';
 
                     const selectCell = document.createElement('td');
@@ -572,8 +616,76 @@
                     checkbox.value = String(row.position ?? 0);
                     checkbox.setAttribute('data-bulk-row-select', '');
                     checkbox.setAttribute('aria-label', `Chọn dòng ${row.index || ''}`);
+                    if (row.blocking) {
+                        checkbox.checked = false;
+                        checkbox.disabled = true;
+                    }
                     selectCell.appendChild(checkbox);
                     tr.appendChild(selectCell);
+
+                    if (hasStatusColumn) {
+                        const statusCell = document.createElement('td');
+                        const badge = document.createElement('span');
+                        const status = String(row.status || '');
+                        badge.className = 'bulk-excel-status-badge';
+                        badge.dataset.status = status;
+                        badge.textContent = row.status_label || 'Mới';
+                        statusCell.appendChild(badge);
+
+                        if (row.planned_action) {
+                            const action = document.createElement('div');
+                            action.className = 'bulk-excel-status-note';
+                            action.textContent = row.planned_action;
+                            statusCell.appendChild(action);
+                        }
+
+                        (row.notes || []).forEach((noteText) => {
+                            const note = document.createElement('div');
+                            note.className = 'bulk-excel-status-note';
+                            note.textContent = noteText;
+                            statusCell.appendChild(note);
+                        });
+
+                        if (row.requires_decision) {
+                            const decisionWrap = document.createElement('div');
+                            decisionWrap.className = 'bulk-excel-status-note d-flex flex-column gap-2 mt-2';
+
+                            const actionSelect = document.createElement('select');
+                            actionSelect.className = 'form-select form-select-sm font-normal';
+                            actionSelect.setAttribute('data-bulk-row-action', '');
+                            actionSelect.setAttribute('aria-label', 'Chọn cách xử lý dòng cần xác nhận');
+                            actionSelect.innerHTML = `
+                                <option value="">Chọn cách xử lý</option>
+                                <option value="update_existing">Cập nhật học sinh hiện có</option>
+                                <option value="create_new">Tạo học sinh mới</option>
+                                <option value="skip">Bỏ qua</option>
+                            `;
+
+                            const candidateSelect = document.createElement('select');
+                            candidateSelect.className = 'form-select form-select-sm font-normal d-none';
+                            candidateSelect.setAttribute('data-bulk-row-student-id', '');
+                            candidateSelect.setAttribute('aria-label', 'Chọn học sinh hiện có cần cập nhật');
+                            candidateSelect.disabled = true;
+                            candidateSelect.innerHTML = '<option value="">Chọn học sinh hiện có</option>';
+                            (row.candidates || []).forEach((candidate) => {
+                                const option = document.createElement('option');
+                                option.value = String(candidate.id || '');
+                                option.textContent = [
+                                    candidate.code || 'Chưa có mã',
+                                    candidate.name || 'Chưa có tên',
+                                    candidate.dob || 'Chưa có ngày sinh',
+                                    candidate.class || 'Chưa có lớp'
+                                ].join(' - ');
+                                candidateSelect.appendChild(option);
+                            });
+
+                            decisionWrap.appendChild(actionSelect);
+                            decisionWrap.appendChild(candidateSelect);
+                            statusCell.appendChild(decisionWrap);
+                        }
+
+                        tr.appendChild(statusCell);
+                    }
 
                     (row.cells || []).forEach((cell) => {
                         const td = document.createElement('td');
@@ -590,6 +702,12 @@
                             error.textContent = cell.error;
                             td.appendChild(error);
                         }
+                        if (cell.warning) {
+                            const warning = document.createElement('span');
+                            warning.className = 'bulk-excel-warning-text text-orange-700 bg-orange-50 text-xs font-normal px-2 py-0.5 rounded';
+                            warning.textContent = cell.warning;
+                            td.appendChild(warning);
+                        }
                         tr.appendChild(td);
                     });
                     body.appendChild(tr);
@@ -605,16 +723,32 @@
                 const confirm = modal.querySelector('[data-bulk-excel-confirm]');
                 const selectAll = modal.querySelector('[data-bulk-row-select-all]');
                 const checkboxes = [...modal.querySelectorAll('[data-bulk-row-select]')];
+                const selectable = checkboxes.filter((checkbox) => ! checkbox.disabled);
                 const selected = checkboxes.filter((checkbox) => checkbox.checked);
                 const selectedHasError = selected.some((checkbox) => checkbox.closest('tr')?.dataset.hasError === '1');
+                const selectedNeedsDecision = selected.some((checkbox) => {
+                    const row = checkbox.closest('tr');
+                    const actionSelect = row?.querySelector('[data-bulk-row-action]');
+                    if (! actionSelect) {
+                        return false;
+                    }
+                    if (actionSelect.value === 'skip' || actionSelect.value === 'create_new') {
+                        return false;
+                    }
+                    if (actionSelect.value === 'update_existing') {
+                        return ! row.querySelector('[data-bulk-row-student-id]')?.value;
+                    }
+
+                    return true;
+                });
 
                 if (selectAll) {
-                    selectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
-                    selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+                    selectAll.checked = selectable.length > 0 && selectable.every((checkbox) => checkbox.checked);
+                    selectAll.indeterminate = selectable.some((checkbox) => checkbox.checked) && ! selectAll.checked;
                 }
 
                 if (confirm) {
-                    confirm.disabled = selected.length === 0 || selectedHasError;
+                    confirm.disabled = selected.length === 0 || selectedHasError || selectedNeedsDecision;
                 }
             };
 
@@ -670,6 +804,9 @@
                 if (selectAll) {
                     const modal = selectAll.closest('[data-bulk-excel-modal]');
                     modal.querySelectorAll('[data-bulk-row-select]').forEach((checkbox) => {
+                        if (checkbox.disabled) {
+                            return;
+                        }
                         checkbox.checked = selectAll.checked;
                     });
                     syncPreviewSelectionState(modal);
@@ -738,6 +875,15 @@
                 formData.append('token', modal.dataset.token || '');
                 modal.querySelectorAll('[data-bulk-row-select]:checked').forEach((checkbox) => {
                     formData.append('selected_rows[]', checkbox.value);
+                    const row = checkbox.closest('tr');
+                    const action = row?.querySelector('[data-bulk-row-action]')?.value;
+                    const studentId = row?.querySelector('[data-bulk-row-student-id]')?.value;
+                    if (action) {
+                        formData.append(`row_actions[${checkbox.value}]`, action);
+                    }
+                    if (studentId) {
+                        formData.append(`row_student_ids[${checkbox.value}]`, studentId);
+                    }
                 });
                 confirm.disabled = true;
 
@@ -766,6 +912,28 @@
             });
 
             document.addEventListener('change', (event) => {
+                const actionSelect = event.target.closest('[data-bulk-row-action]');
+                if (actionSelect) {
+                    const row = actionSelect.closest('tr');
+                    const candidateSelect = row?.querySelector('[data-bulk-row-student-id]');
+                    if (candidateSelect) {
+                        const needsCandidate = actionSelect.value === 'update_existing';
+                        candidateSelect.classList.toggle('d-none', ! needsCandidate);
+                        candidateSelect.disabled = ! needsCandidate;
+                        if (! needsCandidate) {
+                            candidateSelect.value = '';
+                        }
+                    }
+                    syncPreviewSelectionState(actionSelect.closest('[data-bulk-excel-modal]'));
+                    return;
+                }
+
+                const candidateSelect = event.target.closest('[data-bulk-row-student-id]');
+                if (candidateSelect) {
+                    syncPreviewSelectionState(candidateSelect.closest('[data-bulk-excel-modal]'));
+                    return;
+                }
+
                 const rowCheckbox = event.target.closest('[data-bulk-row-select]');
                 if (! rowCheckbox) {
                     return;

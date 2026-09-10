@@ -630,12 +630,22 @@
     }
 
     .attendance-weekly-card .card-header {
+        display: flex !important;
         align-items: flex-start !important;
         justify-content: flex-start !important;
+        gap: .75rem !important;
         text-align: left;
     }
 
-    .attendance-weekly-card .card-header > div:first-child {
+    .attendance-weekly-card .card-header::before {
+        align-self: flex-start;
+        margin-top: .2rem;
+        flex: 0 0 auto;
+    }
+
+    .attendance-weekly-card .attendance-weekly-title {
+        flex: 1 1 auto;
+        min-width: min(100%, 16rem);
         margin-left: 0;
         padding-left: 0;
         text-align: left;
@@ -649,6 +659,12 @@
         .attendance-weekly-card .attendance-weekly-legend {
             margin-left: 0;
         }
+    }
+
+    .attendance-weekly-card > .admin-table-tools,
+    .attendance-daily-summary-card > .admin-table-tools,
+    .attendance-log-card > .admin-table-tools {
+        display: none !important;
     }
 
     .attendance-session-subtext {
@@ -1536,9 +1552,9 @@
     @endif
 
     @if($attendanceViewMode === 'week' && ! $isSubjectTeacherAttendanceView && ($weeklyMatrix['enabled'] ?? false))
-        <div class="card mb-3 attendance-weekly-card">
-            <div class="card-header d-flex flex-column flex-lg-row justify-content-between align-items-start gap-2">
-                <div>
+        <div class="card mb-3 attendance-weekly-card" data-attendance-card-no-toolbar>
+            <div class="card-header attendance-weekly-header d-flex flex-column flex-lg-row align-items-start gap-2">
+                <div class="attendance-weekly-title">
                     <div class="fw-semibold">Chuyên cần theo tuần</div>
                     <div class="text-muted small">
                         {{ $selectedClass?->name ?? 'Tất cả các lớp' }} • Tuần
@@ -1553,7 +1569,7 @@
                 </div>
             </div>
             <div class="table-responsive">
-                <table class="table align-middle w-full table-fixed max-w-full overflow-hidden font-sans mb-0" data-admin-table-skip>
+                <table class="table align-middle w-full table-fixed max-w-full overflow-hidden font-sans mb-0" data-admin-table-skip data-no-auto-toolbar>
                     <thead>
                         <tr>
                             <th style="width: 28%;">Học sinh</th>
@@ -1666,13 +1682,13 @@
 @endif
 
 @if($canViewAttendanceRoster && $isAdminAttendanceView && $attendanceViewMode === 'day' && ! $selectedClassId)
-<div class="card border-0 shadow-xs">
+<div class="card border-0 shadow-xs attendance-daily-summary-card" data-attendance-card-no-toolbar>
     <div class="card-header bg-white border-bottom border-orange-100">
         <div class="fw-semibold text-gray-900">Tổng hợp chuyên cần theo ngày</div>
         <div class="text-muted small">{{ $selectedSemester?->name ?? 'Học kỳ' }} • {{ \Illuminate\Support\Carbon::parse($date)->format('d/m/Y') }}</div>
     </div>
     <div class="table-responsive overflow-hidden">
-        <table class="table attendance-session-table w-full table-fixed max-w-full overflow-hidden font-sans mb-0" data-admin-table-skip>
+        <table class="table attendance-session-table w-full table-fixed max-w-full overflow-hidden font-sans mb-0" data-admin-table-skip data-no-auto-toolbar>
             <thead>
                 <tr>
                     <th style="width: 42%;">Lớp</th>
@@ -1752,12 +1768,12 @@
 @endif
 
 @if($canViewAttendanceRoster && ! $isSubjectTeacherAttendanceView && $attendanceViewMode === 'all')
-<div class="card">
+<div class="card attendance-log-card" data-attendance-card-no-toolbar>
     <div class="card-header">
         <div class="fw-semibold">Nhật ký điểm danh</div>
     </div>
     <div class="table-responsive">
-        <table class="table attendance-session-table w-full table-fixed max-w-full overflow-hidden mb-0" data-admin-table-skip>
+        <table class="table attendance-session-table w-full table-fixed max-w-full overflow-hidden mb-0" data-admin-table-skip data-no-auto-toolbar>
             <thead>
                 <tr>
                     <th style="width: 22%;">Lớp / Ngày</th>
@@ -2056,6 +2072,10 @@
         } else {
             form.appendChild(dropdown);
         }
+    });
+
+    document.querySelectorAll('[data-attendance-card-no-toolbar] > .admin-table-tools').forEach((toolbar) => {
+        toolbar.remove();
     });
 
     document.querySelectorAll('[data-attendance-search]').forEach((input) => {

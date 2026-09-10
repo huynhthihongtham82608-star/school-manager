@@ -31,6 +31,7 @@
             </button>
             <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 320px;">
                 <form method="GET" action="{{ route('students.index') }}" class="row g-3">
+                    <input type="hidden" name="q" value="{{ $keyword }}">
                     <div class="col-12">
                         <label class="form-label small mb-1">Năm học</label>
                         <select name="school_year_id" class="form-select">
@@ -83,6 +84,33 @@
 </x-page-header>
 
 <div class="card">
+    <div class="card-body border-bottom">
+        <form method="GET" action="{{ route('students.index') }}" class="row g-2 align-items-end">
+            <input type="hidden" name="school_year_id" value="{{ $selectedYearId }}">
+            <input type="hidden" name="grade_level" value="{{ $selectedGrade }}">
+            <input type="hidden" name="class_id" value="{{ $selectedClassId }}">
+            <input type="hidden" name="status" value="{{ $selectedStatus }}">
+            <input type="hidden" name="gender" value="{{ $selectedGender }}">
+            <div class="col-md-5">
+                <label class="form-label small mb-1">Tìm kiếm</label>
+                <input type="search" name="q" class="form-control" value="{{ $keyword }}" placeholder="Mã HS, họ tên, phụ huynh, SĐT phụ huynh">
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary">Tìm</button>
+            </div>
+            @if($keyword !== '')
+                <div class="col-auto">
+                    <a href="{{ route('students.index', array_filter([
+                        'school_year_id' => $selectedYearId,
+                        'grade_level' => $selectedGrade !== 'all' ? $selectedGrade : null,
+                        'class_id' => $selectedClassId !== 'all' ? $selectedClassId : null,
+                        'status' => $selectedStatus !== 'all' ? $selectedStatus : null,
+                        'gender' => $selectedGender !== 'all' ? $selectedGender : null,
+                    ])) }}" class="btn btn-secondary">Xóa tìm</a>
+                </div>
+            @endif
+        </form>
+    </div>
     <div class="table-responsive">
         <table class="table">
             <thead>
@@ -100,6 +128,7 @@
                 @php
                     $deleteCheck = $deleteChecks[(string) $student->getKey()] ?? ['allowed' => false, 'message' => null];
                     $loginLocked = (int) ($student->user?->login_status ?? 1) !== 1;
+                    $primaryParent = $student->parents->first();
                 @endphp
                 <tr>
                     <td class="fw-normal">{{ $student->student_code }}</td>
@@ -123,7 +152,14 @@
                     </td>
                     <td>{{ $student->classRoom->name ?? '-' }}</td>
                     <td>
-                        <div>{{ $student->parent_phone ?: '-' }}</div>
+                        @if($primaryParent)
+                            <div>{{ $primaryParent->name }}</div>
+                            @if($primaryParent->phone)
+                                <div class="text-muted small">{{ $primaryParent->phone }}</div>
+                            @endif
+                        @else
+                            <span class="text-muted">-</span>
+                        @endif
                     </td>
 	                    <td><span class="badge {{ $student->statusBadgeClass() }}">{{ $student->statusLabel() }}</span></td>
 	                    <td class="text-end action-column text-right">
@@ -286,7 +322,7 @@
                                     <h6>Thông tin cá nhân & liên hệ</h6>
                                 </div>
                                 <div class="student-compact-list two">
-                                    <div><span>SĐT phụ huynh</span><strong>{{ $student->parent_phone ?: '-' }}</strong></div>
+                                    <div><span>SĐT phụ huynh</span><strong>{{ $student->parents->first()?->phone ?: ($student->parent_phone ?: '-') }}</strong></div>
                                     <div><span>Ngày sinh</span><strong>{{ $student->dob?->format('d/m/Y') ?? '-' }}</strong></div>
                                     <div><span>Giới tính</span><strong>{{ $student->genderLabel() }}</strong></div>
                                     <div><span>Nơi sinh</span><strong>{{ $student->place_of_birth ?: '-' }}</strong></div>
@@ -360,7 +396,7 @@
                                 <div class="student-v2-section-grid">
                                     <article>
                                         <span>SĐT phụ huynh</span>
-                                        <strong>{{ $student->parent_phone ?: '-' }}</strong>
+                                        <strong>{{ $student->parents->first()?->phone ?: ($student->parent_phone ?: '-') }}</strong>
                                     </article>
                                 </div>
                             </section>
