@@ -570,10 +570,14 @@
             @endforeach
         </div>
 
-        <form method="POST" action="{{ route('conduct.store') }}" data-conduct-form>
-            @csrf
-            <input type="hidden" name="class_id" value="{{ $selectedClass->id }}">
-            <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+        @if($canEditConduct)
+            <form method="POST" action="{{ route('conduct.store') }}" data-conduct-form>
+                @csrf
+                <input type="hidden" name="class_id" value="{{ $selectedClass->id }}">
+                <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+        @else
+            <div data-conduct-form-readonly>
+        @endif
             <div class="card">
                 <div class="table-responsive">
                     <table class="table conduct-matrix-table w-full table-fixed max-w-full overflow-hidden mb-0" data-admin-table-skip>
@@ -714,7 +718,11 @@
                     <span class="text-muted small">Bảng hạnh kiểm đang ở chế độ chỉ xem.</span>
                 @endif
             </div>
-        </form>
+        @if($canEditConduct)
+            </form>
+        @else
+            </div>
+        @endif
     @endif
 @endif
 

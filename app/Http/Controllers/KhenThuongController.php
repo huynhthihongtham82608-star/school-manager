@@ -78,7 +78,7 @@ class KhenThuongController extends Controller
             'selectedClassId' => $selectedClassId ?: 'all',
             'selectedType' => $selectedType,
             'isHomeroomOnly' => $this->isHomeroomOnly(),
-            'readOnly' => $this->isHistoricalReadOnly(),
+            'readOnly' => $this->isHistoricalReadOnly($request, true),
         ]);
     }
 
@@ -421,7 +421,7 @@ class KhenThuongController extends Controller
 
     private function denyHistoricalWrite(): void
     {
-        if ($this->isHistoricalReadOnly()) {
+        if ($this->isHistoricalReadOnly(request(), true)) {
             throw ValidationException::withMessages([
                 'history_readonly' => 'Đang xem dữ liệu lịch sử, không thể thay đổi khen thưởng.',
             ]);

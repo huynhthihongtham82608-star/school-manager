@@ -113,7 +113,7 @@ class ConductController extends Controller
             $this->authorizeConductView($selectedClass);
             $canEditConduct = $this->canEditConduct($selectedClass)
                 && $selectedSemester?->isActive()
-                && ! $this->isHistoricalReadOnly();
+                && ! $this->isHistoricalReadOnly($request, true);
 
             $students = Student::where('class_id', $selectedClass->id)->orderBy('student_code')->get();
             $records = Conduct::where('class_id', $selectedClass->id)
@@ -145,7 +145,7 @@ class ConductController extends Controller
             abort(403, 'Học kỳ không ở trạng thái Hoạt động nên không thể nhập hoặc chỉnh sửa hạnh kiểm.');
         }
 
-        if ($this->isHistoricalReadOnly()) {
+        if ($this->isHistoricalReadOnly($request, true)) {
             abort(403, 'Đang xem dữ liệu năm học cũ, chỉ được xem hạnh kiểm.');
         }
 

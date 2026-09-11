@@ -23,7 +23,7 @@ class TuitionFeeController extends Controller
         $selectedSemesterId = $request->query('semester_id') ?: $this->selectedSemesterId($request);
         $selectedClassId = $request->query('class_id', 'all');
         $selectedStatus = $request->query('status', 'all');
-        $readOnly = $this->isHistoricalReadOnly();
+        $readOnly = $this->isHistoricalReadOnly($request, true);
 
         $classes = SchoolClass::with('schoolYear')
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
@@ -193,7 +193,7 @@ class TuitionFeeController extends Controller
     {
         $semester = $semesterId ? Semester::find($semesterId) : null;
 
-        if (! $semester) {
+        if (! $semester || ! $semester->isCurrent()) {
             return;
         }
 
@@ -229,6 +229,13 @@ class TuitionFeeController extends Controller
 
         if (! $semester) {
             return null;
+        }
+
+        if (! $semester->isCurrent()) {
+            return TuitionFee::with(['student', 'classRoom', 'semester.schoolYear'])
+                ->where('student_id', $student->id)
+                ->where('semester_id', $semester->id)
+                ->first();
         }
 
         return TuitionFee::firstOrCreate(
@@ -269,7 +276,7 @@ class TuitionFeeController extends Controller
 
     private function denyHistoricalWrite(): void
     {
-        if ($this->isHistoricalReadOnly()) {
+        if ($this->isHistoricalReadOnly(request(), true)) {
             throw ValidationException::withMessages([
                 'history_readonly' => 'Đang xem dữ liệu lịch sử, không thể thay đổi học phí.',
             ]);

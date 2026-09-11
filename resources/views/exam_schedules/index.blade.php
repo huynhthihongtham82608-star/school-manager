@@ -3,7 +3,8 @@
 
 @section('content')
 @php
-    $canManageSchedules = auth()->user()->isAdmin() || auth()->user()->isStaff();
+    $readOnly = $readOnly ?? false;
+    $canManageSchedules = (auth()->user()->isAdmin() || auth()->user()->isStaff()) && ! $readOnly;
     $canEnterExamScores = auth()->user()->isAdmin() || auth()->user()->isStaff() || auth()->user()->isTeacher();
     $yearName = function ($schedule) use ($years) {
         $yearId = $schedule->schoolYearId();
@@ -319,7 +320,8 @@
                         \App\Models\ExamSchedule::TYPE_FINAL_TEST => \App\Models\ScoreColumn::TYPE_FINAL,
                         default => null,
                     };
-                    $canSyncThisExam = $canEnterExamScores && $scoreColumnType && (
+                    $semesterAllowsExamScoreInput = (bool) ($schedule->semester?->isScoreInputOpen() ?? false);
+                    $canSyncThisExam = $canEnterExamScores && $scoreColumnType && (! $readOnly || $semesterAllowsExamScoreInput) && (
                         auth()->user()->isAdmin()
                         || auth()->user()->isStaff()
                         || \App\Models\TeachingAssignment::where('teacher_id', auth()->user()->teacher?->id)

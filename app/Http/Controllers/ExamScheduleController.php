@@ -31,6 +31,7 @@ class ExamScheduleController extends Controller
         $user = $request->user();
         $selectedYearId = $this->selectedSchoolYearId($request);
         $selectedSemesterId = $this->selectedSemesterId($request);
+        $readOnly = $this->isHistoricalReadOnly($request, true);
         $query = Schema::hasTable('exam_schedules')
             ? ExamSchedule::with(['classRoom.students', 'subject', 'semester.schoolYear'])
             : null;
@@ -129,7 +130,7 @@ class ExamScheduleController extends Controller
             : collect();
         $examTypes = ExamSchedule::EXAM_TYPES;
 
-        return view('exam_schedules.index', compact('schedules', 'classes', 'subjects', 'semesters', 'years', 'rooms', 'examTypes', 'selectedYearId', 'selectedSemesterId'));
+        return view('exam_schedules.index', compact('schedules', 'classes', 'subjects', 'semesters', 'years', 'rooms', 'examTypes', 'selectedYearId', 'selectedSemesterId', 'readOnly'));
     }
 
     public function store(Request $request)
@@ -210,6 +211,10 @@ class ExamScheduleController extends Controller
             ]);
         }
 
+        if ($examSchedule->semester && ! $examSchedule->semester->isCurrent()) {
+            abort(403, 'Học kỳ này không còn là học kỳ hiện hành nên chỉ được xem lịch kiểm tra.');
+        }
+
         if ($examSchedule->semester?->isArchived()) {
             abort(403, 'Học kỳ đã lưu trữ chỉ được xem, không thể xóa lịch kiểm tra.');
         }
@@ -228,6 +233,10 @@ class ExamScheduleController extends Controller
 
         if (! $examSchedule->isPublished()) {
             abort(403, 'Chỉ nhập điểm cho lịch kiểm tra đã công bố.');
+        }
+
+        if (! ($examSchedule->semester?->isScoreInputOpen() ?? false)) {
+            abort(403, 'Học kỳ này đã khóa nhập điểm.');
         }
 
         if (! ($request->user()->isAdmin() || $request->user()->isStaff()) && ! $examSchedule->isScoreInputOpen()) {
@@ -470,6 +479,10 @@ class ExamScheduleController extends Controller
     private function ensureSemesterWritable(string $semesterId): void
     {
         $semester = Semester::findOrFail($semesterId);
+
+        if (! $semester->isCurrent()) {
+            abort(403, 'Học kỳ này không còn là học kỳ hiện hành nên chỉ được xem lịch kiểm tra.');
+        }
 
         if ($semester->isArchived()) {
             abort(403, 'Học kỳ đã lưu trữ chỉ được xem, không thể chỉnh sửa lịch kiểm tra.');

@@ -10,6 +10,8 @@
         'semester_marked_inactive' => 'Chuyển sang Chưa hoạt động',
         'semester_activated' => 'Đặt làm hiện hành',
         'semester_locked' => 'Khóa học kỳ',
+        'semester_score_input_opened' => 'Mở nhập điểm',
+        'semester_score_input_closed' => 'Khóa nhập điểm',
         'semester_archived' => 'Lưu trữ',
         'semester_deleted' => 'Xóa',
     ];
@@ -33,7 +35,7 @@
                 <div><dt>Tên học kỳ</dt><dd>{{ $semester->normalizedName() }}</dd></div>
                 <div><dt>Năm học</dt><dd>{{ $semester->schoolYear->name ?? 'Chưa xác định' }}</dd></div>
                 <div><dt>Trạng thái</dt><dd><span class="badge {{ $semester->statusBadgeClass() }}">{{ $semester->statusLabel() }}</span></dd></div>
-                <div><dt>Nhập điểm</dt><dd>{{ $semester->is_score_input_open && $semester->isActive() ? 'Mở' : 'Khóa' }}</dd></div>
+                <div><dt>Nhập điểm</dt><dd><span class="badge {{ $semester->scoreInputBadgeClass() }}">{{ $semester->scoreInputStatusLabel() }}</span></dd></div>
                 <div><dt>Ngày khóa</dt><dd>{{ $formatDate($semester->locked_at) }}</dd></div>
                 <div><dt>Ngày lưu trữ</dt><dd>{{ $formatDate($semester->archived_at) }}</dd></div>
             </dl>

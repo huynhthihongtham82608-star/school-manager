@@ -91,6 +91,8 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
         Route::patch('semesters/{semester}/mark-inactive', [SemesterController::class, 'markInactive'])->name('semesters.mark-inactive');
         Route::patch('semesters/{semester}/activate', [SemesterController::class, 'activate'])->name('semesters.activate');
         Route::patch('semesters/{semester}/lock', [SemesterController::class, 'lock'])->name('semesters.lock');
+        Route::patch('semesters/{semester}/score-input/open', [SemesterController::class, 'openScoreInput'])->name('semesters.score-input.open');
+        Route::patch('semesters/{semester}/score-input/close', [SemesterController::class, 'closeScoreInput'])->name('semesters.score-input.close');
         Route::patch('semesters/{semester}/archive', [SemesterController::class, 'archive'])->name('semesters.archive');
         Route::resource('semesters', SemesterController::class);
         Route::patch('classes/{class}/activate', [SchoolClassController::class, 'activate'])->name('classes.activate');

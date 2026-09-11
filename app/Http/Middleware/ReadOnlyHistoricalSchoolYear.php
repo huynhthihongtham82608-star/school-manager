@@ -49,7 +49,11 @@ class ReadOnlyHistoricalSchoolYear
             }
         }
 
-        if (! $request->session()->has('history_school_year_id') || $request->isMethodSafe()) {
+        if ($request->isMethodSafe()) {
+            return $next($request);
+        }
+
+        if (! $request->session()->has('history_school_year_id') && ! $this->isViewingPastSemester($request)) {
             return $next($request);
         }
 
@@ -57,6 +61,9 @@ class ReadOnlyHistoricalSchoolYear
             'logout',
             'school-years.history.clear',
             'academic-context.update',
+            'scores.store',
+            'semesters.score-input.open',
+            'semesters.score-input.close',
         ];
 
         if (in_array((string) $request->route()?->getName(), $allowedRoutes, true)) {
@@ -64,14 +71,59 @@ class ReadOnlyHistoricalSchoolYear
         }
 
         if (
-            (string) $request->route()?->getName() === 'attendance.store'
-            && $request->user()?->isAdmin()
+            $this->isViewingPastSemester($request)
+            && ! $request->session()->has('history_school_year_id')
+            && ! $this->isSemesterBoundMutationRoute($request)
         ) {
             return $next($request);
         }
 
+        if (
+            (string) $request->route()?->getName() === 'attendance.store'
+            && $request->user()?->isAdmin()
+            && ! $this->isViewingPastSemester($request)
+        ) {
+            return $next($request);
+        }
+
+        $message = $this->isViewingPastSemester($request) && ! $request->session()->has('history_school_year_id')
+            ? 'Bạn đang xem dữ liệu học kỳ không hiện hành ở chế độ chỉ xem. Vui lòng chuyển về học kỳ hiện hành để thực hiện thao tác thay đổi dữ liệu.'
+            : 'Bạn đang xem dữ liệu năm học cũ ở chế độ chỉ xem. Vui lòng quay về năm học hiện hành để thực hiện thao tác thay đổi dữ liệu.';
+
         return back()->withErrors([
-            'history_readonly' => 'Bạn đang xem dữ liệu năm học cũ ở chế độ chỉ xem. Vui lòng quay về năm học hiện hành để thực hiện thao tác thay đổi dữ liệu.',
+            'history_readonly' => $message,
         ]);
+    }
+
+    private function isViewingPastSemester(Request $request): bool
+    {
+        $semesterId = $request->input('semester_id') ?: $request->query('semester_id') ?: $request->session()->get('working_semester_id');
+        $semester = $semesterId ? Semester::find($semesterId) : null;
+
+        return $semester ? ! $semester->isCurrent() : false;
+    }
+
+    private function isSemesterBoundMutationRoute(Request $request): bool
+    {
+        return in_array((string) $request->route()?->getName(), [
+            'attendance.store',
+            'conduct.store',
+            'assignments.store',
+            'assignments.update',
+            'assignments.destroy',
+            'exam-schedules.store',
+            'exam-schedules.update',
+            'exam-schedules.destroy',
+            'rewards.scan',
+            'rewards.store',
+            'rewards.update',
+            'rewards.destroy',
+            'tuition-fees.update',
+            'substitute-teachings.store',
+            'substitute-teachings.update',
+            'substitute-teachings.destroy',
+            'timetable.entries.save',
+            'timetable.clone',
+        ], true);
     }
 }

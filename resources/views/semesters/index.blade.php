@@ -33,11 +33,7 @@
                     <td>{{ $semester->schoolYear->name ?? '' }}</td>
                     <td><span class="badge {{ $semester->statusBadgeClass() }}">{{ $semester->statusLabel() }}</span></td>
                     <td>
-                        @if($semester->is_score_input_open && $semester->isActive())
-                            <span class="badge bg-success">Mở</span>
-                        @else
-                            <span class="badge bg-secondary">Khóa</span>
-                        @endif
+                        <span class="badge {{ $semester->scoreInputBadgeClass() }}">{{ $semester->scoreInputStatusLabel() }}</span>
                     </td>
                     <td class="text-end">
                         <div class="content-action-group justify-content-end" data-action-synced="true">
@@ -85,6 +81,27 @@
                                                     @method('PATCH')
                                                     <button type="submit" class="dropdown-item">
                                                         <i class="bi bi-check-circle me-2"></i>Đặt làm hiện hành
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @endif
+                                        @if($semester->canOpenScoreInput())
+                                            <li>
+                                                <form action="{{ route('semesters.score-input.open', $semester) }}" method="POST" onsubmit="return confirm('Mở nhập điểm cho học kỳ này? Hành động này không đổi học kỳ hiện hành.');">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit" class="dropdown-item">
+                                                        <i class="bi bi-unlock me-2"></i>Mở nhập điểm
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @elseif($semester->canCloseScoreInput())
+                                            <li>
+                                                <form action="{{ route('semesters.score-input.close', $semester) }}" method="POST" onsubmit="return confirm('Khóa nhập điểm cho học kỳ này? Dữ liệu điểm hiện có không bị thay đổi.');">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit" class="dropdown-item">
+                                                        <i class="bi bi-shield-lock me-2"></i>Khóa nhập điểm
                                                     </button>
                                                 </form>
                                             </li>

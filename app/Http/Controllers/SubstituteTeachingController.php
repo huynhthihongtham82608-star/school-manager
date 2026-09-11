@@ -37,7 +37,7 @@ class SubstituteTeachingController extends Controller
         $selectedSemesterId = $request->query('semester_id') ?: $this->selectedSemesterId($request);
         $selectedClassId = $request->query('class_id', 'all');
         $selectedStatus = $request->query('status', 'all');
-        $readOnly = $this->isHistoricalReadOnly();
+        $readOnly = $this->isHistoricalReadOnly($request, true);
 
         $classes = SchoolClass::with('schoolYear')
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
@@ -473,7 +473,7 @@ class SubstituteTeachingController extends Controller
 
     private function denyHistoricalWrite(): void
     {
-        if ($this->isHistoricalReadOnly()) {
+        if ($this->isHistoricalReadOnly(request(), true)) {
             throw ValidationException::withMessages([
                 'history_readonly' => 'Đang xem dữ liệu lịch sử, không thể thay đổi lịch dạy thay.',
             ]);

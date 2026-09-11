@@ -2,7 +2,22 @@
 @section('title', 'Xin nghỉ học')
 
 @section('content')
-<div class="page-heading">
+<style>
+    .parent-leave-heading {
+        max-width: none !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+    }
+
+    .parent-leave-heading > div {
+        width: 100%;
+        text-align: left !important;
+    }
+</style>
+
+<div class="page-heading parent-leave-heading">
     <div>
         <h5>Xin nghỉ học</h5>
         <div class="text-muted">Phụ huynh gửi đơn xin nghỉ học cho học sinh đang chọn để giáo viên chủ nhiệm phê duyệt.</div>

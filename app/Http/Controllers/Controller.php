@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\CurrentAcademicContext;
+use App\Models\Semester;
 use App\Models\SchoolYear;
 use Illuminate\Http\Request;
 
@@ -35,8 +36,44 @@ abstract class Controller
         return app(CurrentAcademicContext::class)->semester($selectedYear)?->getKey();
     }
 
-    protected function isHistoricalReadOnly(): bool
+    protected function selectedSemester(?Request $request = null): ?Semester
     {
-        return (bool) session('history_school_year_id');
+        $request ??= request();
+        $requestedSemesterId = $request->input('semester_id') ?: $request->query('semester_id');
+
+        if ($requestedSemesterId) {
+            $semester = Semester::with('schoolYear')->find($requestedSemesterId);
+
+            if ($semester) {
+                return $semester;
+            }
+        }
+
+        $selectedSemesterId = $this->selectedSemesterId($request);
+
+        return $selectedSemesterId ? Semester::with('schoolYear')->find($selectedSemesterId) : null;
+    }
+
+    protected function isHistoricalReadOnly(?Request $request = null, bool $includeSemester = false): bool
+    {
+        if (session('history_school_year_id')) {
+            return true;
+        }
+
+        return $includeSemester && $this->isSemesterReadOnly($request);
+    }
+
+    protected function isSemesterReadOnly(?Request $request = null): bool
+    {
+        $semester = $this->selectedSemester($request);
+
+        return $semester ? ! $semester->isCurrent() : false;
+    }
+
+    protected function ensureSemesterCanWrite(Semester $semester, string $message): void
+    {
+        if (! $semester->isCurrent()) {
+            abort(403, $message);
+        }
     }
 }

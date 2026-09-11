@@ -131,7 +131,6 @@ class SemesterController extends Controller
 
         $semester->update([
             'status' => Semester::STATUS_INACTIVE,
-            'is_score_input_open' => false,
         ]);
         AuditLogger::log('semester_marked_inactive', Semester::class, (string) $semester->getKey(), 'Chuyển học kỳ sang Chưa hoạt động');
 
@@ -171,12 +170,45 @@ class SemesterController extends Controller
 
         $semester->update([
             'status' => Semester::STATUS_LOCKED,
-            'is_score_input_open' => false,
             'locked_at' => now(),
         ]);
         AuditLogger::log('semester_locked', Semester::class, (string) $semester->getKey(), 'Khóa học kỳ ' . $semester->name);
 
         return back()->with('success', 'Đã khóa học kỳ.');
+    }
+
+    public function openScoreInput(Semester $semester)
+    {
+        $this->ensureScoreInputToggleAllowed($semester);
+
+        if (! $semester->canOpenScoreInput()) {
+            return back()->withErrors(['semester' => 'Học kỳ này không thể mở nhập điểm.']);
+        }
+
+        $semester->update([
+            'is_score_input_open' => true,
+        ]);
+
+        AuditLogger::log('semester_score_input_opened', Semester::class, (string) $semester->getKey(), 'Mở nhập điểm cho học kỳ ' . $semester->name);
+
+        return back()->with('success', 'Đã mở nhập điểm cho học kỳ.');
+    }
+
+    public function closeScoreInput(Semester $semester)
+    {
+        $this->ensureScoreInputToggleAllowed($semester);
+
+        if (! $semester->canCloseScoreInput()) {
+            return back()->withErrors(['semester' => 'Học kỳ này đã khóa nhập điểm.']);
+        }
+
+        $semester->update([
+            'is_score_input_open' => false,
+        ]);
+
+        AuditLogger::log('semester_score_input_closed', Semester::class, (string) $semester->getKey(), 'Khóa nhập điểm cho học kỳ ' . $semester->name);
+
+        return back()->with('success', 'Đã khóa nhập điểm cho học kỳ.');
     }
 
     public function archive(Semester $semester)
@@ -193,7 +225,6 @@ class SemesterController extends Controller
 
         $semester->update([
             'status' => Semester::STATUS_ARCHIVED,
-            'is_score_input_open' => false,
             'archived_at' => now(),
         ]);
         AuditLogger::log('semester_archived', Semester::class, (string) $semester->getKey(), 'Lưu trữ học kỳ ' . $semester->name);
@@ -433,6 +464,23 @@ class SemesterController extends Controller
                     'Tự động lưu trữ phân công khi lưu trữ học kỳ ' . $semester->name
                 );
             });
+    }
+
+    private function ensureScoreInputToggleAllowed(Semester $semester): void
+    {
+        $semester->loadMissing('schoolYear');
+
+        if ($semester->isDraft()) {
+            throw ValidationException::withMessages([
+                'semester' => 'Học kỳ bản nháp chưa được phép mở nhập điểm.',
+            ]);
+        }
+
+        if ($semester->isArchived() || $semester->schoolYear?->isArchived()) {
+            throw ValidationException::withMessages([
+                'semester' => 'Học kỳ hoặc năm học đã lưu trữ chỉ được xem dữ liệu điểm.',
+            ]);
+        }
     }
 
     private function denyHistoricalWrite(): void

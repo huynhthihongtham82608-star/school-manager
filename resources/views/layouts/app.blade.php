@@ -13,7 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link href="{{ asset('css/school-ui.css') }}?v=20260727-academic-interactions" rel="stylesheet">
+    <link href="{{ asset('css/school-ui.css') }}?v=20260911-readonly-semester" rel="stylesheet">
 </head>
 @php
     $currentUser = auth()->user();
@@ -29,6 +29,7 @@
     $headerSchoolYear = null;
     $headerSemester = null;
     $historySchoolYear = null;
+    $readOnlySemester = null;
     $historySchoolYearId = session('viewing_mode') === 'history'
         ? session('viewing_school_year_id', session('history_school_year_id'))
         : session('history_school_year_id');
@@ -58,6 +59,18 @@
                 ?? $headerSemesters->first();
         }
 
+    }
+
+    if ($currentUser && ! $historySchoolYear && \Illuminate\Support\Facades\Schema::hasTable('semesters')) {
+        $readOnlySemester = $headerSemester;
+
+        if (! $readOnlySemester && session('working_semester_id')) {
+            $readOnlySemester = \App\Models\Semester::with('schoolYear')->find(session('working_semester_id'));
+        }
+
+        if (! $readOnlySemester || $readOnlySemester->isCurrent()) {
+            $readOnlySemester = null;
+        }
     }
 
     $roleMenuItems = [];
@@ -380,7 +393,7 @@
     $visibleAdminSidebar = $showSidebar
         && ! in_array($activeAdminGroup['key'] ?? '', ['overview', 'reports'], true);
 @endphp
-<body class="role-{{ $currentUser->role }} {{ $visibleAdminSidebar ? 'has-sidebar admin-hide-duplicate-heading' : 'no-sidebar' }} {{ $historySchoolYear ? 'history-readonly' : '' }}">
+<body class="role-{{ $currentUser->role }} {{ $visibleAdminSidebar ? 'has-sidebar admin-hide-duplicate-heading' : 'no-sidebar' }} {{ ($historySchoolYear || $readOnlySemester) ? 'history-readonly' : '' }}">
 @if($visibleAdminSidebar)
 <div class="sidebar-overlay" data-sidebar-close></div>
 @elseif($showRoleMenu)
@@ -842,18 +855,26 @@
         </header>
         @endif
         <main class="content {{ $showRoleMenu ? 'role-content-fixed-offset w-full min-h-screen pt-22 px-4 bg-gray-50 flex flex-col gap-6 text-left' : '' }}">
-            @if($showSidebar && $historySchoolYear)
+            @if($currentUser && ($historySchoolYear || $readOnlySemester))
                 <div class="history-readonly-banner" role="status">
                     <div class="history-readonly-banner-icon">
                         <i class="bi bi-lock-fill"></i>
                     </div>
                     <div class="history-readonly-banner-content">
-                        <div class="history-readonly-banner-title">Đang xem dữ liệu năm học <strong>{{ $historySchoolYear->name }}</strong></div>
-                        <div class="history-readonly-banner-subtitle">Chế độ chỉ xem: chỉ được xem, tìm kiếm, lọc, xuất dữ liệu hoặc in.</div>
+                        <div class="history-readonly-banner-chip">CHỈ XEM</div>
+                        @if($historySchoolYear)
+                            <div class="history-readonly-banner-title">Đang xem dữ liệu năm học <strong>{{ $historySchoolYear->name }}</strong></div>
+                            <div class="history-readonly-banner-subtitle">Năm học này không còn là năm học hiện hành. Bạn chỉ có thể xem, tìm kiếm, lọc, xuất dữ liệu hoặc in. Các thao tác thay đổi dữ liệu đã bị vô hiệu hóa.</div>
+                        @else
+                            <div class="history-readonly-banner-title">Đang xem dữ liệu {{ $readOnlySemester->normalizedName() }} – Năm học {{ $readOnlySemester->schoolYear?->name ?? 'đang cập nhật' }}</div>
+                            <div class="history-readonly-banner-subtitle">Học kỳ này không còn là học kỳ hiện hành. Bạn chỉ có thể xem, tìm kiếm, lọc, xuất dữ liệu hoặc in. Các thao tác thay đổi dữ liệu đã bị vô hiệu hóa.</div>
+                        @endif
                     </div>
-                    <a href="{{ route('school-years.history.clear') }}" class="btn btn-primary history-readonly-back">
-                        ← Quay về năm học hiện hành
-                    </a>
+                    @if($historySchoolYear)
+                        <a href="{{ route('school-years.history.clear') }}" class="btn btn-primary history-readonly-back">
+                            ← Quay về năm học hiện hành
+                        </a>
+                    @endif
                 </div>
             @endif
 

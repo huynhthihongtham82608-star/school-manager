@@ -362,9 +362,16 @@
 @if($isScoreAdmin)
     <div class="score-permission-alert mb-3">
         <i class="bi bi-shield-check me-1"></i>
-        Chế độ quản trị: được phép chỉnh sửa điểm bất kỳ lúc nào để xử lý sai sót sau phúc khảo.
+        Chế độ quản trị: chỉ xem bảng điểm và quản lý cấu hình mở/khóa nhập điểm, không trực tiếp nhập hoặc sửa điểm học sinh.
     </div>
 @endif
+
+@unless($semester->isScoreInputOpen())
+    <div class="alert alert-warning text-left">
+        <i class="bi bi-lock me-1"></i>
+        Học kỳ này đã khóa nhập điểm. Bảng điểm đang ở chế độ chỉ xem.
+    </div>
+@endunless
 
 <form method="POST" action="{{ route('scores.store') }}" data-score-entry-form>
     @csrf
@@ -511,7 +518,7 @@
         @elseif(! $isScoreAdmin)
             <span class="text-muted">Bạn đang ở chế độ chỉ xem hoặc chưa có cột điểm nào được mở.</span>
         @else
-            <span class="text-muted">Chưa có cột điểm để chỉnh sửa.</span>
+            <span class="text-muted">Admin và nhân viên chỉ quản lý cấu hình, không trực tiếp nhập hoặc sửa điểm học sinh.</span>
         @endif
     </div>
 </form>

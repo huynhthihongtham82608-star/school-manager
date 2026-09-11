@@ -123,6 +123,41 @@ class Semester extends Model
         return $this->isLocked() || $this->isArchived();
     }
 
+    public function isScoreInputOpen(): bool
+    {
+        $this->loadMissing('schoolYear');
+
+        return (bool) $this->is_score_input_open
+            && ! $this->isDraft()
+            && ! $this->isArchived()
+            && ! ($this->schoolYear?->isArchived() ?? false);
+    }
+
+    public function scoreInputStatusLabel(): string
+    {
+        return $this->isScoreInputOpen() ? 'Mở nhập điểm' : 'Khóa nhập điểm';
+    }
+
+    public function scoreInputBadgeClass(): string
+    {
+        return $this->isScoreInputOpen() ? 'bg-success' : 'bg-secondary';
+    }
+
+    public function canOpenScoreInput(): bool
+    {
+        $this->loadMissing('schoolYear');
+
+        return ! $this->isDraft()
+            && ! $this->isArchived()
+            && ! ($this->schoolYear?->isArchived() ?? false)
+            && ! $this->isScoreInputOpen();
+    }
+
+    public function canCloseScoreInput(): bool
+    {
+        return $this->isScoreInputOpen();
+    }
+
     public function canEdit(): bool
     {
         return $this->isDraft() || $this->isInactive();

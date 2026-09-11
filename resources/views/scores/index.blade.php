@@ -1717,53 +1717,41 @@
                 @if(! $isScoreAdmin && auth()->user()->isTeacher())
                     @php
                         $firstAssignment = $assignments->first();
+                        $teacherScoreAssignments = $assignments->map(fn ($assignment) => [
+                            'id' => (string) $assignment->getKey(),
+                            'class_id' => (string) $assignment->class_id,
+                            'class_name' => $assignment->classRoom?->name ?? 'Không rõ lớp',
+                            'class_grade' => (int) ($assignment->classRoom?->grade_level ?? 0),
+                            'subject_id' => (string) $assignment->subject_id,
+                            'subject_name' => $assignment->subject?->name ?? 'Không rõ môn',
+                            'semester_id' => (string) $assignment->semester_id,
+                            'semester_name' => $assignment->semester?->normalizedName() ?? 'Không rõ học kỳ',
+                            'school_year_id' => (string) $assignment->school_year_id,
+                            'school_year_name' => $assignment->schoolYear?->name ?? '',
+                        ])->values();
                     @endphp
                     <input type="hidden" name="class_id" data-score-class-id value="{{ $firstAssignment?->class_id }}">
                     <input type="hidden" name="subject_id" data-score-subject-id value="{{ $firstAssignment?->subject_id }}">
                     <input type="hidden" name="semester_id" data-score-semester-id value="{{ $firstAssignment?->semester_id }}">
+                    <script type="application/json" data-score-teacher-assignments>
+                        {!! $teacherScoreAssignments->toJson() !!}
+                    </script>
                     <div class="score-filter-field">
                         <label>Lớp</label>
                         <select class="form-select" data-score-assignment-class @disabled($assignments->isEmpty())>
-                            @forelse($assignments as $assignment)
-                                <option
-                                    value="{{ $assignment->id }}"
-                                    data-class-id="{{ $assignment->class_id }}"
-                                    data-subject-id="{{ $assignment->subject_id }}"
-                                    data-semester-id="{{ $assignment->semester_id }}"
-                                >{{ $assignment->classRoom?->name ?? 'Không rõ lớp' }}</option>
-                            @empty
-                                <option value="">Chưa có lớp</option>
-                            @endforelse
+                            <option value="">Chọn lớp</option>
                         </select>
                     </div>
                     <div class="score-filter-field">
                         <label>Môn</label>
                         <select class="form-select" data-score-assignment-subject @disabled($assignments->isEmpty())>
-                            @forelse($assignments as $assignment)
-                                <option
-                                    value="{{ $assignment->id }}"
-                                    data-class-id="{{ $assignment->class_id }}"
-                                    data-subject-id="{{ $assignment->subject_id }}"
-                                    data-semester-id="{{ $assignment->semester_id }}"
-                                >{{ $assignment->subject?->name ?? 'Không rõ môn' }}</option>
-                            @empty
-                                <option value="">Chưa có môn</option>
-                            @endforelse
+                            <option value="">Chọn môn</option>
                         </select>
                     </div>
                     <div class="score-filter-field">
                         <label>Học kỳ</label>
                         <select class="form-select" data-score-assignment-semester @disabled($assignments->isEmpty())>
-                            @forelse($assignments as $assignment)
-                                <option
-                                    value="{{ $assignment->id }}"
-                                    data-class-id="{{ $assignment->class_id }}"
-                                    data-subject-id="{{ $assignment->subject_id }}"
-                                    data-semester-id="{{ $assignment->semester_id }}"
-                                >{{ $assignment->semester?->normalizedName() ?? 'Không rõ học kỳ' }}</option>
-                            @empty
-                                <option value="">Chưa có học kỳ</option>
-                            @endforelse
+                            <option value="">Chọn học kỳ</option>
                         </select>
                     </div>
                 @else
@@ -1884,25 +1872,100 @@
                 const classInput = form.querySelector('[data-score-class-id]');
                 const subjectInput = form.querySelector('[data-score-subject-id]');
                 const semesterInput = form.querySelector('[data-score-semester-id]');
+                const [classSelect, subjectSelect, semesterSelect] = selects;
+                const assignmentPayload = form.querySelector('[data-score-teacher-assignments]')?.textContent || '[]';
+                const teacherAssignments = JSON.parse(assignmentPayload);
+                const uniqueBy = (items, keyFactory) => {
+                    const seen = new Set();
+                    return items.filter((item) => {
+                        const key = keyFactory(item);
+                        if (!key || seen.has(key)) {
+                            return false;
+                        }
 
-                const syncAssignment = (source) => {
-                    const selectedId = source?.value || selects[0]?.value || '';
-
-                    selects.forEach((select) => {
-                        select.value = selectedId;
+                        seen.add(key);
+                        return true;
                     });
-
-                    const option = selects[0]?.selectedOptions[0];
-                    classInput.value = option?.dataset.classId || '';
-                    subjectInput.value = option?.dataset.subjectId || '';
-                    semesterInput.value = option?.dataset.semesterId || '';
+                };
+                const resetSelect = (select, label) => {
+                    select.innerHTML = '';
+                    select.append(new Option(label, ''));
+                };
+                const selectedAssignment = () => teacherAssignments.find((assignment) => (
+                    assignment.class_id === classSelect.value
+                    && assignment.subject_id === subjectSelect.value
+                    && assignment.semester_id === semesterSelect.value
+                ));
+                const syncHiddenInputs = () => {
+                    const assignment = selectedAssignment();
+                    classInput.value = assignment?.class_id || '';
+                    subjectInput.value = assignment?.subject_id || '';
+                    semesterInput.value = assignment?.semester_id || '';
+                };
+                const renderClasses = () => {
+                    const currentValue = classSelect.value;
+                    resetSelect(classSelect, 'Chọn lớp');
+                    uniqueBy(teacherAssignments, (assignment) => assignment.class_id)
+                        .forEach((assignment) => classSelect.append(new Option(assignment.class_name, assignment.class_id)));
+                    classSelect.value = teacherAssignments.some((assignment) => assignment.class_id === currentValue)
+                        ? currentValue
+                        : (classSelect.options[1]?.value || '');
+                };
+                const renderSubjects = () => {
+                    const currentValue = subjectSelect.value;
+                    resetSelect(subjectSelect, 'Chọn môn');
+                    uniqueBy(
+                        teacherAssignments.filter((assignment) => assignment.class_id === classSelect.value),
+                        (assignment) => assignment.subject_id
+                    ).forEach((assignment) => subjectSelect.append(new Option(assignment.subject_name, assignment.subject_id)));
+                    subjectSelect.value = Array.from(subjectSelect.options).some((option) => option.value === currentValue)
+                        ? currentValue
+                        : (subjectSelect.options[1]?.value || '');
+                };
+                const renderSemesters = () => {
+                    const currentValue = semesterSelect.value;
+                    resetSelect(semesterSelect, 'Chọn học kỳ');
+                    uniqueBy(
+                        teacherAssignments.filter((assignment) => (
+                            assignment.class_id === classSelect.value
+                            && assignment.subject_id === subjectSelect.value
+                        )),
+                        (assignment) => assignment.semester_id
+                    ).forEach((assignment) => {
+                        const label = assignment.school_year_name
+                            ? `${assignment.semester_name} • ${assignment.school_year_name}`
+                            : assignment.semester_name;
+                        semesterSelect.append(new Option(label, assignment.semester_id));
+                    });
+                    semesterSelect.value = Array.from(semesterSelect.options).some((option) => option.value === currentValue)
+                        ? currentValue
+                        : (semesterSelect.options[1]?.value || '');
+                };
+                const syncTeacherAssignmentFilters = () => {
+                    renderSubjects();
+                    renderSemesters();
+                    syncHiddenInputs();
                 };
 
-                selects.forEach((select) => {
-                    select.addEventListener('change', () => syncAssignment(select));
-                });
+                renderClasses();
+                syncTeacherAssignmentFilters();
 
-                syncAssignment(selects[0]);
+                classSelect.addEventListener('change', () => {
+                    renderSubjects();
+                    renderSemesters();
+                    syncHiddenInputs();
+                });
+                subjectSelect.addEventListener('change', () => {
+                    renderSemesters();
+                    syncHiddenInputs();
+                });
+                semesterSelect.addEventListener('change', syncHiddenInputs);
+                form.addEventListener('submit', (event) => {
+                    syncHiddenInputs();
+                    if (! classInput.value || ! subjectInput.value || ! semesterInput.value) {
+                        event.preventDefault();
+                    }
+                });
             }
 
             const gradeSelect = form.querySelector('[data-score-admin-grade]');

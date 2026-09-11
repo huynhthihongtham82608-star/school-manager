@@ -95,7 +95,7 @@ class ScoreController extends Controller
         }
 
         if ($user->isTeacher() && $user->teacher) {
-            $assignments = $this->teacherScoreEntryAssignments($user->teacher);
+            $assignments = $this->teacherScoreEntryAssignments($user->teacher, $selectedYearId);
         }
 
         return view('scores.index', compact('years', 'semesters', 'subjects', 'classes', 'teachers', 'assignments', 'selectedYearId', 'selectedSemesterId', 'scoreSetting', 'scoreColumnConfig', 'adminMatrix'));
@@ -1367,7 +1367,6 @@ class ScoreController extends Controller
         $editableColumns = $scoreColumns->filter(fn (ScoreColumn $column) => ($columnPermissions[$column->id]['editable'] ?? false)
             && $submittedScores->has((string) $column->id));
         $usesPassFailAssessment = $subject->usesPassFailAssessment();
-        $isScoreAdmin = Auth::user()->isAdmin() || Auth::user()->isStaff();
 
         if ($editableColumns->isEmpty()) {
             abort(403, 'Hiện không có cột điểm nào đang mở để nhập hoặc chỉnh sửa.');
@@ -1397,7 +1396,7 @@ class ScoreController extends Controller
                 $header = $existingHeaders->get($student->id);
                 $detail = $header?->details?->firstWhere('score_column_id', $column->id);
                 $columnEditable = (bool) ($columnPermissions[$column->id]['editable'] ?? false);
-                if (! $this->canEditScoreDetail($detail, $columnEditable, $isScoreAdmin)) {
+                if (! $this->canEditScoreDetail($detail, $columnEditable)) {
                     continue;
                 }
 
@@ -1558,19 +1557,20 @@ class ScoreController extends Controller
             ->values();
     }
 
-    private function teacherScoreEntryAssignments(Teacher $teacher): Collection
+    private function teacherScoreEntryAssignments(Teacher $teacher, ?string $yearId = null): Collection
     {
-        $assignedClassIds = $this->teacherActiveTeachingClassIds($teacher);
-
-        if ($assignedClassIds->isEmpty()) {
-            return collect();
-        }
-
         return $teacher->assignments()
-            ->with(['classRoom', 'subject', 'schoolYear', 'semester'])
+            ->with(['classRoom', 'subject.gradeMappings', 'schoolYear', 'semester'])
             ->where('status', TeachingAssignment::STATUS_ACTIVE)
-            ->whereIn('class_id', $assignedClassIds)
+            ->when($yearId, fn ($query) => $query->where('school_year_id', $yearId))
             ->get()
+            ->filter(function (TeachingAssignment $assignment) {
+                return $assignment->classRoom
+                    && $assignment->subject
+                    && $assignment->semester
+                    && $assignment->subject->isEvaluated()
+                    && $assignment->subject->appliesToGrade((int) $assignment->classRoom->grade_level);
+            })
             ->sortBy(fn (TeachingAssignment $assignment) => sprintf(
                 '%02d|%s|%s|%s',
                 (int) ($assignment->classRoom?->grade_level ?? 0),
@@ -1578,7 +1578,11 @@ class ScoreController extends Controller
                 $assignment->subject?->name ?? '',
                 $assignment->semester?->name ?? ''
             ))
-            ->unique('class_id')
+            ->unique(fn (TeachingAssignment $assignment) => implode('|', [
+                (string) $assignment->class_id,
+                (string) $assignment->subject_id,
+                (string) $assignment->semester_id,
+            ]))
             ->values();
     }
 
@@ -1634,20 +1638,16 @@ class ScoreController extends Controller
 
     protected function authorizeScoreEdit(SchoolClass $class, string $subjectId, Semester $semester): void
     {
-        if (Auth::user()->isAdmin() || Auth::user()->isStaff()) {
-            return;
+        if (! $semester->isScoreInputOpen()) {
+            abort(403, 'Học kỳ này đã khóa nhập điểm.');
+        }
+
+        if (! Auth::user()->isTeacher() || ! Auth::user()->teacher) {
+            abort(403, 'Chỉ giáo viên bộ môn được phân công mới được nhập hoặc chỉnh sửa điểm.');
         }
 
         if (! $this->isAssignedSubjectTeacher($class, $subjectId, $semester)) {
             abort(403, 'Chỉ giáo viên bộ môn được phân công mới được nhập hoặc chỉnh sửa điểm.');
-        }
-
-        if ($this->isHistoricalReadOnly()) {
-            abort(403, 'Đang xem dữ liệu năm học cũ, chỉ được xem điểm.');
-        }
-
-        if (! $semester->isActive()) {
-            abort(403, 'Học kỳ không ở trạng thái Hoạt động nên không thể nhập hoặc chỉnh sửa điểm.');
         }
     }
 
@@ -1678,16 +1678,17 @@ class ScoreController extends Controller
 
     private function scoreColumnPermissions(SchoolClass $class, Subject $subject, Semester $semester, Collection $scoreColumns): array
     {
-        $isScoreAdmin = Auth::user()->isAdmin() || Auth::user()->isStaff();
+        $isScoreManager = Auth::user()->isAdmin() || Auth::user()->isStaff();
+        $semesterInputOpen = $semester->isScoreInputOpen();
         $canTeacherEdit = Auth::user()->isTeacher()
             && $this->isAssignedSubjectTeacher($class, $subject->id, $semester)
-            && $semester->isActive()
-            && ! $this->isHistoricalReadOnly();
+            && $semesterInputOpen;
 
-        return $scoreColumns->mapWithKeys(function (ScoreColumn $column) use ($canTeacherEdit, $isScoreAdmin) {
-            $editable = $isScoreAdmin || ($canTeacherEdit && $column->isInputOpen());
+        return $scoreColumns->mapWithKeys(function (ScoreColumn $column) use ($canTeacherEdit, $isScoreManager, $semesterInputOpen) {
+            $editable = $semesterInputOpen && $canTeacherEdit && $column->isInputOpen();
             $reason = match (true) {
-                $isScoreAdmin => 'Admin được phép chỉnh sửa điểm bất kỳ lúc nào.',
+                ! $semesterInputOpen => 'Học kỳ này đã khóa nhập điểm.',
+                $isScoreManager => 'Admin và nhân viên chỉ quản lý cấu hình nhập điểm, không trực tiếp nhập hoặc sửa điểm học sinh.',
                 ! $canTeacherEdit => 'Chỉ giáo viên bộ môn được phân công mới được nhập điểm.',
                 $column->isInputOpen() => 'Đang mở nhập điểm.',
                 default => $column->inputStatusLabel(),
@@ -1702,15 +1703,12 @@ class ScoreController extends Controller
 
     private function scoreCellPermissions(Collection $students, Collection $headers, Collection $scoreColumns, array $columnPermissions): array
     {
-        $isScoreAdmin = Auth::user()->isAdmin() || Auth::user()->isStaff();
-
-        return $scoreColumns->mapWithKeys(function (ScoreColumn $column) use ($students, $headers, $columnPermissions, $isScoreAdmin) {
+        return $scoreColumns->mapWithKeys(function (ScoreColumn $column) use ($students, $headers, $columnPermissions) {
             $columnEditable = (bool) ($columnPermissions[$column->id]['editable'] ?? false);
-            $cells = $students->mapWithKeys(function (Student $student) use ($headers, $column, $columnEditable, $isScoreAdmin) {
+            $cells = $students->mapWithKeys(function (Student $student) use ($headers, $column, $columnEditable) {
                 $detail = ($headers->get($student->id))?->details?->firstWhere('score_column_id', $column->id);
-                $editable = $this->canEditScoreDetail($detail, $columnEditable, $isScoreAdmin);
+                $editable = $this->canEditScoreDetail($detail, $columnEditable);
                 $reason = match (true) {
-                    $isScoreAdmin => 'Admin được phép sửa điểm bất kỳ lúc nào.',
                     ! $columnEditable => 'Cột điểm đang khóa hoặc bạn không có quyền nhập điểm.',
                     ! $detail => 'Được nhập điểm mới.',
                     $editable => 'Điểm còn trong thời hạn 7 ngày kể từ lúc tạo.',
@@ -1727,12 +1725,8 @@ class ScoreController extends Controller
         })->all();
     }
 
-    private function canEditScoreDetail(?ScoreDetail $detail, bool $columnEditable, bool $isScoreAdmin = false): bool
+    private function canEditScoreDetail(?ScoreDetail $detail, bool $columnEditable): bool
     {
-        if ($isScoreAdmin) {
-            return true;
-        }
-
         if (! $columnEditable) {
             return false;
         }

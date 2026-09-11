@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\ConductController;
 use App\Http\Controllers\KhenThuongController;
 use App\Http\Controllers\ParentLeaveRequestController;
 use App\Http\Controllers\ScoreController;
@@ -11,11 +12,16 @@ use App\Models\Conduct;
 use App\Models\ParentLeaveRequest;
 use App\Models\Reward;
 use App\Models\SchoolClass;
+use App\Models\SchoolYear;
+use App\Models\ScoreColumn;
+use App\Models\ScoreDetail;
 use App\Models\ScoreHeader;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Subject;
+use App\Models\SubjectGradeMapping;
 use App\Models\Teacher;
+use App\Models\TeachingAssignment;
 use App\Models\Timetable;
 use App\Models\TimetableEntry;
 use App\Models\User;
@@ -23,10 +29,12 @@ use App\Services\AcademicEvaluationService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Support\ViewErrorBag;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class ResultManagementBatchTest extends TestCase
@@ -118,6 +126,263 @@ class ResultManagementBatchTest extends TestCase
         $this->assertStringContainsString("const hasValue = value !== null && value !== undefined && value !== ''", $html);
         $this->assertStringContainsString("controls.subject.value = ''", $html);
         $this->assertStringNotContainsString("iconSpan.textContent = '?'", $html);
+    }
+
+    public function test_past_semester_context_shows_readonly_banner_without_hiding_read_actions(): void
+    {
+        $admin = $this->adminUser();
+        $semester = $this->inactiveSemesterForCurrentYear();
+        $class = SchoolClass::where('school_year_id', $semester->school_year_id)->firstOrFail();
+
+        session([
+            'working_school_year_id' => $semester->school_year_id,
+            'working_semester_id' => $semester->getKey(),
+        ]);
+        $this->actingAs($admin);
+
+        $view = app(AttendanceController::class)->index($this->requestFor('/attendance', [
+            'school_year_id' => $semester->school_year_id,
+            'semester_id' => $semester->getKey(),
+            'class_id' => $class->getKey(),
+            'attendance_view' => 'day',
+        ], $admin));
+
+        $this->assertInstanceOf(View::class, $view);
+        $html = $view->render();
+        $this->assertStringContainsString('CHỈ XEM', $html);
+        $this->assertStringContainsString($semester->normalizedName(), $html);
+        $this->assertStringContainsString($semester->schoolYear?->name, $html);
+        $this->assertStringContainsString('data-attendance-search-text', $html);
+        $this->assertStringNotContainsString('id="attendance-register"', $html);
+    }
+
+    public function test_attendance_store_blocks_past_semester_without_writing_records(): void
+    {
+        $admin = $this->adminUser();
+        $semester = $this->inactiveSemesterForCurrentYear();
+        $date = now()->startOfWeek()->addDay();
+        [$class, $student] = $this->createScheduledClass($semester, $date, [1]);
+
+        $this->actingAs($admin);
+
+        try {
+            app(AttendanceController::class)->store(
+                $this->attendanceStoreRequest($admin, $semester, $class, $date, AttendanceRecord::SESSION_MORNING, $student)
+            );
+            $this->fail('Past semester attendance mutation should be blocked.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+            $this->assertStringContainsString('chỉ được xem điểm danh', $exception->getMessage());
+        }
+
+        $this->assertDatabaseMissing('attendance_records', [
+            'student_id' => $student->getKey(),
+            'class_id' => $class->getKey(),
+            'semester_id' => $semester->getKey(),
+            'attendance_date' => $date->toDateString(),
+        ]);
+    }
+
+    public function test_conduct_page_disables_editing_for_past_semester(): void
+    {
+        $admin = $this->adminUser();
+        $semester = $this->inactiveSemesterForCurrentYear();
+        $class = SchoolClass::where('school_year_id', $semester->school_year_id)->firstOrFail();
+        $this->actingAs($admin);
+
+        $view = app(ConductController::class)->index($this->requestFor('/conduct', [
+            'school_year_id' => $semester->school_year_id,
+            'semester_id' => $semester->getKey(),
+            'class_id' => $class->getKey(),
+        ], $admin));
+
+        $this->assertInstanceOf(View::class, $view);
+        $this->assertFalse($view->getData()['canEditConduct']);
+        $html = $view->render();
+        $this->assertStringNotContainsString('data-conduct-form>', $html);
+        $this->assertStringContainsString('data-conduct-form-readonly', $html);
+    }
+
+    public function test_score_store_blocks_admin_when_semester_score_input_is_closed(): void
+    {
+        $admin = $this->adminUser();
+        [$semester, $class, $subject, $student, $column] = $this->scoreEntryFixture();
+        $semester->update([
+            'status' => Semester::STATUS_INACTIVE,
+            'is_score_input_open' => false,
+        ]);
+
+        $this->actingAs($admin);
+
+        try {
+            app(ScoreController::class)->store($this->scoreStoreRequest($admin, $semester, $class, $subject, $column, $student, '8.5'));
+            $this->fail('Closed semester score input should block admin score mutation.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+            $this->assertStringContainsString('khóa nhập điểm', $exception->getMessage());
+        }
+
+        $this->assertFalse(ScoreHeader::where('student_id', $student->getKey())
+            ->where('subject_id', $subject->getKey())
+            ->where('semester_id', $semester->getKey())
+            ->exists());
+    }
+
+    public function test_score_store_blocks_admin_even_when_semester_score_input_is_open(): void
+    {
+        $admin = $this->adminUser();
+        [$semester, $class, $subject, $student, $column] = $this->scoreEntryFixture();
+        $semester->update([
+            'status' => Semester::STATUS_INACTIVE,
+            'is_score_input_open' => true,
+        ]);
+
+        $this->actingAs($admin);
+
+        try {
+            app(ScoreController::class)->store($this->scoreStoreRequest($admin, $semester, $class, $subject, $column, $student, '8.5'));
+            $this->fail('Admin should not directly mutate student scores.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+            $this->assertStringContainsString('Chỉ giáo viên bộ môn', $exception->getMessage());
+        }
+
+        $this->assertFalse(ScoreHeader::where('student_id', $student->getKey())
+            ->where('subject_id', $subject->getKey())
+            ->where('semester_id', $semester->getKey())
+            ->exists());
+        $this->assertSame(Semester::STATUS_INACTIVE, $semester->refresh()->status);
+    }
+
+    public function test_score_store_allows_assigned_teacher_when_semester_score_input_and_column_are_open(): void
+    {
+        [$semester, $class, $subject, $student, $column] = $this->scoreEntryFixture();
+        $teacherUser = $this->teacherUserForScoreAssignment($semester, $class, $subject);
+        $semester->update([
+            'status' => Semester::STATUS_INACTIVE,
+            'is_score_input_open' => true,
+        ]);
+
+        $this->actingAs($teacherUser);
+
+        app(ScoreController::class)->store($this->scoreStoreRequest($teacherUser, $semester, $class, $subject, $column, $student, '8.5'));
+
+        $header = ScoreHeader::where('student_id', $student->getKey())
+            ->where('subject_id', $subject->getKey())
+            ->where('semester_id', $semester->getKey())
+            ->firstOrFail();
+
+        $this->assertSame(8.5, round((float) $header->details()->where('score_column_id', $column->getKey())->firstOrFail()->value, 1));
+        $this->assertSame(Semester::STATUS_INACTIVE, $semester->refresh()->status);
+    }
+
+    public function test_teacher_still_respects_score_column_window_and_seven_day_edit_limit_when_semester_is_reopened(): void
+    {
+        [$semester, $class, $subject, $student, $column] = $this->scoreEntryFixture();
+        $teacherUser = $this->teacherUserForScoreAssignment($semester, $class, $subject);
+        $semester->update([
+            'status' => Semester::STATUS_INACTIVE,
+            'is_score_input_open' => true,
+        ]);
+        $column->update(['is_active' => false]);
+
+        $this->actingAs($teacherUser);
+
+        try {
+            app(ScoreController::class)->store($this->scoreStoreRequest($teacherUser, $semester, $class, $subject, $column, $student, '7.5'));
+            $this->fail('Closed score column should block teacher score mutation.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+
+        $column->update(['is_active' => true]);
+        $header = ScoreHeader::create([
+            'student_id' => $student->getKey(),
+            'subject_id' => $subject->getKey(),
+            'semester_id' => $semester->getKey(),
+            'school_year_id' => $semester->school_year_id,
+            'average' => 6.0,
+        ]);
+        $detail = ScoreDetail::create([
+            'score_header_id' => $header->getKey(),
+            'score_column_id' => $column->getKey(),
+            'type' => $column->type,
+            'name' => $column->name,
+            'value' => 6.0,
+            'weight_group' => 1,
+        ]);
+        $detail->forceFill([
+            'created_at' => now()->subDays(8),
+            'updated_at' => now()->subDays(8),
+        ])->save();
+
+        app(ScoreController::class)->store($this->scoreStoreRequest($teacherUser, $semester, $class, $subject, $column, $student, '9.0'));
+
+        $this->assertSame(6.0, round((float) $detail->refresh()->value, 1));
+    }
+
+    public function test_semester_score_input_toggle_does_not_activate_old_semester(): void
+    {
+        $admin = $this->adminUser();
+        $semester = $this->semesterWithClass();
+        $semester->update([
+            'status' => Semester::STATUS_INACTIVE,
+            'is_score_input_open' => false,
+        ]);
+
+        $this->actingAs($admin);
+
+        $this->assertNotNull(Route::getRoutes()->getByName('semesters.score-input.open'));
+        $this->assertNotNull(Route::getRoutes()->getByName('semesters.score-input.close'));
+
+        app(\App\Http\Controllers\SemesterController::class)->openScoreInput($semester);
+
+        $semester->refresh();
+        $this->assertTrue((bool) $semester->is_score_input_open);
+        $this->assertSame(Semester::STATUS_INACTIVE, $semester->status);
+
+        app(\App\Http\Controllers\SemesterController::class)->closeScoreInput($semester);
+
+        $semester->refresh();
+        $this->assertFalse((bool) $semester->is_score_input_open);
+        $this->assertSame(Semester::STATUS_INACTIVE, $semester->status);
+    }
+
+    public function test_teacher_score_entry_assignment_source_filters_missing_semester_records(): void
+    {
+        [$semester, $class, $subject] = $this->scoreEntryFixture();
+        $teacherUser = $this->teacherUserForScoreAssignment($semester, $class, $subject);
+        $teacherId = $teacherUser->teacher_id;
+
+        TeachingAssignment::create([
+            'teacher_id' => $teacherId,
+            'class_id' => $class->getKey(),
+            'subject_id' => $subject->getKey(),
+            'school_year_id' => $semester->school_year_id,
+            'semester_id' => null,
+            'role' => TeachingAssignment::ROLE_PRIMARY,
+            'weekly_periods' => 1,
+            'status' => TeachingAssignment::STATUS_ACTIVE,
+        ]);
+
+        session([
+            'working_school_year_id' => $semester->school_year_id,
+            'working_semester_id' => $semester->getKey(),
+        ]);
+        $this->actingAs($teacherUser);
+
+        $view = app(ScoreController::class)->index($this->requestFor('/scores', [
+            'school_year_id' => $semester->school_year_id,
+            'semester_id' => $semester->getKey(),
+        ], $teacherUser));
+
+        $assignments = $view->getData()['assignments'];
+        $this->assertCount(1, $assignments);
+        $this->assertSame((string) $class->getKey(), (string) $assignments->first()->class_id);
+        $this->assertSame((string) $subject->getKey(), (string) $assignments->first()->subject_id);
+        $this->assertSame((string) $semester->getKey(), (string) $assignments->first()->semester_id);
+        $this->assertStringContainsString('data-score-teacher-assignments', $view->render());
+        $this->assertStringNotContainsString('Không rõ học kỳ', $view->render());
     }
 
     public function test_score_admin_matrix_keeps_selected_numeric_and_assessment_subjects(): void
@@ -571,6 +836,100 @@ class ResultManagementBatchTest extends TestCase
             ->firstOrFail();
     }
 
+    private function scoreEntryFixture(): array
+    {
+        $semester = $this->semesterWithClass();
+        $class = SchoolClass::where('school_year_id', $semester->school_year_id)->firstOrFail();
+        $subject = Subject::create([
+            'code' => 'TST' . Str::upper(Str::random(8)),
+            'name' => 'Môn nhập điểm test ' . Str::upper(Str::random(6)),
+            'credit' => 1,
+            'type' => Subject::TYPE_OFFICIAL,
+            'assessment_type' => Subject::ASSESSMENT_GRADE_10,
+            'status' => Subject::STATUS_ACTIVE,
+        ]);
+        SubjectGradeMapping::create([
+            'subject_id' => $subject->getKey(),
+            'grade_level' => (int) $class->grade_level,
+        ]);
+        $student = $this->createStudent($class, 'SCR');
+        $column = ScoreColumn::create([
+            'school_year_id' => $semester->school_year_id,
+            'subject_id' => $subject->getKey(),
+            'grade_level' => (int) $class->grade_level,
+            'name' => '15 phút test ' . Str::upper(Str::random(6)),
+            'type' => ScoreColumn::TYPE_REGULAR,
+            'weight_group' => 1,
+            'sort_order' => 10,
+            'is_active' => true,
+        ]);
+
+        return [$semester, $class, $subject, $student, $column];
+    }
+
+    private function scoreStoreRequest(
+        User $user,
+        Semester $semester,
+        SchoolClass $class,
+        Subject $subject,
+        ScoreColumn $column,
+        Student $student,
+        string $score
+    ): Request {
+        $request = Request::create('/scores/entry', 'POST', [
+            'class_id' => $class->getKey(),
+            'subject_id' => $subject->getKey(),
+            'semester_id' => $semester->getKey(),
+            'scores' => [
+                $column->getKey() => [
+                    $student->getKey() => $score,
+                ],
+            ],
+        ]);
+        $request->setUserResolver(fn () => $user);
+        app()->instance('request', $request);
+
+        return $request;
+    }
+
+    private function teacherUserForScoreAssignment(Semester $semester, SchoolClass $class, Subject $subject): User
+    {
+        $teacher = Teacher::create([
+            'teacher_code' => 'TCH' . Str::upper(Str::random(8)),
+            'name' => 'Giáo viên nhập điểm test',
+            'gender' => Teacher::GENDER_NAM,
+            'dob' => '1985-01-01',
+            'phone' => '09' . random_int(10000000, 99999999),
+            'email' => Str::lower(Str::random(8)) . '@example.test',
+            'work_status' => Teacher::STATUS_WORKING,
+        ]);
+
+        $user = User::create([
+            'username' => 'teacher_score_' . Str::lower(Str::random(8)),
+            'full_name' => $teacher->name,
+            'email' => Str::lower(Str::random(8)) . '@example.test',
+            'role' => 'teacher',
+            'role_type' => 'teacher',
+            'teacher_id' => $teacher->getKey(),
+            'password_hash' => '$2y$12$Z2FJ9wVbk03D58EQ38Fn6O9z3.nBTeoNRZoh9c6uPfYRJrL46Y0wW',
+            'is_active' => 1,
+            'login_status' => 1,
+        ]);
+
+        TeachingAssignment::create([
+            'teacher_id' => $teacher->getKey(),
+            'class_id' => $class->getKey(),
+            'subject_id' => $subject->getKey(),
+            'school_year_id' => $semester->school_year_id,
+            'semester_id' => $semester->getKey(),
+            'role' => TeachingAssignment::ROLE_PRIMARY,
+            'weekly_periods' => 1,
+            'status' => TeachingAssignment::STATUS_ACTIVE,
+        ]);
+
+        return $user;
+    }
+
     private function requestFor(string $uri, array $query, User $user): Request
     {
         $request = Request::create($uri, 'GET', $query);
@@ -593,6 +952,26 @@ class ResultManagementBatchTest extends TestCase
             ->whereHas('schoolYear')
             ->first()
             ?: $this->semesterWithClass();
+    }
+
+    private function inactiveSemesterForCurrentYear(): Semester
+    {
+        $activeYear = SchoolYear::where('is_active', true)
+            ->whereNull('archived_at')
+            ->whereHas('classes')
+            ->first();
+
+        if (! $activeYear) {
+            $this->markTestSkipped('No active school year with classes is available.');
+        }
+
+        return Semester::create([
+            'name' => 'Học kỳ 1',
+            'order' => 98,
+            'school_year_id' => $activeYear->getKey(),
+            'status' => Semester::STATUS_INACTIVE,
+            'is_score_input_open' => false,
+        ]);
     }
 
     private function classWithMultipleRequiredNumericSubjects(Semester $semester): ?SchoolClass

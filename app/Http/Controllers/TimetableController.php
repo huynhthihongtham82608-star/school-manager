@@ -185,7 +185,7 @@ class TimetableController extends Controller
     {
         $selectedYearId = $this->effectiveSchoolYearId($request);
         $selectedSemesterId = $this->effectiveSemesterId($request, $selectedYearId);
-        $readOnly = $this->isHistoricalReadOnly();
+        $readOnly = $this->isHistoricalReadOnly($request, true);
         $years = $readOnly
             ? SchoolYear::whereKey($selectedYearId)->get()
             : SchoolYear::where('is_active', true)->whereNull('archived_at')->orderByDesc('start_date')->get();
@@ -662,9 +662,15 @@ class TimetableController extends Controller
 
     private function ensureTimetableEditable(Timetable $timetable): void
     {
-        if ($this->isHistoricalReadOnly()) {
+        if ($this->isHistoricalReadOnly(request(), true)) {
             throw ValidationException::withMessages([
                 'timetable' => 'Đang xem dữ liệu lịch sử, không thể thay đổi thời khóa biểu.',
+            ]);
+        }
+
+        if ($timetable->semester && ! $timetable->semester->isCurrent()) {
+            throw ValidationException::withMessages([
+                'timetable' => 'Học kỳ này không còn là học kỳ hiện hành nên chỉ được xem thời khóa biểu.',
             ]);
         }
 
@@ -1153,7 +1159,7 @@ class TimetableController extends Controller
 
     private function denyHistoricalWrite(): void
     {
-        if ($this->isHistoricalReadOnly()) {
+        if ($this->isHistoricalReadOnly(request(), true)) {
             throw ValidationException::withMessages([
                 'history_readonly' => 'Đang xem dữ liệu lịch sử, không thể thay đổi thời khóa biểu.',
             ]);

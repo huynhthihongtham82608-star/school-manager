@@ -2481,42 +2481,59 @@
 
 .history-readonly-banner {
     display: grid;
-    grid-template-columns: 54px minmax(0, 1fr) auto;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    padding: 1rem 1.15rem;
+    gap: 1.1rem;
+    margin-bottom: 1.15rem;
+    padding: 1.1rem 1.25rem;
     color: var(--sm-primary-strong);
-    border: 1px solid rgba(var(--sm-primary-rgb), .2);
-    border-radius: 20px;
-    background: linear-gradient(135deg, #FFFFFF, #FFF4E8);
-    box-shadow: var(--sm-shadow-soft);
+    border: 1px solid rgba(var(--sm-primary-rgb), .42);
+    border-radius: 18px;
+    background: linear-gradient(135deg, #FFF8F1 0%, #FFE8D2 100%);
+    box-shadow: 0 18px 42px rgba(var(--sm-primary-rgb), .14);
 }
 
 .history-readonly-banner-icon {
-    width: 54px;
-    height: 54px;
+    width: 64px;
+    height: 64px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 16px;
-    color: var(--sm-primary);
-    background: var(--sm-primary-soft);
-    font-size: 1.45rem;
+    border: 1px solid rgba(var(--sm-primary-rgb), .25);
+    border-radius: 18px;
+    color: #FFFFFF;
+    background: var(--sm-primary);
+    font-size: 1.75rem;
+    box-shadow: 0 12px 26px rgba(var(--sm-primary-rgb), .24);
+}
+
+.history-readonly-banner-chip {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    margin-bottom: .35rem;
+    padding: .22rem .55rem;
+    color: #FFFFFF;
+    border-radius: 999px;
+    background: var(--sm-primary-strong);
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .05em;
 }
 
 .history-readonly-banner-title {
     color: var(--sm-ink);
-    font-size: 1.02rem;
+    font-size: 1.08rem;
     font-weight: 800;
     line-height: 1.35;
 }
 
 .history-readonly-banner-subtitle {
-    margin-top: .15rem;
-    color: var(--sm-muted);
-    font-size: .9rem;
-    font-weight: 600;
+    margin-top: .2rem;
+    color: #7C3F08;
+    font-size: .94rem;
+    font-weight: 500;
+    line-height: 1.45;
 }
 
 .history-readonly-back {
@@ -4186,9 +4203,11 @@ body.admin-sidebar-collapsed .admin-sidebar-collapse i {
 .admin-nav-link.active {
     color: var(--sm-primary-strong) !important;
     text-decoration: none !important;
-    background: var(--sm-primary-soft);
-    border-color: rgba(var(--sm-primary-rgb), .26);
-    box-shadow: inset 4px 0 0 var(--sm-primary);
+    background: rgba(var(--sm-primary-rgb), .065);
+    border-color: transparent;
+    border-radius: 10px;
+    box-shadow: none;
+    font-weight: 600;
 }
 
 .admin-sidebar .admin-nav-link {
@@ -4221,14 +4240,26 @@ body.admin-sidebar-collapsed .admin-sidebar-collapse i {
 
 .admin-sidebar .admin-nav-link.active {
     color: var(--sm-primary-strong) !important;
-    background: rgba(var(--sm-primary-rgb), .14);
-    border-color: transparent;
-    box-shadow: inset 4px 0 0 var(--sm-primary);
-    font-weight: 850;
+    background: rgba(var(--sm-primary-rgb), .065);
+    border-color: transparent !important;
+    border-radius: 10px;
+    box-shadow: none;
+    font-weight: 600;
 }
 
 .admin-sidebar .admin-nav-link.active i {
     color: var(--sm-primary);
+}
+
+.admin-sidebar .admin-nav-link.active::after {
+    content: "";
+    width: .42rem;
+    height: .42rem;
+    flex: 0 0 .42rem;
+    margin-left: auto;
+    border-radius: 999px;
+    background: var(--sm-primary);
+    box-shadow: 0 0 0 3px rgba(var(--sm-primary-rgb), .12);
 }
 
 .admin-sidebar .admin-submenu .admin-menu-heading.admin-submenu-heading {
@@ -5658,10 +5689,27 @@ body.role-menu-open .role-menu-overlay {
 }
 
 .role-nav-link.active {
-    color: #9A4A0B;
-    background: #F8FAFC;
-    border-color: rgba(226, 232, 240, .95);
-    box-shadow: inset 4px 0 0 rgba(var(--sm-primary-rgb), .85);
+    color: var(--sm-primary-strong);
+    background: rgba(var(--sm-primary-rgb), .055);
+    border-color: transparent;
+    border-radius: 10px;
+    box-shadow: none;
+    font-weight: 600;
+}
+
+.role-nav-link.active i {
+    color: var(--sm-primary);
+}
+
+.role-nav-link.active::after {
+    content: "";
+    width: .42rem;
+    height: .42rem;
+    flex: 0 0 .42rem;
+    margin-left: auto;
+    border-radius: 999px;
+    background: var(--sm-primary);
+    box-shadow: 0 0 0 3px rgba(var(--sm-primary-rgb), .12);
 }
 
 .role-nav-button {
@@ -7660,9 +7708,12 @@ body.role-menu-open .role-menu-overlay {
 
 .admin-sidebar .admin-nav-link.active,
 .role-sidebar .role-nav-link.active {
-    background: rgba(var(--sm-primary-rgb), .12);
+    background: rgba(var(--sm-primary-rgb), .065);
     color: var(--sm-primary-strong);
-    font-weight: 800;
+    border-color: transparent;
+    border-radius: 10px;
+    box-shadow: none;
+    font-weight: 600;
 }
 
 .admin-sidebar .admin-nav-link:focus,
@@ -15324,6 +15375,24 @@ body.role-staff .admin-sidebar .font-medium {
     font-weight: 400 !important;
 }
 
+body.role-admin .admin-sidebar .admin-nav-link.active,
+body.role-staff .admin-sidebar .admin-nav-link.active {
+    color: var(--sm-primary-strong) !important;
+    background: rgba(var(--sm-primary-rgb), .065) !important;
+    border-color: transparent !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+    font-weight: 600 !important;
+}
+
+body.role-admin .admin-sidebar .admin-nav-link.active i,
+body.role-staff .admin-sidebar .admin-nav-link.active i,
+body.role-admin .admin-sidebar .admin-nav-link.active span,
+body.role-staff .admin-sidebar .admin-nav-link.active span {
+    color: var(--sm-primary-strong) !important;
+    font-weight: 600 !important;
+}
+
 body.role-admin .content .appearance-card-title,
 body.role-staff .content .appearance-card-title,
 body.role-admin .content .management-card-title,
@@ -15444,10 +15513,24 @@ body.role-teacher .role-nav-link.active,
 body.role-homeroom .role-nav-link.active,
 body.role-student .role-nav-link.active,
 body.role-parent .role-nav-link.active {
-    font-weight: 400 !important;
+    font-weight: 600 !important;
     color: #9a3412 !important;
-    background: #fff7ed !important;
-    border-color: #fed7aa !important;
+    background: rgba(var(--sm-primary-rgb), .055) !important;
+    border-color: transparent !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+}
+
+body.role-teacher .role-nav-link.active i,
+body.role-homeroom .role-nav-link.active i,
+body.role-student .role-nav-link.active i,
+body.role-parent .role-nav-link.active i,
+body.role-teacher .role-nav-link.active span,
+body.role-homeroom .role-nav-link.active span,
+body.role-student .role-nav-link.active span,
+body.role-parent .role-nav-link.active span {
+    color: var(--sm-primary-strong) !important;
+    font-weight: 600 !important;
 }
 
 body.role-teacher .content .card,

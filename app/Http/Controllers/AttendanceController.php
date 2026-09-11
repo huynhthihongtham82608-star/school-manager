@@ -33,7 +33,7 @@ class AttendanceController extends Controller
         $attendanceViewMode = in_array($request->query('attendance_view', 'day'), ['day', 'week', 'all'], true)
             ? $request->query('attendance_view', 'day')
             : 'day';
-        $readOnly = $this->isHistoricalReadOnly();
+        $readOnly = $this->isHistoricalReadOnly($request, true);
         $rawSessionType = $request->query('attendance_type', $request->query('session_type'));
         $selectedSessionType = in_array((string) $rawSessionType, ['', 'all'], true) ? null : $rawSessionType;
         $requestedMainSessionType = in_array((string) $rawSessionType, [AttendanceRecord::SESSION_MORNING, AttendanceRecord::SESSION_AFTERNOON], true)
@@ -470,6 +470,7 @@ class AttendanceController extends Controller
         $timetableEntry = null;
 
         $this->ensureSelectionMatchesYear($data['school_year_id'], $class, $semester);
+        $this->ensureSemesterCanWrite($semester, 'Học kỳ này không còn là học kỳ hiện hành nên chỉ được xem điểm danh.');
         $this->ensureMainSessionIsScheduled($class, $semester, $data['attendance_date'], $data['attendance_type'], $data['timetable_entry_id'] ?? null);
         $this->authorizeAttendanceMutation($request->user(), $class, $semester, $data['attendance_date'], $data['attendance_type'], $data['timetable_entry_id'] ?? null);
 
