@@ -28,6 +28,7 @@ class SimpleExcel
     public static function downloadXlsx(string $filename, array $headers, array $rows)
     {
         $path = tempnam(sys_get_temp_dir(), 'emis_xlsx_');
+        $downloadName = Str::finish($filename, '.xlsx');
         $zip = new ZipArchive();
         $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
 
@@ -41,9 +42,12 @@ class SimpleExcel
         $zip->addFromString('xl/worksheets/sheet1.xml', self::sheetXml(array_merge([$headers], $rows)));
         $zip->close();
 
-        return response()->download($path, Str::finish($filename, '.xlsx'), [
+        $response = response()->download($path, $downloadName, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ])->deleteFileAfterSend(true);
+        ]);
+        $response->headers->set('Content-Disposition', 'attachment; filename="' . addcslashes($downloadName, "\\\"") . '"');
+
+        return $response->deleteFileAfterSend(true);
     }
 
     public static function downloadPdf(string $filename, array $headers, array $rows)

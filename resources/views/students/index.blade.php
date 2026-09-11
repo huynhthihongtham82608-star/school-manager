@@ -84,33 +84,6 @@
 </x-page-header>
 
 <div class="card">
-    <div class="card-body border-bottom">
-        <form method="GET" action="{{ route('students.index') }}" class="row g-2 align-items-end">
-            <input type="hidden" name="school_year_id" value="{{ $selectedYearId }}">
-            <input type="hidden" name="grade_level" value="{{ $selectedGrade }}">
-            <input type="hidden" name="class_id" value="{{ $selectedClassId }}">
-            <input type="hidden" name="status" value="{{ $selectedStatus }}">
-            <input type="hidden" name="gender" value="{{ $selectedGender }}">
-            <div class="col-md-5">
-                <label class="form-label small mb-1">Tìm kiếm</label>
-                <input type="search" name="q" class="form-control" value="{{ $keyword }}" placeholder="Mã HS, họ tên, phụ huynh, SĐT phụ huynh">
-            </div>
-            <div class="col-auto">
-                <button class="btn btn-primary">Tìm</button>
-            </div>
-            @if($keyword !== '')
-                <div class="col-auto">
-                    <a href="{{ route('students.index', array_filter([
-                        'school_year_id' => $selectedYearId,
-                        'grade_level' => $selectedGrade !== 'all' ? $selectedGrade : null,
-                        'class_id' => $selectedClassId !== 'all' ? $selectedClassId : null,
-                        'status' => $selectedStatus !== 'all' ? $selectedStatus : null,
-                        'gender' => $selectedGender !== 'all' ? $selectedGender : null,
-                    ])) }}" class="btn btn-secondary">Xóa tìm</a>
-                </div>
-            @endif
-        </form>
-    </div>
     <div class="table-responsive">
         <table class="table">
             <thead>

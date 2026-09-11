@@ -47,6 +47,7 @@
                     <option value="{{ $subject->id }}"
                         data-departments="{{ $subject->departments->pluck('id')->implode(',') }}"
                         data-department-names="{{ $subject->departments->pluck('name')->join(', ') }}"
+                        data-subject-name="{{ $subject->name }}"
                         data-grade-levels="{{ implode(',', $subject->applicableGradeLevels()) }}"
                         @selected(old('subject_id') === $subject->id)>
                         {{ $subject->code }} - {{ $subject->name }}
@@ -58,28 +59,19 @@
         </div>
 
         <div class="col-lg-6">
-            <label class="form-label">Lọc theo tổ chuyên môn</label>
-            <select class="form-select" data-assignment-department-filter>
-                <option value="">Tất cả tổ</option>
-                @foreach($departments as $department)
-                    <option value="{{ $department->id }}">{{ $department->name }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="col-lg-6">
             <label class="form-label">Giáo viên</label>
             <select name="teacher_id" class="form-select" required data-assignment-teacher>
                 <option value="">Chọn giáo viên</option>
                 @foreach($teachers as $teacher)
                     <option value="{{ $teacher->id }}"
-                        data-department="{{ $teacher->department_id }}"
-                        data-primary-subject="{{ $teacher->primarySubjectName() }}"
+                        data-primary-subject-id="{{ $teacher->primary_subject_id }}"
+                        data-primary-subject-name="{{ $teacher->primarySubjectName() }}"
                         @selected(old('teacher_id') === $teacher->id)>
-                        {{ $teacher->teacher_code }} - {{ $teacher->name }}{{ $teacher->department ? ' - ' . $teacher->department->name : '' }}
+                        {{ $teacher->teacher_code }} - {{ $teacher->name }} - {{ $teacher->primarySubjectName() }}
                     </option>
                 @endforeach
             </select>
-            <div class="form-text text-warning d-none" data-assignment-department-warning>Giáo viên này không thuộc tổ phụ trách môn học.</div>
+            <div class="form-text text-warning d-none" data-assignment-department-warning>Giáo viên này không có môn chính là môn đang chọn.</div>
             @error('teacher_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
         </div>
 

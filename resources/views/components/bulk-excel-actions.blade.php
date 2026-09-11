@@ -285,7 +285,48 @@
             font-weight: 400;
             text-align: left;
             vertical-align: top;
-            white-space: nowrap;
+            min-width: 7.5rem;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .bulk-excel-table-wrap {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: thin;
+        }
+
+        .bulk-excel-table {
+            width: max-content !important;
+            min-width: 1200px;
+            table-layout: auto !important;
+        }
+
+        .bulk-excel-table th {
+            min-width: 7.5rem;
+            line-height: 1.35;
+        }
+
+        .bulk-excel-table th:nth-child(2),
+        .bulk-excel-table td:nth-child(2) {
+            min-width: 11rem;
+            max-width: 16rem;
+        }
+
+        .bulk-excel-table th:nth-child(n + 3),
+        .bulk-excel-table td:nth-child(n + 3) {
+            min-width: 9rem;
+        }
+
+        .bulk-excel-table td:nth-child(n + 3) {
+            max-width: 15rem;
+        }
+
+        .bulk-excel-table th.bulk-excel-select-cell,
+        .bulk-excel-table td.bulk-excel-select-cell {
+            width: 3rem;
+            min-width: 3rem;
         }
 
         .bulk-excel-cell-value {

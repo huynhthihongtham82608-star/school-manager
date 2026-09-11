@@ -954,15 +954,8 @@ class ScoreController extends Controller
         $selectedYearId = $years->contains('id', $yearId)
             ? $yearId
             : ($years->first()?->id ?? $student->school_year_id);
-        $scoreSemesterIds = ScoreHeader::where('student_id', $student->id)
-            ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
-            ->pluck('semester_id')
-            ->filter()
-            ->unique()
-            ->values();
         $semesters = Semester::where('school_year_id', $selectedYearId)
-            ->when($scoreSemesterIds->isNotEmpty(), fn ($query) => $query->whereIn('id', $scoreSemesterIds))
-            ->when($scoreSemesterIds->isEmpty(), fn ($query) => $query->whereRaw('1 = 0'))
+            ->whereNotIn('status', [Semester::STATUS_ARCHIVED])
             ->orderBy('order')
             ->orderBy('name')
             ->get();

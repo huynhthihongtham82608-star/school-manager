@@ -1,8 +1,13 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const normalizeText = (value) => (value || '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
     const teacherSelect = document.querySelector('[data-assignment-teacher]');
     const subjectSelect = document.querySelector('[data-assignment-subject-select]');
-    const departmentFilter = document.querySelector('[data-assignment-department-filter]');
     const departmentWarning = document.querySelector('[data-assignment-department-warning]');
     const subjectDepartmentsText = document.querySelector('[data-assignment-subject-departments]');
 
@@ -21,19 +26,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const warnIfTeacherOutsideDepartment = () => {
         const teacher = teacherSelect?.selectedOptions?.[0];
-        const teacherDepartment = teacher?.dataset?.department || '';
-        const subjectDepartments = selectedSubjectDepartmentIds();
-        const shouldWarn = subjectDepartments.length > 0
-            && Boolean(teacher?.value)
-            && (! teacherDepartment || ! subjectDepartments.includes(teacherDepartment));
+        const subject = subjectSelect?.selectedOptions?.[0];
+        const subjectId = subjectSelect?.value || '';
+        const subjectName = normalizeText(subject?.dataset?.subjectName);
+        const teacherSubjectName = normalizeText(teacher?.dataset?.primarySubjectName);
+        const shouldWarn = Boolean(teacher?.value)
+            && Boolean(subjectId)
+            && teacher?.dataset?.primarySubjectId !== subjectId
+            && (! subjectName || teacherSubjectName !== subjectName);
 
         departmentWarning?.classList.toggle('d-none', ! shouldWarn);
     };
 
     const filterTeachers = () => {
-        const departmentId = departmentFilter?.value || '';
+        const subject = subjectSelect?.selectedOptions?.[0];
+        const subjectId = subjectSelect?.value || '';
+        const subjectName = normalizeText(subject?.dataset?.subjectName);
         [...teacherSelect.options].forEach((option) => {
-            option.hidden = Boolean(departmentId) && option.value && option.dataset.department !== departmentId;
+            const matchesSubjectId = option.dataset.primarySubjectId === subjectId;
+            const matchesSubjectName = subjectName && normalizeText(option.dataset.primarySubjectName) === subjectName;
+            option.hidden = Boolean(subjectId) && option.value && ! matchesSubjectId && ! matchesSubjectName;
         });
 
         if (teacherSelect.selectedOptions[0]?.hidden) {
@@ -45,18 +57,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const syncDepartmentFromSubject = () => {
         updateSubjectDepartmentText();
-
-        const subjectDepartments = selectedSubjectDepartmentIds();
-        if (subjectDepartments.length === 1 && departmentFilter) {
-            departmentFilter.value = subjectDepartments[0];
-        }
-
         filterTeachers();
     };
 
     subjectSelect?.addEventListener('change', syncDepartmentFromSubject);
     teacherSelect?.addEventListener('change', warnIfTeacherOutsideDepartment);
-    departmentFilter?.addEventListener('change', filterTeachers);
 
     syncDepartmentFromSubject();
 });

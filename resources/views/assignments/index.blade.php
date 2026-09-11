@@ -131,7 +131,7 @@
                                     $periodText = $period['expected'] ? $period['expected'] . 'T' : '-';
                                 @endphp
                                 <span class="assignment-class-period-tag" title="{{ $assignment->classRoom?->name ?? '-' }} - {{ $assignment->subject?->name ?? '-' }} - {{ $assignment->roleLabel() }} - {{ $assignment->statusLabel() }}">
-                                    {{ $assignment->classRoom?->name ?? '-' }} <strong>({{ $periodText }})</strong>
+                                    {{ $assignment->classRoom?->name ?? '-' }} - {{ $assignment->subject?->name ?? 'Chưa có môn' }} <strong>({{ $periodText }})</strong>
                                 </span>
                             @endforeach
                         </div>
@@ -215,6 +215,24 @@
                                         <span>Ghi chú</span>
                                         <p>{{ trim((string) $assignment->note) !== '' ? $assignment->note : '-' }}</p>
                                     </div>
+                                    @unless($readOnly)
+                                        @php
+                                            $assignmentDeleteCheck = $deleteChecks[(string) $assignment->getKey()] ?? ['allowed' => false, 'message' => 'Không thể xác định trạng thái xóa.'];
+                                        @endphp
+                                        <div class="d-flex justify-content-end mt-3">
+                                            @if($assignmentDeleteCheck['allowed'])
+                                                <form method="POST" action="{{ route('assignments.destroy', $assignment) }}" data-confirm-message="Bạn có chắc muốn xóa phân công {{ $assignment->classRoom?->name ?? '-' }} - {{ $assignment->subject?->name ?? '-' }} của giáo viên này?">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                        <i class="bi bi-trash me-1"></i>Xóa phân công này
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <span class="text-muted small" title="{{ $assignmentDeleteCheck['message'] }}">Không thể xóa vì đã phát sinh dữ liệu liên quan.</span>
+                                            @endif
+                                        </div>
+                                    @endunless
                                 </article>
                             @endforeach
                         </div>

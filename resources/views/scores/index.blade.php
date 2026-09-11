@@ -145,6 +145,35 @@
         text-align: left;
     }
 
+    .student-report-student-card {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding: 1.25rem;
+        border: 1px solid #fed7aa;
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    .student-report-student-card-item {
+        min-width: 0;
+    }
+
+    .student-report-student-card-label {
+        display: block;
+        margin-bottom: .3rem;
+        color: #6b7280;
+        font-size: .8rem;
+    }
+
+    .student-report-student-card-value {
+        display: block;
+        overflow-wrap: anywhere;
+        color: #111827;
+        font-size: .95rem;
+    }
+
     .student-report-table {
         width: 100%;
         max-width: 100%;
@@ -755,22 +784,20 @@
         </div>
     </div>
 
-    <div class="w-full bg-white border border-orange-100 p-5 rounded-xl shadow-2xs text-left mb-3 font-sans">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-left">
-            <div>
-                <div class="text-sm font-normal text-gray-400">Học sinh</div>
-                <div class="text-sm font-normal text-gray-900 truncate">{{ $student?->student_code }} - {{ $student?->name }}</div>
+    <div class="student-report-student-card">
+        <div class="student-report-student-card-item">
+                <span class="student-report-student-card-label">Học sinh</span>
+                <strong class="student-report-student-card-value">{{ $student?->student_code }} - {{ $student?->name }}</strong>
             </div>
-            <div>
-                <div class="text-sm font-normal text-gray-400">Lớp</div>
-                <div class="text-sm font-normal text-gray-900 truncate">{{ $student?->classRoom?->name ?? 'Chưa phân lớp' }}</div>
+            <div class="student-report-student-card-item">
+                <span class="student-report-student-card-label">Lớp</span>
+                <strong class="student-report-student-card-value">{{ $student?->classRoom?->name ?? 'Chưa phân lớp' }}</strong>
             </div>
-            <div>
-                <div class="text-sm font-normal text-gray-400">Học kỳ</div>
-                <div class="text-sm font-normal text-gray-900 truncate">{{ $semesters->firstWhere('id', $selectedSemesterId)?->normalizedName() ?? 'Học kỳ hiện hành' }}</div>
+            <div class="student-report-student-card-item">
+                <span class="student-report-student-card-label">Học kỳ</span>
+                <strong class="student-report-student-card-value">{{ $semesters->firstWhere('id', $selectedSemesterId)?->normalizedName() ?? 'Học kỳ hiện hành' }}</strong>
             </div>
         </div>
-    </div>
 
     <div class="student-report-toolbar" data-student-report-toolbar>
         <form data-student-report-filter data-url="{{ route('scores.report-card') }}">

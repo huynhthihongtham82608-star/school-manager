@@ -180,6 +180,12 @@
 >
     @if(! $readOnly)
         <div class="d-flex align-items-center gap-2">
+            @if($isAdmin)
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reward-approval-modal">
+                    <i class="bi bi-check2-square me-1"></i>Duyệt khen thưởng
+                    <span class="badge bg-danger ms-1">{{ $pendingRewards->count() }}</span>
+                </button>
+            @endif
             <button type="button" class="btn btn-primary" data-reward-open-create>
                 <i class="bi bi-plus-lg me-1"></i>Thêm quyết định mới
             </button>
@@ -234,6 +240,7 @@
                     <th style="width: 10%;">Lớp</th>
                     <th style="width: 18%;">Hình thức khen thưởng</th>
                     <th style="width: 22%;">Số quyết định / Chi tiết</th>
+                    <th style="width: 10%;">Trạng thái</th>
                     <th style="width: 12%;">Hành động</th>
                 </tr>
             </thead>
@@ -254,6 +261,11 @@
                                 <span class="text-sm font-normal text-gray-700">{{ $reward->decision_number ?: '-' }}</span>
                                 <span class="text-sm font-normal text-gray-500">{{ $reward->detail ?: '-' }}</span>
                             </div>
+                        </td>
+                        <td>
+                            <span class="badge {{ $reward->approval_status === \App\Models\Reward::STATUS_APPROVED ? 'bg-success' : ($reward->approval_status === \App\Models\Reward::STATUS_REJECTED ? 'bg-secondary' : 'bg-warning text-dark') }}">
+                                {{ $reward->approvalStatusLabel() }}
+                            </span>
                         </td>
                         <td>
                             <div class="d-flex align-items-center gap-2 justify-content-start">
@@ -287,7 +299,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7">
+                        <td colspan="8">
                             <div class="empty-state"><i class="bi bi-award"></i>Chưa có quyết định khen thưởng.</div>
                         </td>
                     </tr>
@@ -299,6 +311,67 @@
         <span>Hiển thị {{ $rewards->count() }} quyết định khen thưởng</span>
     </div>
 </div>
+
+@if($isAdmin)
+    <div class="modal fade" id="reward-approval-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title">Khen thưởng chờ duyệt</h5>
+                        <div class="text-muted small">Kiểm tra đề xuất của giáo viên trước khi đưa vào danh sách chính thức.</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    @if($pendingRewards->isNotEmpty())
+                        <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Học sinh</th>
+                                    <th>Lớp</th>
+                                    <th>Học kỳ</th>
+                                    <th>Hình thức</th>
+                                    <th>Người đề xuất</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($pendingRewards as $pendingReward)
+                                    <tr>
+                                        <td>{{ $pendingReward->student?->student_code }} - {{ $pendingReward->student?->name }}</td>
+                                        <td>{{ $pendingReward->classRoom?->name ?? '-' }}</td>
+                                        <td>{{ $pendingReward->semester?->normalizedName() ?? '-' }}</td>
+                                        <td>{{ $pendingReward->typeLabel() }}</td>
+                                        <td>{{ $pendingReward->creator?->display_name ?? $pendingReward->creator?->name ?? '-' }}</td>
+                                        <td>
+                                            <div class="d-flex gap-2">
+                                                <form method="POST" action="{{ route('rewards.approve', $pendingReward) }}" data-confirm-message="Bạn có chắc muốn duyệt khen thưởng này?">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check2 me-1"></i>Duyệt</button>
+                                                </form>
+                                                <form method="POST" action="{{ route('rewards.reject', $pendingReward) }}" data-confirm-message="Bạn có chắc muốn không duyệt khen thưởng này?">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Không duyệt</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                        </div>
+                    @else
+                        <div class="empty-state"><i class="bi bi-check2-circle"></i>Không có khen thưởng đang chờ duyệt.</div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
 
 @if(! $readOnly)
     <div id="reward-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 font-sans animate-fade-in d-none" aria-hidden="true">

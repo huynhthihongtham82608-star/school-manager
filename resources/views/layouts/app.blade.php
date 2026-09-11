@@ -3027,6 +3027,19 @@
                 "'": '&#039;',
             }[char]));
 
+            if (!document.documentElement.dataset.multiSelectOutsideClickBound) {
+                document.documentElement.dataset.multiSelectOutsideClickBound = 'true';
+                document.addEventListener('click', (event) => {
+                    if (event.target.closest('[data-multi-select-picker]')) {
+                        return;
+                    }
+
+                    document.querySelectorAll('[data-multi-select-picker].open').forEach((picker) => {
+                        picker.classList.remove('open');
+                    });
+                });
+            }
+
             root.querySelectorAll('[data-multi-select-picker-select]').forEach((select) => {
                 const picker = select.nextElementSibling;
                 if (!picker || !picker.matches('[data-multi-select-picker]') || picker.dataset.initialized === 'true') {

@@ -234,6 +234,12 @@ Route::middleware(['auth', 'no-cache', 'force-password-change', 'history.readonl
     Route::post('rewards/scan', [KhenThuongController::class, 'scan'])
         ->middleware('role:admin,staff,teacher')
         ->name('rewards.scan');
+    Route::patch('rewards/{reward}/approve', [KhenThuongController::class, 'approve'])
+        ->middleware('role:admin,staff')
+        ->name('rewards.approve');
+    Route::patch('rewards/{reward}/reject', [KhenThuongController::class, 'reject'])
+        ->middleware('role:admin,staff')
+        ->name('rewards.reject');
     Route::resource('rewards', KhenThuongController::class)
         ->except(['show', 'create', 'edit'])
         ->middleware('role:admin,staff,teacher');

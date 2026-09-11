@@ -9,12 +9,19 @@ trait UsesConsolidatedTable
 {
     protected function usesConsolidatedTable(string $targetTable, string $sourceTable, string $flagColumn): bool
     {
-        return Schema::hasColumn($targetTable, $flagColumn) && ! static::baseTableExists($sourceTable);
+        return Schema::hasColumn($targetTable, $flagColumn)
+            && (! static::baseTableExists($sourceTable) || static::baseTableIsEmpty($sourceTable));
     }
 
     protected static function shouldScopeConsolidatedTable(string $targetTable, string $sourceTable, string $flagColumn): bool
     {
-        return Schema::hasColumn($targetTable, $flagColumn) && ! static::baseTableExists($sourceTable);
+        return Schema::hasColumn($targetTable, $flagColumn)
+            && (! static::baseTableExists($sourceTable) || static::baseTableIsEmpty($sourceTable));
+    }
+
+    protected static function baseTableIsEmpty(string $table): bool
+    {
+        return static::baseTableExists($table) && DB::table($table)->doesntExist();
     }
 
     protected static function baseTableExists(string $table): bool

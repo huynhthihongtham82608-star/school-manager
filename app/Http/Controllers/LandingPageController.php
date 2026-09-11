@@ -143,7 +143,7 @@ SVG;
 
     private function events(int $limit)
     {
-        if (! Schema::hasTable('school_events')) {
+        if (! $this->eventsTableReady()) {
             return collect();
         }
 
@@ -166,9 +166,15 @@ SVG;
             ->values();
     }
 
+    private function eventsTableReady(): bool
+    {
+        return Schema::hasTable('school_events')
+            || (Schema::hasTable('school_posts') && Schema::hasColumn('school_posts', 'post_type'));
+    }
+
     private function documents(int $limit)
     {
-        if (! Schema::hasTable('learning_documents')) {
+        if (! $this->documentsTableReady()) {
             return collect();
         }
 
@@ -181,13 +187,19 @@ SVG;
             ->values();
     }
 
+    private function documentsTableReady(): bool
+    {
+        return Schema::hasTable('learning_documents')
+            || (Schema::hasTable('school_posts') && Schema::hasColumn('school_posts', 'post_type'));
+    }
+
     private function stats(): array
     {
         return [
             'students' => Schema::hasColumn('users', 'role_type') ? Student::count() : 0,
             'teachers' => Schema::hasColumn('users', 'role_type') ? Teacher::count() : 0,
             'classes' => Schema::hasTable('classes') ? SchoolClass::count() : 0,
-            'documents' => Schema::hasTable('learning_documents')
+            'documents' => $this->documentsTableReady()
                 ? LearningDocument::where('is_published', true)->get()->filter(fn (LearningDocument $document) => $document->isVisibleToRole(null))->count()
                 : 0,
         ];

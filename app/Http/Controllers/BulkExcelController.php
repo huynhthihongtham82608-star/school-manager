@@ -674,6 +674,7 @@ class BulkExcelController extends Controller
     private function classifyParentImportRow(array $row, int $rowIndex): array
     {
         $code = trim((string) $this->rowValue($row, ['ma_phu_huynh', 'parent_code']));
+        $name = trim((string) $this->rowValue($row, ['ho_ten', 'ho_va_ten', 'name']));
         $phone = trim((string) $this->rowValue($row, ['sdt', 'so_dien_thoai', 'phone']));
         $parentByCode = $code !== '' ? ParentProfile::where('parent_code', $code)->first() : null;
         $parentByPhone = $phone !== '' ? ParentProfile::where('phone', $phone)->first() : null;
@@ -699,6 +700,15 @@ class BulkExcelController extends Controller
         }
 
         if ($parentByPhone) {
+            if ($name !== '' && $this->normalizeText($parentByPhone->name) === $this->normalizeText($name)) {
+                return [
+                    'status' => 'update',
+                    'status_label' => 'Cập nhật',
+                    'planned_action' => 'Cập nhật phụ huynh hiện có theo họ tên và số điện thoại.',
+                    'candidate' => $this->parentCandidatePayload($parentByPhone),
+                ];
+            }
+
             return [
                 'status' => 'need_confirmation',
                 'status_label' => 'Cần xác nhận',
@@ -1139,9 +1149,13 @@ class BulkExcelController extends Controller
 
         foreach ($rows as $row) {
             $code = trim((string) $this->rowValue($row, ['ma_phu_huynh', 'parent_code']));
+            $name = trim((string) $this->rowValue($row, ['ho_ten', 'ho_va_ten', 'name']));
             $phone = trim((string) $this->rowValue($row, ['sdt', 'so_dien_thoai', 'phone']));
             $parent = $code !== '' ? ParentProfile::where('parent_code', $code)->first() : null;
             $parentByPhone = $phone !== '' ? ParentProfile::where('phone', $phone)->first() : null;
+            if (! $parent && $parentByPhone && $name !== '' && $this->normalizeText($parentByPhone->name) === $this->normalizeText($name)) {
+                $parent = $parentByPhone;
+            }
             if ($parentByPhone && (! $parent || (string) $parent->id !== (string) $parentByPhone->id)) {
                 throw ValidationException::withMessages([
                     'file' => 'Dữ liệu phụ huynh cần xác nhận vì số điện thoại đã thuộc hồ sơ khác hoặc thiếu parent_code.',

@@ -14,6 +14,7 @@ use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -28,6 +29,7 @@ class KhenThuongController extends Controller
         $selectedSemesterId = $request->query('semester_id') ?: $this->selectedSemesterId($request);
         $selectedClassId = $request->query('class_id', 'all');
         $selectedType = $request->query('reward_type', 'all');
+        $isAdmin = $user->isAdmin() || $user->isStaff();
 
         $classes = SchoolClass::with('schoolYear')
             ->when($selectedYearId, fn ($query) => $query->where('school_year_id', $selectedYearId))
@@ -62,11 +64,19 @@ class KhenThuongController extends Controller
 
         $rewards = Reward::with(['student', 'classRoom', 'semester'])
             ->whereIn('class_id', $allowedClassIds)
+            ->when(! $isAdmin && $this->approvalWorkflowAvailable(), fn ($query) => $query->whereIn('approval_status', [Reward::STATUS_PENDING, Reward::STATUS_APPROVED]))
             ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
             ->when($selectedClassId && $selectedClassId !== 'all', fn ($query) => $query->where('class_id', $selectedClassId))
             ->when($selectedType && $selectedType !== 'all', fn ($query) => $query->where('reward_type', $selectedType))
             ->latest()
             ->get();
+
+        $pendingRewards = $isAdmin && $this->approvalWorkflowAvailable()
+            ? Reward::with(['student', 'classRoom', 'semester', 'creator'])
+                ->where('approval_status', Reward::STATUS_PENDING)
+                ->latest()
+                ->get()
+            : collect();
 
         return view('rewards.index', [
             'rewards' => $rewards,
@@ -79,6 +89,8 @@ class KhenThuongController extends Controller
             'selectedType' => $selectedType,
             'isHomeroomOnly' => $this->isHomeroomOnly(),
             'readOnly' => $this->isHistoricalReadOnly($request, true),
+            'isAdmin' => $isAdmin,
+            'pendingRewards' => $pendingRewards,
         ]);
     }
 
@@ -117,7 +129,7 @@ class KhenThuongController extends Controller
             return $students->map(function (Student $student) use ($data) {
                 $this->authorizeStudent($student);
 
-                return Reward::create([
+                return Reward::create(array_merge([
                     'student_id' => $student->id,
                     'class_id' => $student->class_id,
                     'semester_id' => $data['semester_id'],
@@ -127,7 +139,7 @@ class KhenThuongController extends Controller
                     'decision_number' => $data['decision_number'] ?? null,
                     'created_by' => Auth::id(),
                     'updated_by' => Auth::id(),
-                ]);
+                ], $this->approvalAttributes()));
             });
         });
 
@@ -160,6 +172,56 @@ class KhenThuongController extends Controller
         AuditLogger::log('reward_updated', Reward::class, (string) $reward->getKey(), 'Cập nhật quyết định khen thưởng cho ' . $student->name);
 
         return back()->with('success', 'Đã cập nhật quyết định khen thưởng.');
+    }
+
+    public function approve(Request $request, Reward $reward)
+    {
+        $this->authorizeAdmin();
+        $this->denyHistoricalWrite();
+
+        if ($reward->approval_status !== Reward::STATUS_PENDING) {
+            return back()->withErrors(['reward' => 'Khen thưởng này đã được xử lý, không thể duyệt lại.']);
+        }
+
+        $alreadyApproved = Reward::where('student_id', $reward->student_id)
+            ->where('semester_id', $reward->semester_id)
+            ->where('approval_status', Reward::STATUS_APPROVED)
+            ->whereKeyNot($reward->getKey())
+            ->exists();
+
+        if ($alreadyApproved) {
+            return back()->withErrors(['reward' => 'Học sinh này đã có khen thưởng được duyệt trong học kỳ.']);
+        }
+
+        $reward->update([
+            'approval_status' => Reward::STATUS_APPROVED,
+            'approved_by' => Auth::id(),
+            'approved_at' => now(),
+            'updated_by' => Auth::id(),
+        ]);
+
+        AuditLogger::log('reward_approved', Reward::class, (string) $reward->getKey(), 'Duyệt khen thưởng');
+
+        return back()->with('success', 'Đã duyệt khen thưởng.');
+    }
+
+    public function reject(Request $request, Reward $reward)
+    {
+        $this->authorizeAdmin();
+        $this->denyHistoricalWrite();
+
+        if ($reward->approval_status !== Reward::STATUS_PENDING) {
+            return back()->withErrors(['reward' => 'Khen thưởng này đã được xử lý, không thể từ chối lại.']);
+        }
+
+        $reward->update([
+            'approval_status' => Reward::STATUS_REJECTED,
+            'updated_by' => Auth::id(),
+        ]);
+
+        AuditLogger::log('reward_rejected', Reward::class, (string) $reward->getKey(), 'Không duyệt khen thưởng');
+
+        return back()->with('success', 'Đã chuyển khen thưởng sang Không duyệt.');
     }
 
     public function destroy(Reward $reward)
@@ -297,10 +359,10 @@ class KhenThuongController extends Controller
                     'detail' => $automaticDetail,
                     'decision_number' => null,
                     'updated_by' => Auth::id(),
-                ]);
+                ] + $this->approvalAttributes());
                 $updated++;
             } else {
-                Reward::create([
+                Reward::create(array_merge([
                     'student_id' => $student->id,
                     'class_id' => $student->class_id,
                     'semester_id' => $semester->id,
@@ -310,7 +372,7 @@ class KhenThuongController extends Controller
                     'decision_number' => null,
                     'created_by' => Auth::id(),
                     'updated_by' => Auth::id(),
-                ]);
+                ], $this->approvalAttributes()));
                 $created++;
             }
 
@@ -386,6 +448,36 @@ class KhenThuongController extends Controller
         abort(403, 'Chỉ Admin hoặc giáo viên chủ nhiệm được quản lý khen thưởng.');
     }
 
+    private function authorizeAdmin(): void
+    {
+        abort_unless($this->isAdminUser(), 403, 'Chỉ Admin hoặc nhân sự được phân quyền mới được duyệt khen thưởng.');
+    }
+
+    private function isAdminUser(): bool
+    {
+        $user = Auth::user();
+
+        return (bool) ($user?->isAdmin() || $user?->isStaff());
+    }
+
+    private function approvalWorkflowAvailable(): bool
+    {
+        return Schema::hasTable('rewards') && Schema::hasColumn('rewards', 'approval_status');
+    }
+
+    private function approvalAttributes(): array
+    {
+        if (! $this->approvalWorkflowAvailable()) {
+            return [];
+        }
+
+        return [
+            'approval_status' => $this->isAdminUser() ? Reward::STATUS_APPROVED : Reward::STATUS_PENDING,
+            'approved_by' => $this->isAdminUser() ? Auth::id() : null,
+            'approved_at' => $this->isAdminUser() ? now() : null,
+        ];
+    }
+
     private function authorizeStudent(Student $student): void
     {
         if (! $this->isHomeroomOnly()) {
@@ -403,6 +495,10 @@ class KhenThuongController extends Controller
     {
         if (! $this->isHomeroomOnly()) {
             return;
+        }
+
+        if ($reward->approval_status !== Reward::STATUS_PENDING) {
+            abort(403, 'Giáo viên chỉ được chỉnh sửa khen thưởng đang chờ duyệt.');
         }
 
         if ((string) $reward->classRoom?->homeroom_teacher_id === (string) Auth::user()->teacher_id) {

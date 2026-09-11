@@ -13,6 +13,9 @@ class Reward extends Model
     public const TYPE_OUTSTANDING = 'outstanding';
     public const TYPE_GOOD = 'good';
     public const TYPE_SUDDEN = 'sudden';
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_REJECTED = 'rejected';
 
     protected $fillable = [
         'student_id',
@@ -24,7 +27,28 @@ class Reward extends Model
         'decision_number',
         'created_by',
         'updated_by',
+        'approval_status',
+        'approved_by',
+        'approved_at',
     ];
+
+    protected $casts = [
+        'approved_at' => 'datetime',
+    ];
+
+    public static function approvalStatusLabels(): array
+    {
+        return [
+            self::STATUS_PENDING => 'Chờ duyệt',
+            self::STATUS_APPROVED => 'Đã duyệt',
+            self::STATUS_REJECTED => 'Không duyệt',
+        ];
+    }
+
+    public function approvalStatusLabel(): string
+    {
+        return self::approvalStatusLabels()[$this->approval_status] ?? 'Chờ duyệt';
+    }
 
     public static function typeLabels(): array
     {

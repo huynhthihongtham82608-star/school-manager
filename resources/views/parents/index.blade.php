@@ -18,22 +18,6 @@
 </x-page-header>
 
 <div class="card">
-    <div class="card-body border-bottom">
-        <form method="GET" action="{{ route('parents.index') }}" class="row g-2 align-items-end">
-            <div class="col-md-5">
-                <label class="form-label small mb-1">Tìm kiếm</label>
-                <input type="search" name="q" class="form-control" value="{{ $keyword ?? '' }}" placeholder="Họ tên, số điện thoại, mã phụ huynh, học sinh">
-            </div>
-            <div class="col-auto">
-                <button class="btn btn-primary">Tìm</button>
-            </div>
-            @if(($keyword ?? '') !== '')
-                <div class="col-auto">
-                    <a href="{{ route('parents.index') }}" class="btn btn-secondary">Xóa tìm</a>
-                </div>
-            @endif
-        </form>
-    </div>
     <div class="table-responsive">
         <table class="table align-middle">
             <thead>
