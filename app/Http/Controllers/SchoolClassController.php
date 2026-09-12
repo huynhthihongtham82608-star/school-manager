@@ -12,6 +12,7 @@ use App\Models\Student;
 use App\Models\StudentClassAssignment;
 use App\Models\Teacher;
 use App\Models\Timetable;
+use App\Rules\BusinessText;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -482,9 +483,9 @@ class SchoolClassController extends Controller
     private function validatedData(Request $request, ?SchoolClass $class = null): array
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', new BusinessText('Ten lop')],
             'grade_level' => ['required', 'integer', Rule::in([10, 11, 12])],
-            'cohort' => ['nullable', 'string', 'max:20'],
+            'cohort' => ['nullable', 'string', 'max:20', new BusinessText('Nien khoa')],
             'school_year_id' => ['required', 'exists:school_years,id'],
             'homeroom_teacher_id' => ['nullable', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'teacher')],
             'capacity' => ['required', 'integer', 'min:1', 'max:45'],

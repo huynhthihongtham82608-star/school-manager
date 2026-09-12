@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\TeacherDepartment;
+use App\Rules\BusinessText;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -182,12 +183,13 @@ class TeacherDepartmentController extends Controller
                 'required',
                 'string',
                 'max:255',
+                new BusinessText('Tên tổ chuyên môn'),
                 Rule::unique('teacher_departments', 'name')->ignore($department?->getKey()),
             ],
             'subject_ids' => ['required', 'array', 'min:1'],
             'subject_ids.*' => ['required', 'distinct', \Illuminate\Validation\Rule::exists('subjects', 'id')->where('subject_record_type', 'subject')],
             'leader_teacher_id' => ['nullable', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'teacher')],
-            'description' => ['nullable', 'string', 'max:2000'],
+            'description' => ['nullable', 'string', 'max:2000', new BusinessText('Mô tả tổ chuyên môn')],
             'status' => ['required', Rule::in(array_keys(TeacherDepartment::STATUSES))],
         ], [
             'code.regex' => 'Mã tổ chỉ gồm chữ in hoa, số hoặc dấu gạch dưới.',

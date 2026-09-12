@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\BusinessText;
+use App\Rules\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -18,9 +20,9 @@ class UpdateAdminUserRequest extends FormRequest
 
         return [
             'username' => ['required', 'string', 'max:100', 'alpha_dash', Rule::unique('users', 'username')->ignore($userId)],
-            'full_name' => ['required', 'string', 'max:255'],
+            'full_name' => ['required', 'string', 'max:255', new BusinessText('Ho ten')],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'phone' => ['nullable', 'string', 'max:30', new PhoneNumber()],
             'role_ids' => ['required', 'array', 'min:1'],
             'role_ids.*' => ['string', Rule::exists('rbac_roles', 'id')->where('is_active', true)],
             'is_active' => ['nullable', 'boolean'],

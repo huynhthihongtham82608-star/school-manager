@@ -385,6 +385,29 @@ class ResultManagementBatchTest extends TestCase
         $this->assertStringNotContainsString('Không rõ học kỳ', $view->render());
     }
 
+    public function test_teacher_score_entry_page_keeps_filter_controls_after_opening_sheet(): void
+    {
+        [$semester, $class, $subject] = $this->scoreEntryFixture();
+        $teacherUser = $this->teacherUserForScoreAssignment($semester, $class, $subject);
+        $this->actingAs($teacherUser);
+
+        $view = app(ScoreController::class)->entry($this->requestFor('/scores/entry', [
+            'class_id' => $class->getKey(),
+            'subject_id' => $subject->getKey(),
+            'semester_id' => $semester->getKey(),
+        ], $teacherUser));
+
+        $html = $view->render();
+
+        $this->assertStringContainsString('data-score-entry-context-form', $html);
+        $this->assertStringContainsString('data-score-assignment-class', $html);
+        $this->assertStringContainsString('data-score-assignment-subject', $html);
+        $this->assertStringContainsString('data-score-assignment-semester', $html);
+        $this->assertStringContainsString((string) $class->getKey(), $html);
+        $this->assertStringContainsString((string) $subject->getKey(), $html);
+        $this->assertStringContainsString((string) $semester->getKey(), $html);
+    }
+
     public function test_score_admin_matrix_keeps_selected_numeric_and_assessment_subjects(): void
     {
         $admin = $this->adminUser();

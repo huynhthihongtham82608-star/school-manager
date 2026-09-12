@@ -15442,6 +15442,56 @@ body.role-parent .topbar {
     -moz-osx-font-smoothing: grayscale;
 }
 
+body.role-teacher .role-sidebar,
+body.role-homeroom .role-sidebar,
+body.role-student .role-sidebar,
+body.role-parent .role-sidebar {
+    background: linear-gradient(180deg, #fff7ed 0%, #fff4e6 40%, #fffbf7 100%) !important;
+    border-right-color: rgba(234, 88, 12, .22) !important;
+    box-shadow: 12px 0 30px rgba(217, 111, 22, .09) !important;
+}
+
+body.role-teacher header.fixed.top-0,
+body.role-homeroom header.fixed.top-0,
+body.role-student header.fixed.top-0,
+body.role-parent header.fixed.top-0 {
+    background: linear-gradient(90deg, #fff7ed 0%, #ffedd5 46%, #fed7aa 100%) !important;
+    border-bottom-color: rgba(234, 88, 12, .24) !important;
+    box-shadow: 0 10px 28px rgba(217, 111, 22, .12), 0 1px 1px rgba(15, 23, 42, .035) !important;
+}
+
+body.role-teacher .role-sidebar-head,
+body.role-homeroom .role-sidebar-head,
+body.role-student .role-sidebar-head,
+body.role-parent .role-sidebar-head {
+    border-color: rgba(234, 88, 12, .14) !important;
+    background: rgba(255, 237, 213, .58) !important;
+}
+
+body.role-teacher .topbar-search,
+body.role-homeroom .topbar-search,
+body.role-student .topbar-search,
+body.role-parent .topbar-search,
+body.role-teacher header.fixed.top-0 .dropdown-toggle,
+body.role-homeroom header.fixed.top-0 .dropdown-toggle,
+body.role-student header.fixed.top-0 .dropdown-toggle,
+body.role-parent header.fixed.top-0 .dropdown-toggle {
+    background: rgba(255, 255, 255, .78) !important;
+    border-color: rgba(234, 88, 12, .22) !important;
+    box-shadow: 0 8px 18px rgba(217, 111, 22, .08) !important;
+}
+
+body.role-teacher .role-sidebar-title,
+body.role-homeroom .role-sidebar-title,
+body.role-student .role-sidebar-title,
+body.role-parent .role-sidebar-title,
+body.role-teacher .school-heading,
+body.role-homeroom .school-heading,
+body.role-student .school-heading,
+body.role-parent .school-heading {
+    color: #431407 !important;
+}
+
 body.role-teacher .content *,
 body.role-homeroom .content *,
 body.role-student .content *,

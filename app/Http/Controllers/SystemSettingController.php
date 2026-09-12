@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\HomePageContent;
 use App\Models\SchoolYear;
 use App\Models\SystemSetting;
+use App\Rules\BusinessText;
+use App\Rules\PhoneNumber;
 use App\Support\AuditLogger;
 use App\Support\CurrentAcademicContext;
 use Illuminate\Http\Request;
@@ -40,14 +42,14 @@ class SystemSettingController extends Controller
         );
 
         $data = $request->validate([
-            'school_name' => ['required', 'string', 'max:255'],
-            'short_name' => ['nullable', 'string', 'max:50'],
+            'school_name' => ['required', 'string', 'max:255', new BusinessText('Ten truong')],
+            'short_name' => ['nullable', 'string', 'max:50', new BusinessText('Ten viet tat')],
             'logo' => ['nullable', 'image', 'max:5120'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'address' => ['nullable', 'string', 'max:255', new BusinessText('Dia chi')],
+            'phone' => ['nullable', 'string', 'max:50', new PhoneNumber()],
             'email' => ['nullable', 'email', 'max:255'],
             'website' => ['nullable', 'string', 'max:255'],
-            'principal_name' => ['nullable', 'string', 'max:255'],
+            'principal_name' => ['nullable', 'string', 'max:255', new BusinessText('Hieu truong')],
             'default_school_year_id' => ['nullable', 'exists:school_years,id'],
             'banner_title' => ['nullable', 'string', 'max:255'],
             'banner_welcome' => ['nullable', 'string', 'max:500'],

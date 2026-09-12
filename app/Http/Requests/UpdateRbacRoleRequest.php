@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\BusinessText;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -18,8 +19,8 @@ class UpdateRbacRoleRequest extends FormRequest
 
         return [
             'key' => ['required', 'string', 'max:100', 'alpha_dash', Rule::unique('rbac_roles', 'key')->ignore($roleId)],
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:1000'],
+            'name' => ['required', 'string', 'max:255', new BusinessText('Ten vai tro')],
+            'description' => ['nullable', 'string', 'max:1000', new BusinessText('Mo ta vai tro')],
             'permission_ids' => ['nullable', 'array'],
             'permission_ids.*' => ['string', Rule::exists('rbac_permissions', 'id')],
             'is_active' => ['nullable', 'boolean'],

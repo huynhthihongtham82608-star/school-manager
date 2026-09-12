@@ -573,11 +573,7 @@ class MessageController extends Controller
         $message->loadMissing(['sender.teacher', 'recipients.receiver']);
 
         if ($message->sender_user_id === $currentUser->id) {
-            return ($currentUser->isAdmin() || $currentUser->isStaff())
-                && $message->recipients
-                    ->pluck('receiver')
-                    ->filter()
-                    ->contains(fn (User $receiver) => $receiver->id !== $currentUser->id);
+            return $this->replyRecipient($currentUser, $message) !== null;
         }
 
         $isReceiver = $message->recipients->contains('receiver_user_id', $currentUser->id);
@@ -619,14 +615,24 @@ class MessageController extends Controller
             return $message->sender;
         }
 
-        if ($currentUser->isAdmin() || $currentUser->isStaff()) {
-            return $message->recipients
-                ->pluck('receiver')
-                ->filter()
-                ->firstWhere('id', '!=', $currentUser->id);
+        $conversationId = $message->conversationKey();
+        $latestOtherMessage = Message::query()
+            ->with('sender')
+            ->where(fn (Builder $query) => $query
+                ->where('conversation_id', $conversationId)
+                ->orWhere('id', $conversationId))
+            ->where('sender_user_id', '!=', $currentUser->id)
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($latestOtherMessage?->sender) {
+            return $latestOtherMessage->sender;
         }
 
-        return null;
+        return $message->recipients
+            ->pluck('receiver')
+            ->filter()
+            ->firstWhere('id', '!=', $currentUser->id);
     }
 
     private function availableRecipients(User $user): Collection

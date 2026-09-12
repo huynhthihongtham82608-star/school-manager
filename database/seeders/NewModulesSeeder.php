@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Student;
+use App\Models\Teacher;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -40,7 +42,7 @@ class NewModulesSeeder extends Seeder
 
     private function seedTuitionFees(): void
     {
-        if (! Schema::hasTable('tuition_fees') || ! Schema::hasTable('students') || DB::table('tuition_fees')->exists()) {
+        if (! Schema::hasTable('tuition_fees') || DB::table('tuition_fees')->exists()) {
             return;
         }
 
@@ -60,9 +62,10 @@ class NewModulesSeeder extends Seeder
             ['key' => 'accident_insurance', 'label' => 'Bao hiem Tai nan', 'amount' => 150000, 'status' => 'unpaid'],
         ];
 
-        DB::table('students')
+        Student::query()
             ->select('id', 'class_id', 'school_year_id')
-            ->orderBy('id')
+            ->whereNotNull('class_id')
+            ->orderBy('student_code')
             ->chunk(100, function ($students) use ($items, $semesterId, $schoolYearId) {
                 foreach ($students as $student) {
                     DB::table('tuition_fees')->insert([
@@ -90,13 +93,16 @@ class NewModulesSeeder extends Seeder
     {
         if (
             ! Schema::hasTable('rewards') ||
-            ! Schema::hasTable('students') ||
             DB::table('rewards')->exists()
         ) {
             return;
         }
 
-        $student = DB::table('students')->select('id', 'class_id', 'school_year_id')->orderBy('id')->first();
+        $student = Student::query()
+            ->select('id', 'class_id', 'school_year_id')
+            ->whereNotNull('class_id')
+            ->orderBy('student_code')
+            ->first();
 
         if (! $student) {
             return;
@@ -125,7 +131,6 @@ class NewModulesSeeder extends Seeder
         if (
             ! Schema::hasTable('substitute_teachings') ||
             ! Schema::hasTable('timetable_entries') ||
-            ! Schema::hasTable('teachers') ||
             DB::table('substitute_teachings')->exists()
         ) {
             return;
@@ -148,8 +153,8 @@ class NewModulesSeeder extends Seeder
             return;
         }
 
-        $substituteTeacherId = DB::table('teachers')
-            ->where('id', '<>', $entry->teacher_id)
+        $substituteTeacherId = Teacher::query()
+            ->whereKeyNot($entry->teacher_id)
             ->value('id') ?: $entry->teacher_id;
 
         DB::table('substitute_teachings')->insert([

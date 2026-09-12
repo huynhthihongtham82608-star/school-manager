@@ -118,6 +118,74 @@ class AdminFinalBatchTest extends TestCase
         $this->assertStringContainsString('Chưa đọc', $html);
     }
 
+    public function test_original_sender_can_continue_message_thread_from_sent_box(): void
+    {
+        $student = $this->makeUser('student');
+        $admin = $this->makeUser('admin');
+
+        $message = Message::create([
+            'sender_user_id' => $student->id,
+            'receiver_user_id' => $admin->id,
+            'title' => 'Toi muon de cu ve quyet dinh QD-2025-0001',
+            'content' => 'Toi muon de cu nhieu van de lien quan.',
+            'target_type' => 'individual',
+            'recipient_summary' => $admin->display_name,
+            'is_read' => false,
+            'created_at' => now()->subMinutes(5),
+        ]);
+        $message->update(['conversation_id' => $message->id]);
+        $message->recipients()->create([
+            'receiver_user_id' => $admin->id,
+            'is_read' => true,
+            'read_at' => now()->subMinutes(4),
+        ]);
+
+        $adminReply = Message::create([
+            'sender_user_id' => $admin->id,
+            'receiver_user_id' => $student->id,
+            'conversation_id' => $message->id,
+            'parent_message_id' => $message->id,
+            'title' => 'Re: Toi muon de cu ve quyet dinh QD-2025-0001',
+            'content' => 'Ban muon de cu nhu the a',
+            'target_type' => 'individual',
+            'recipient_summary' => $student->display_name,
+            'is_read' => false,
+            'created_at' => now()->subMinutes(2),
+        ]);
+        $adminReply->recipients()->create([
+            'receiver_user_id' => $student->id,
+            'is_read' => false,
+        ]);
+
+        $this->actingAs($student);
+
+        $view = app(MessageController::class)->sent(Request::create('/messages/sent', 'GET'));
+        $html = $view->render();
+
+        $this->assertStringContainsString('name="content"', $html);
+        $this->assertStringContainsString('type="submit"', $html);
+
+        $request = Request::create('/messages/' . $message->id . '/reply', 'POST', [
+            'content' => 'Toi bo sung them noi dung.',
+            'redirect_box' => 'sent',
+        ]);
+        $request->setLaravelSession($this->app['session.store']);
+        $request->setUserResolver(fn () => $student);
+
+        app(MessageController::class)->reply($request, $message);
+
+        $reply = Message::where('sender_user_id', $student->id)
+            ->where('conversation_id', $message->id)
+            ->where('content', 'Toi bo sung them noi dung.')
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('messages', [
+            'message_id' => $reply->id,
+            'receiver_user_id' => $admin->id,
+            'message_record_type' => 'recipient',
+        ]);
+    }
+
     public function test_message_dropdown_script_flips_near_viewport_bottom_and_audit_logs_hide_technical_modules(): void
     {
         $script = file_get_contents(resource_path('views/messages/_dropdown_positioning.blade.php'));

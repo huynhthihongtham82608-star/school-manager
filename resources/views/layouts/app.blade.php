@@ -473,9 +473,9 @@
             justify-content: space-between !important;
             padding-left: 1.5rem !important;
             padding-right: 1.5rem !important;
-            border-bottom: 1px solid #ffedd5 !important;
-            background: #fff !important;
-            box-shadow: 0 1px 1px rgba(15, 23, 42, .035) !important;
+            border-bottom: 1px solid rgba(234, 88, 12, .24) !important;
+            background: linear-gradient(90deg, #fff7ed 0%, #ffedd5 46%, #fed7aa 100%) !important;
+            box-shadow: 0 10px 28px rgba(217, 111, 22, .12), 0 1px 1px rgba(15, 23, 42, .035) !important;
             text-align: left !important;
         }
 
@@ -489,6 +489,13 @@
             gap: .75rem !important;
             overflow: hidden !important;
             text-align: left !important;
+            margin: .75rem .75rem .35rem !important;
+            padding-left: .75rem !important;
+            padding-right: .75rem !important;
+            border: 1px solid rgba(234, 88, 12, .14) !important;
+            border-radius: 1rem !important;
+            background: rgba(255, 237, 213, .58) !important;
+            box-shadow: 0 10px 22px rgba(217, 111, 22, .08) !important;
         }
 
         .role-sidebar-head .brand-mark {
@@ -569,12 +576,13 @@
                 left: 0 !important;
                 top: 0 !important;
                 height: 100vh !important;
-                background-color: #ffffff !important;
-                border-right: 1px solid #ffedd5 !important;
+                background: linear-gradient(180deg, #fff7ed 0%, #fff4e6 40%, #fffbf7 100%) !important;
+                border-right: 1px solid rgba(234, 88, 12, .22) !important;
                 border-radius: 0 !important;
                 z-index: 40 !important;
                 text-align: left !important;
                 overflow: hidden !important;
+                box-shadow: 12px 0 30px rgba(217, 111, 22, .09) !important;
             }
             .role-menu-toggle, .role-sidebar-close {
                 display: none !important;
@@ -640,6 +648,85 @@
         @media (max-width: 991.98px) {
             .fixed.top-0.right-0.left-56.h-16.bg-white.border-b.border-orange-100 {
                 left: 0 !important;
+                height: auto !important;
+                min-height: 8.75rem !important;
+                align-items: stretch !important;
+                justify-content: flex-start !important;
+                flex-direction: column !important;
+                gap: .55rem !important;
+                padding: .65rem .85rem .8rem !important;
+                overflow: visible !important;
+            }
+
+            .role-topbar-left {
+                width: 100% !important;
+                display: grid !important;
+                grid-template-columns: auto minmax(0, 1fr) !important;
+                align-items: center !important;
+                gap: .55rem .7rem !important;
+            }
+
+            .role-topbar-left .school-heading {
+                min-width: 0 !important;
+                max-width: 100% !important;
+                white-space: normal !important;
+                line-height: 1.25 !important;
+                font-size: .95rem !important;
+            }
+
+            .role-topbar-left .topbar-search {
+                grid-column: 1 / -1 !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                max-width: 100% !important;
+                flex: none !important;
+                height: 2.5rem !important;
+                order: initial !important;
+            }
+
+            .fixed.top-0.right-0.left-56.h-16.bg-white.border-b.border-orange-100 .topbar-actions {
+                width: 100% !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                gap: .5rem !important;
+                flex-wrap: nowrap !important;
+                min-width: 0 !important;
+            }
+
+            .topbar-actions .badge-role {
+                max-width: 6.5rem !important;
+                padding: .32rem .55rem !important;
+                font-size: .72rem !important;
+            }
+
+            .topbar-actions .dropdown {
+                min-width: 0 !important;
+            }
+
+            .topbar-actions .dropdown-toggle {
+                max-width: calc(100vw - 9.5rem) !important;
+                min-width: 0 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: .35rem !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+
+            .topbar-actions .dropdown-toggle span {
+                min-width: 0 !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+
+            .main-panel > main.content.role-content-fixed-offset,
+            .role-content-fixed-offset {
+                padding-top: 10rem !important;
+                padding-left: .85rem !important;
+                padding-right: .85rem !important;
+                gap: 1rem !important;
             }
         }
     </style>

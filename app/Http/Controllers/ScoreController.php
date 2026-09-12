@@ -1332,8 +1332,12 @@ class ScoreController extends Controller
         $canSubmitScores = collect($scoreCellPermissions)
             ->flatMap(fn (array $cells) => $cells)
             ->contains(fn (array $meta) => $meta['editable']);
+        $entryAssignments = collect();
+        if (Auth::user()->isTeacher() && Auth::user()->teacher && ! (Auth::user()->isAdmin() || Auth::user()->isStaff())) {
+            $entryAssignments = $this->teacherScoreEntryAssignments(Auth::user()->teacher, $semester->school_year_id);
+        }
 
-        return view('scores.entry', compact('class', 'subject', 'semester', 'students', 'headers', 'scoreColumns', 'columnPermissions', 'scoreCellPermissions', 'canSubmitScores', 'subjectAnnualAverages', 'scoreSetting'));
+        return view('scores.entry', compact('class', 'subject', 'semester', 'students', 'headers', 'scoreColumns', 'columnPermissions', 'scoreCellPermissions', 'canSubmitScores', 'subjectAnnualAverages', 'scoreSetting', 'entryAssignments'));
     }
 
     public function store(Request $request)

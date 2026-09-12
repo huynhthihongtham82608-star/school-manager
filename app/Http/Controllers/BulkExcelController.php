@@ -19,8 +19,10 @@ use App\Models\Teacher;
 use App\Models\TeacherDepartment;
 use App\Models\TeachingAssignment;
 use App\Models\User;
+use App\Rules\PhoneNumber;
 use App\Support\AuditLogger;
 use App\Support\SimpleExcel;
+use App\Support\StudentCodeGenerator;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -983,6 +985,7 @@ class BulkExcelController extends Controller
             $name = trim((string) $this->rowValue($row, ['ho_ten', 'ho_va_ten', 'name']));
             $dob = $this->parseDate($this->rowValue($row, ['ngay_sinh', 'dob']));
             $parentPhone = trim((string) $this->rowValue($row, ['sdt_phu_huynh', 'parent_phone']));
+            $this->ensureImportedPhoneIsDigitsOnly($parentPhone, $position + 2, 'so dien thoai phu huynh');
             $student = $this->findImportedStudentByStableKey($code);
 
             if ($student && $this->studentImportDifferences($student, $name, $dob) !== []) {
@@ -1021,7 +1024,7 @@ class BulkExcelController extends Controller
 
             $studentWasExisting = (bool) $student?->exists;
             $oldClassId = $student?->class_id ? (string) $student->class_id : null;
-            $student ??= new Student(['student_code' => $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date']))]);
+            $student ??= new Student(['student_code' => $code !== '' ? $code : StudentCodeGenerator::nextForClass($class)]);
             $preserveExistingParent = $code === '' && $parentPhone === '' && $student->exists;
             $studentData = [
                 'name' => $name,
@@ -1040,7 +1043,9 @@ class BulkExcelController extends Controller
                 'transfer_grade_level' => trim((string) $this->rowValue($row, ['transfer_grade_level', 'khoi_hien_tai'])) ?: null,
                 'previous_class' => trim((string) $this->rowValue($row, ['previous_class', 'lop_cu'])) ?: null,
                 'note' => trim((string) $this->rowValue($row, ['note', 'ghi_chu'])) ?: null,
-                'status' => $this->normalizeStudentStatus($this->rowValue($row, ['trang_thai', 'status'])),
+                'status' => $studentWasExisting
+                    ? $this->normalizeStudentStatus($this->rowValue($row, ['trang_thai', 'status']))
+                    : Student::STATUS_STUDYING,
             ];
 
             if (! $preserveExistingParent) {
@@ -1048,10 +1053,12 @@ class BulkExcelController extends Controller
             }
 
             $student->fill($this->studentImportDataForSave($student, $studentData, $studentWasExisting));
-            $student->student_code ??= $code !== '' ? $code : $this->nextStudentCode($this->rowValue($row, ['ngay_nhap_hoc', 'enrollment_date']));
+            $student->student_code ??= $code !== '' ? $code : StudentCodeGenerator::nextForClass($class);
             $studentTable = $student->getTable();
             if (Schema::hasColumn($studentTable, 'student_phone')) {
-                $student->setAttribute('student_phone', trim((string) $this->rowValue($row, ['sdt_hoc_sinh', 'student_phone', 'phone'])) ?: null);
+                $studentPhone = trim((string) $this->rowValue($row, ['sdt_hoc_sinh', 'student_phone', 'phone']));
+                $this->ensureImportedPhoneIsDigitsOnly($studentPhone, $position + 2, 'so dien thoai hoc sinh');
+                $student->setAttribute('student_phone', $studentPhone ?: null);
             }
             if (Schema::hasColumn($studentTable, 'hometown')) {
                 $student->setAttribute('hometown', trim((string) $this->rowValue($row, ['que_quan', 'hometown'])) ?: null);
@@ -1098,13 +1105,15 @@ class BulkExcelController extends Controller
             $subject = $this->resolveSubject((string) $this->rowValue($row, ['mon_chinh', 'mon_giang_day', 'primary_subject_id', 'main_subject']));
             $department = $this->resolveDepartment((string) $this->rowValue($row, ['to_chuyen_mon', 'department_id']));
             $code = trim((string) $this->rowValue($row, ['ma_gv', 'ma_giao_vien', 'teacher_code']));
+            $phone = trim((string) $this->rowValue($row, ['sdt', 'so_dien_thoai', 'phone']));
+            $this->ensureImportedPhoneIsDigitsOnly($phone, (int) ($row['__bulk_position'] ?? 0) + 2, 'so dien thoai giao vien');
             $teacher = $code !== '' ? Teacher::where('teacher_code', $code)->first() : null;
             $teacher ??= new Teacher(['teacher_code' => $code !== '' ? $code : $this->nextTeacherCode()]);
             $teacher->fill([
                 'name' => trim((string) $this->rowValue($row, ['ho_ten', 'ho_va_ten', 'name'])),
                 'dob' => $this->parseDate($this->rowValue($row, ['ngay_sinh', 'dob'])),
                 'gender' => $this->normalizeGender($this->rowValue($row, ['gioi_tinh', 'gender'])),
-                'phone' => trim((string) $this->rowValue($row, ['sdt', 'so_dien_thoai', 'phone'])) ?: null,
+                'phone' => $phone ?: null,
                 'email' => trim((string) $this->rowValue($row, ['email'])) ?: null,
                 'address' => trim((string) $this->rowValue($row, ['dia_chi', 'address'])) ?: null,
                 'qualification' => trim((string) $this->rowValue($row, ['trinh_do', 'qualification'])) ?: null,
@@ -1151,6 +1160,7 @@ class BulkExcelController extends Controller
             $code = trim((string) $this->rowValue($row, ['ma_phu_huynh', 'parent_code']));
             $name = trim((string) $this->rowValue($row, ['ho_ten', 'ho_va_ten', 'name']));
             $phone = trim((string) $this->rowValue($row, ['sdt', 'so_dien_thoai', 'phone']));
+            $this->ensureImportedPhoneIsDigitsOnly($phone, (int) ($row['__bulk_position'] ?? 0) + 2, 'so dien thoai phu huynh');
             $parent = $code !== '' ? ParentProfile::where('parent_code', $code)->first() : null;
             $parentByPhone = $phone !== '' ? ParentProfile::where('phone', $phone)->first() : null;
             if (! $parent && $parentByPhone && $name !== '' && $this->normalizeText($parentByPhone->name) === $this->normalizeText($name)) {
@@ -2149,6 +2159,15 @@ class BulkExcelController extends Controller
         return $default;
     }
 
+    private function ensureImportedPhoneIsDigitsOnly(?string $phone, int $rowNumber, string $label): void
+    {
+        if (! PhoneNumber::isValid($phone)) {
+            throw ValidationException::withMessages([
+                'file' => 'Dòng ' . $rowNumber . ': ' . $label . ' chỉ được chứa chữ số.',
+            ]);
+        }
+    }
+
     private function rowForHeaders(array $headers, array $values): array
     {
         return array_map(function (array $header) use ($values) {
@@ -2540,6 +2559,7 @@ class BulkExcelController extends Controller
     {
         $parentCode = trim((string) $this->rowValue($row, ['ma_phu_huynh', 'parent_code']));
         $phone = trim((string) $this->rowValue($row, ['sdt_phu_huynh', 'parent_phone']));
+        $this->ensureImportedPhoneIsDigitsOnly($phone, (int) ($row['__bulk_position'] ?? 0) + 2, 'so dien thoai phu huynh');
         if ($phone === '' && $parentCode === '') {
             return;
         }

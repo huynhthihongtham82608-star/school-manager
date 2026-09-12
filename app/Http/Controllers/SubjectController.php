@@ -7,6 +7,7 @@ use App\Models\ScoreColumn;
 use App\Models\ScoreSetting;
 use App\Models\Subject;
 use App\Models\SubjectPeriodNorm;
+use App\Rules\BusinessText;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -171,6 +172,7 @@ class SubjectController extends Controller
                 'required',
                 'string',
                 'max:255',
+                new BusinessText('Ten mon hoc'),
                 Rule::unique('subjects', 'name')->ignore($subject?->getKey()),
             ],
             'credit' => ['required', 'integer', 'min:1', 'max:10'],

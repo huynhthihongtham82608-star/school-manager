@@ -122,7 +122,7 @@ class TimetableController extends Controller
                 : $teachers->first();
 
             if ($selectedTeacher && $selectedSemester) {
-                $teacherEntries = TimetableEntry::with(['timetable.classRoom.homeroomTeacher', 'assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo', 'approvedSubstitutes'])
+                $teacherEntries = TimetableEntry::with(['timetable.classRoom.homeroomTeacher', 'timetable.classRoom.fixedRoom', 'assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo', 'approvedSubstitutes'])
                     ->where('status', TimetableEntry::STATUS_ACTIVE)
                     ->where(function ($query) use ($selectedTeacher) {
                         $query->where('teacher_id', $selectedTeacher->id)
@@ -564,7 +564,7 @@ class TimetableController extends Controller
             abort(403);
         }
 
-        $entries = TimetableEntry::with(['timetable.classRoom.homeroomTeacher', 'assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo', 'approvedSubstitutes'])
+        $entries = TimetableEntry::with(['timetable.classRoom.homeroomTeacher', 'timetable.classRoom.fixedRoom', 'assignment.subject', 'assignment.teacher', 'subject', 'teacher', 'roomInfo', 'approvedSubstitutes'])
             ->where(function ($query) use ($teacherId) {
                 $query->where('teacher_id', $teacherId)
                     ->orWhere(function ($homeroomQuery) use ($teacherId) {

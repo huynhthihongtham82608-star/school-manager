@@ -8,6 +8,7 @@ use App\Models\ScoreDetail;
 use App\Models\ScoreHeader;
 use App\Models\ScoreSetting;
 use App\Models\Subject;
+use App\Rules\BusinessText;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -292,7 +293,7 @@ class ScoreColumnController extends Controller
             'school_year_id' => ['required', 'exists:school_years,id'],
             'subject_id' => ['required', 'exists:subjects,id'],
             'grade_level' => ['required', 'integer', Rule::in([10, 11, 12])],
-            'name' => ['required', 'string', 'max:255', $uniqueName],
+            'name' => ['required', 'string', 'max:255', new BusinessText('Ten cot diem'), $uniqueName],
             'type' => ['required', Rule::in($types)],
             'input_opens_at' => ['nullable', 'date'],
             'input_closes_at' => ['nullable', 'date', 'after_or_equal:input_opens_at'],

@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Setting;
 use App\Models\TuitionFee;
+use App\Rules\BusinessText;
 use App\Services\AcademicEvaluationService;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class SystemRegulationController extends Controller
 {
@@ -38,7 +40,7 @@ class SystemRegulationController extends Controller
 
         $data = $request->validate([
             'academic_levels' => ['required', 'array', 'min:1'],
-            'academic_levels.*.label' => ['required', 'string', 'max:80'],
+            'academic_levels.*.label' => ['required', 'string', 'max:80', new BusinessText('Ten moc diem hoc luc')],
             'academic_levels.*.gpa_min' => ['required', 'numeric', 'min:0', 'max:10'],
             'academic_levels.*.subject_min' => ['required', 'numeric', 'min:0', 'max:10'],
             'confirmed_delete' => ['nullable', 'boolean'],
@@ -56,7 +58,7 @@ class SystemRegulationController extends Controller
         $deletedAcademicKeys = $existingAcademicKeys->diff($incomingAcademicKeys);
 
         if ($deletedAcademicKeys->isNotEmpty() && ! $request->boolean('confirmed_delete')) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'academic_levels' => 'Thao tác xóa mốc điểm học lực cần được xác nhận trước khi lưu.',
             ]);
         }
@@ -89,7 +91,7 @@ class SystemRegulationController extends Controller
 
         $data = $request->validate([
             'conduct_levels' => ['required', 'array', 'min:1'],
-            'conduct_levels.*.label' => ['required', 'string', 'max:80'],
+            'conduct_levels.*.label' => ['required', 'string', 'max:80', new BusinessText('Ten dinh muc hanh kiem')],
             'conduct_levels.*.max_unexcused_absence' => ['required', 'integer', 'min:0', 'max:365'],
             'conduct_levels.*.max_period_absence' => ['required', 'integer', 'min:0', 'max:500'],
             'conduct_levels.*.max_late' => ['required', 'integer', 'min:0', 'max:500'],
@@ -108,7 +110,7 @@ class SystemRegulationController extends Controller
         $deletedConductKeys = $existingConductKeys->diff($incomingConductKeys);
 
         if ($deletedConductKeys->isNotEmpty() && ! $request->boolean('confirmed_delete')) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'conduct_levels' => 'Thao tác xóa định mức hạnh kiểm cần được xác nhận trước khi lưu.',
             ]);
         }
@@ -151,7 +153,7 @@ class SystemRegulationController extends Controller
         $data = $request->validate([
             'fee_items' => ['required', 'array', 'min:1'],
             'fee_items.*.key' => ['nullable', 'string', 'max:80'],
-            'fee_items.*.label' => ['required', 'string', 'max:120'],
+            'fee_items.*.label' => ['required', 'string', 'max:120', new BusinessText('Ten khoan thu')],
             'fee_items.*.amount' => ['required', 'numeric', 'min:0'],
             'tuition_qr_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:20480'],
         ]);
@@ -175,6 +177,19 @@ class SystemRegulationController extends Controller
             ->unique('key')
             ->values()
             ->all();
+
+        $removedFeeKeys = collect(TuitionFee::configuredFeeItems())
+            ->pluck('key')
+            ->diff(collect($items)->pluck('key'))
+            ->filter()
+            ->values();
+
+        $usedRemovedFeeKeys = $this->usedTuitionFeeItemKeys($removedFeeKeys->all());
+        if ($usedRemovedFeeKeys !== []) {
+            throw ValidationException::withMessages([
+                'fee_items' => 'Không thể xóa cấu hình mức thu đã phát sinh dữ liệu học phí: ' . implode(', ', $usedRemovedFeeKeys) . '.',
+            ]);
+        }
 
         Setting::putValue('tuition_fee_items', json_encode($items, JSON_UNESCAPED_UNICODE), 'tuition_rules');
         if ($request->hasFile('tuition_qr_image')) {
@@ -249,9 +264,27 @@ class SystemRegulationController extends Controller
     private function denyHistoricalWrite(string $label): void
     {
         if ($this->isHistoricalReadOnly()) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'history_readonly' => 'Đang xem dữ liệu lịch sử, không thể thay đổi ' . $label . '.',
             ]);
         }
+    }
+
+    private function usedTuitionFeeItemKeys(array $keys): array
+    {
+        $keys = collect($keys)->filter()->values();
+
+        if ($keys->isEmpty() || ! Schema::hasTable('tuition_fees') || ! Schema::hasColumn('tuition_fees', 'fee_items')) {
+            return [];
+        }
+
+        return TuitionFee::query()
+            ->whereNotNull('fee_items')
+            ->get(['fee_items'])
+            ->flatMap(fn (TuitionFee $fee) => collect($fee->fee_items ?: [])->pluck('key')->filter())
+            ->intersect($keys)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

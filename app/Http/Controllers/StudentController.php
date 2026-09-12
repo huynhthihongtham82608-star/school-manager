@@ -7,7 +7,10 @@ use App\Models\SchoolYear;
 use App\Models\Student;
 use App\Models\ParentProfile;
 use App\Models\User;
+use App\Rules\BusinessText;
+use App\Rules\PhoneNumber;
 use App\Support\AuditLogger;
+use App\Support\StudentCodeGenerator;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -114,7 +117,7 @@ class StudentController extends Controller
         $this->ensureClassCanReceiveStudent($class, $data['school_year_id']);
 
         return DB::transaction(function () use ($request, $data, $parentData, $class) {
-            $data['student_code'] = $this->generateStudentCode($data['enrollment_date']);
+            $data['student_code'] = StudentCodeGenerator::nextForClass($class);
             $data['avatar'] = $this->storeAvatar($request);
 
             $student = Student::create($data);
@@ -173,6 +176,7 @@ class StudentController extends Controller
                 $name = trim((string) ($row['ho_ten'] ?? ''));
                 $phone = trim((string) ($row['sdt_phu_huynh'] ?? ''));
                 $studentCode = trim((string) ($row['ma_hs'] ?? ''));
+                $this->ensureImportedPhoneIsDigitsOnly($phone, $index + 2, 'so dien thoai phu huynh');
 
                 if ($name === '') {
                     throw ValidationException::withMessages([
@@ -247,7 +251,7 @@ class StudentController extends Controller
                     'previous_school' => $admissionType === Student::ADMISSION_TRANSFER ? ($row['truong_cu'] ?? null) : null,
                     'transfer_grade_level' => $admissionType === Student::ADMISSION_TRANSFER ? $transferGradeLevel : null,
                     'previous_class' => $admissionType === Student::ADMISSION_TRANSFER ? ($row['lop_cu'] ?? null) : null,
-                    'status' => $status,
+                    'status' => $matchedStudent ? $status : Student::STATUS_STUDYING,
                 ];
 
                 if ($phone !== '') {
@@ -264,7 +268,7 @@ class StudentController extends Controller
                     $updated++;
                 } else {
                     $createData = $studentData + [
-                        'student_code' => $studentCode !== '' ? $studentCode : $this->generateStudentCode($enrollmentDate),
+                        'student_code' => $studentCode !== '' ? $studentCode : StudentCodeGenerator::nextForClass($class),
                         'parent_phone' => $phone ?: null,
                     ];
 
@@ -362,6 +366,13 @@ class StudentController extends Controller
             ]);
         }
 
+        if (! PhoneNumber::isValid($phone)) {
+            return response()->json([
+                'exists' => false,
+                'message' => 'Số điện thoại chỉ được chứa chữ số.',
+            ], 422);
+        }
+
         $parent = ParentProfile::where('phone', $phone)->first();
 
         if (! $parent) {
@@ -453,6 +464,14 @@ class StudentController extends Controller
         $studentId = (string) $student->getKey();
 
         DB::transaction(function () use ($student) {
+            if (Schema::hasTable('parent_student')) {
+                DB::table('parent_student')->where('student_id', $student->getKey())->delete();
+            }
+
+            if (Schema::hasTable('student_movements') && Schema::hasColumn('student_movements', 'student_id')) {
+                DB::table('student_movements')->where('student_id', $student->getKey())->delete();
+            }
+
             $student->user?->delete();
             $student->delete();
         });
@@ -544,30 +563,30 @@ class StudentController extends Controller
     private function validatedData(Request $request, ?Student $student = null): array
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', new BusinessText('Họ tên học sinh')],
             'gender' => ['required', Rule::in(array_keys(Student::genderLabels()))],
             'dob' => ['nullable', 'date'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'place_of_birth' => ['nullable', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255', new BusinessText('Địa chỉ')],
+            'place_of_birth' => ['nullable', 'string', 'max:255', new BusinessText('Nơi sinh')],
             'ethnicity_choice' => ['nullable', Rule::in(['Kinh', 'Khác'])],
-            'ethnicity_custom' => ['nullable', 'string', 'max:100', 'required_if:ethnicity_choice,Khác'],
+            'ethnicity_custom' => ['nullable', 'string', 'max:100', 'required_if:ethnicity_choice,Khác', new BusinessText('Dan toc')],
             'religion_choice' => ['nullable', Rule::in(['Không', 'Khác'])],
-            'religion_custom' => ['nullable', 'string', 'max:100', 'required_if:religion_choice,Khác'],
-            'parent_phone' => ['nullable', 'string', 'max:50', function (string $attribute, mixed $value, \Closure $fail) use ($student) {
+            'religion_custom' => ['nullable', 'string', 'max:100', 'required_if:religion_choice,Khác', new BusinessText('Ton giao')],
+            'parent_phone' => ['nullable', 'string', 'max:50', new PhoneNumber(), function (string $attribute, mixed $value, \Closure $fail) use ($student) {
                 if ($this->userPhoneConflictForParent((string) $value, $student?->parents()->first())) {
                     $fail('Thông tin này đã tồn tại trong hệ thống, vui lòng kiểm tra lại!');
                 }
             }],
             'enrollment_date' => ['required', 'date'],
             'admission_type' => ['required', Rule::in(array_keys(Student::admissionTypeLabels()))],
-            'previous_school' => ['nullable', 'string', 'max:255'],
+            'previous_school' => ['nullable', 'string', 'max:255', new BusinessText('Trường cũ')],
             'transfer_grade_level' => ['nullable', 'integer', Rule::in([10, 11, 12])],
-            'previous_class' => ['nullable', 'string', 'max:50'],
+            'previous_class' => ['nullable', 'string', 'max:50', new BusinessText('Lớp cũ')],
             'avatar' => ['nullable', 'image', 'max:2048'],
             'note' => ['nullable', 'string', 'max:2000'],
             'class_id' => ['required', 'exists:classes,id'],
             'school_year_id' => ['required', 'exists:school_years,id'],
-            'status' => ['required', Rule::in(array_keys(Student::statuses()))],
+            'status' => [$student ? 'required' : 'nullable', Rule::in(array_keys(Student::statuses()))],
         ]);
 
         $class = SchoolClass::findOrFail($validated['class_id']);
@@ -600,20 +619,24 @@ class StudentController extends Controller
             $validated['religion_custom'],
         );
 
+        if (! $student) {
+            $validated['status'] = Student::STATUS_STUDYING;
+        }
+
         return $validated;
     }
 
     private function validatedParentData(Request $request): array
     {
         return $request->validate([
-            'parent_name' => ['required', 'string', 'max:255'],
+            'parent_name' => ['required', 'string', 'max:255', new BusinessText('Phu huynh')],
             'parent_relation' => ['required', Rule::in(array_keys(ParentProfile::relationLabels()))],
-            'parent_phone' => ['required', 'string', 'max:50', function (string $attribute, mixed $value, \Closure $fail) {
+            'parent_phone' => ['required', 'string', 'max:50', new PhoneNumber(), function (string $attribute, mixed $value, \Closure $fail) {
                 if ($this->userPhoneConflictForParent((string) $value)) {
                     $fail('Thông tin này đã tồn tại trong hệ thống, vui lòng kiểm tra lại!');
                 }
             }],
-            'parent_address' => ['nullable', 'string', 'max:255'],
+            'parent_address' => ['nullable', 'string', 'max:255', new BusinessText('Dia chi phu huynh')],
         ], [], [
             'parent_name' => 'họ tên phụ huynh',
             'parent_relation' => 'quan hệ',
@@ -630,10 +653,10 @@ class StudentController extends Controller
     private function validatedOptionalParentData(Request $request): array
     {
         $validated = $request->validate([
-            'parent_name' => ['nullable', 'string', 'max:255'],
+            'parent_name' => ['nullable', 'string', 'max:255', new BusinessText('Phu huynh')],
             'parent_relation' => ['nullable', Rule::in(array_keys(ParentProfile::relationLabels()))],
             'parent_id' => ['nullable', 'string'],
-            'parent_phone' => ['nullable', 'string', 'max:50', function (string $attribute, mixed $value, \Closure $fail) use ($request) {
+            'parent_phone' => ['nullable', 'string', 'max:50', new PhoneNumber(), function (string $attribute, mixed $value, \Closure $fail) use ($request) {
                 $currentParent = $request->input('parent_id')
                     ? ParentProfile::find($request->input('parent_id'))
                     : null;
@@ -642,7 +665,7 @@ class StudentController extends Controller
                     $fail('Thông tin này đã tồn tại trong hệ thống, vui lòng kiểm tra lại!');
                 }
             }],
-            'parent_address' => ['nullable', 'string', 'max:255'],
+            'parent_address' => ['nullable', 'string', 'max:255', new BusinessText('Dia chi phu huynh')],
         ], [], [
             'parent_name' => 'họ tên phụ huynh',
             'parent_relation' => 'quan hệ',
@@ -921,6 +944,15 @@ class StudentController extends Controller
         return Student::where('student_code', $studentCode)->first();
     }
 
+    private function ensureImportedPhoneIsDigitsOnly(?string $phone, int $rowNumber, string $label): void
+    {
+        if (! PhoneNumber::isValid($phone)) {
+            throw ValidationException::withMessages([
+                'file' => 'Dòng ' . $rowNumber . ': ' . $label . ' chỉ được chứa chữ số.',
+            ]);
+        }
+    }
+
     private function findImportedStudentByIdentity(string $name, string $dob, string $classId): ?Student
     {
         $name = trim($name);
@@ -1028,11 +1060,11 @@ class StudentController extends Controller
             return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đã phát sinh hạnh kiểm. Hãy đổi trạng thái nếu học sinh không còn học.'];
         }
 
-        if ($this->tableHasRows('parent_student', 'student_id', (string) $student->getKey())) {
+        if (false && $this->tableHasRows('parent_student', 'student_id', (string) $student->getKey())) {
             return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đang liên kết phụ huynh. Hãy gỡ liên kết hoặc đổi trạng thái học sinh.'];
         }
 
-        if ($this->tableHasRows('student_movements', 'student_id', (string) $student->getKey())) {
+        if (false && $this->tableHasRows('student_movements', 'student_id', (string) $student->getKey())) {
             return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đã có lịch sử lớp học. Hãy đổi trạng thái nếu học sinh không còn học.'];
         }
 
@@ -1049,6 +1081,11 @@ class StudentController extends Controller
         }
 
         if ($this->tableHasRows('messages', 'student_id', (string) $student->getKey())) {
+            return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đã phát sinh dữ liệu trao đổi. Hãy đổi trạng thái nếu học sinh không còn học.'];
+        }
+
+        if ($this->tableHasRows('messages', 'sender_user_id', (string) $student->getKey())
+            || $this->tableHasRows('messages', 'receiver_user_id', (string) $student->getKey())) {
             return ['allowed' => false, 'message' => 'Không thể xóa học sinh vì đã phát sinh dữ liệu trao đổi. Hãy đổi trạng thái nếu học sinh không còn học.'];
         }
 

@@ -724,11 +724,12 @@
     </div>
 </div>
 
+<script type="application/json" id="timetable-resource-data">@json($resourceRows->values())</script>
+<script type="application/json" id="timetable-existing-slot-data">@json($existingSlots)</script>
+<script type="application/json" id="timetable-validation-data">@json($validationRows)</script>
+<script type="application/json" id="timetable-room-data">@json($rooms->map(fn ($room) => ['id' => (string) $room->id, 'name' => (string) $room->name])->values())</script>
+
 @if($timetable)
-    <script type="application/json" id="timetable-resource-data">@json($resourceRows->values())</script>
-    <script type="application/json" id="timetable-existing-slot-data">@json($existingSlots)</script>
-    <script type="application/json" id="timetable-validation-data">@json($validationRows)</script>
-    <script type="application/json" id="timetable-room-data">@json($rooms->map(fn ($room) => ['id' => (string) $room->id, 'name' => (string) $room->name])->values())</script>
     <script>
         (() => {
             const form = document.querySelector('[data-timetable-form]');

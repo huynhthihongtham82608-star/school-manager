@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\ParentProfile;
+use App\Rules\PhoneNumber;
 use App\Services\AdminProtectionService;
 
 class ProfileController extends Controller
@@ -90,7 +91,7 @@ class ProfileController extends Controller
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'email' => 'nullable|email|max:255',
-                'phone' => 'nullable|string|max:20',
+                'phone' => ['nullable', 'string', 'max:20', new PhoneNumber()],
             ]);
             
             if ($user->teacher) {
@@ -119,7 +120,7 @@ class ProfileController extends Controller
         elseif ($user->isParent()) {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
-                'phone' => 'nullable|string|max:20',
+                'phone' => ['nullable', 'string', 'max:20', new PhoneNumber()],
                 'address' => 'nullable|string|max:500',
             ]);
             

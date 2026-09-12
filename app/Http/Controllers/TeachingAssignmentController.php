@@ -14,6 +14,7 @@ use App\Models\TeacherDepartment;
 use App\Models\TeachingAssignment;
 use App\Models\Timetable;
 use App\Models\TimetableEntry;
+use App\Rules\BusinessText;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -280,7 +281,7 @@ class TeachingAssignmentController extends Controller
             'teacher_id' => ['required', \Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'teacher')],
             'subject_id' => ['required', \Illuminate\Validation\Rule::exists('subjects', 'id')->where('subject_record_type', 'subject')],
             'role' => ['required', Rule::in(array_keys(TeachingAssignment::ROLES))],
-            'custom_role' => ['nullable', 'string', 'max:255', 'required_if:role,' . TeachingAssignment::ROLE_OTHER],
+            'custom_role' => ['nullable', 'string', 'max:255', new BusinessText('Vai tro tuy chinh'), 'required_if:role,' . TeachingAssignment::ROLE_OTHER],
             'weekly_periods' => ['nullable', 'integer', 'min:1', 'max:20'],
             'note' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in(array_keys(TeachingAssignment::STATUSES))],

@@ -6,6 +6,8 @@ use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\TeacherDepartment;
 use App\Models\User;
+use App\Rules\BusinessText;
+use App\Rules\PhoneNumber;
 use App\Services\AdminProtectionService;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
@@ -179,15 +181,15 @@ class TeacherController extends Controller
                 Rule::unique($this->teacherTable(), 'teacher_code')->ignore($teacher?->getKey()),
                 Rule::unique('users', 'username')->ignore($teacher?->user?->id),
             ],
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', new BusinessText('Ho ten giao vien')],
             'dob' => ['nullable', 'date'],
             'gender' => ['nullable', Rule::in(array_keys(Teacher::genderLabels()))],
-            'phone' => ['nullable', 'string', 'max:50', 'regex:/^[0-9+\-\s().]{8,20}$/'],
+            'phone' => ['nullable', 'string', 'min:8', 'max:20', new PhoneNumber()],
             'email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->ignore($teacher?->getKey())],
-            'address' => ['nullable', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255', new BusinessText('Dia chi')],
             'joined_at' => ['nullable', 'date'],
             'work_status' => ['required', Rule::in(array_keys(Teacher::workStatuses()))],
-            'qualification' => ['nullable', 'string', 'max:255'],
+            'qualification' => ['nullable', 'string', 'max:255', new BusinessText('Trinh do')],
             'primary_subject_id' => ['required', 'exists:subjects,id'],
             'department_id' => ['nullable', 'exists:teacher_departments,id'],
         ]);

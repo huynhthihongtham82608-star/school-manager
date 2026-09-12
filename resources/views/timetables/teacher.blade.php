@@ -142,7 +142,7 @@
                                                     @php
                                                         $subjectName = $entry->subject?->name ?? $entry->assignment?->subject?->name ?? 'Môn học';
                                                         $className = $entry->timetable?->classRoom?->name ?? '-';
-                                                        $roomName = $entry->roomInfo?->name ?? $entry->room ?? '-';
+                                                        $roomName = $entry->displayRoomLabel() ?? '-';
                                                         $title = $subjectName . ' • ' . $className;
                                                         $roomLabel = 'Phòng: ' . $roomName;
                                                         $marker = $entry->displaySubstituteMarker();

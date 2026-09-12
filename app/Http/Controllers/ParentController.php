@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\ParentProfile;
 use App\Models\Student;
 use App\Models\User;
+use App\Rules\BusinessText;
+use App\Rules\PhoneNumber;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -116,7 +118,11 @@ class ParentController extends Controller
 
     public function destroy(ParentProfile $parent)
     {
-        if ($parent->students()->exists()) {
+        $dependencies = $this->parentDependencyLabels($parent);
+        if ($dependencies !== []) {
+            return back()->withErrors([
+                'parent' => 'Không thể xóa phụ huynh vì đã phát sinh dữ liệu: ' . implode(', ', $dependencies) . '. Vui lòng khóa đăng nhập hoặc cập nhật liên kết để giữ nguyên lịch sử.',
+            ]);
             return back()->withErrors([
                 'parent' => 'Không thể xóa phụ huynh đang liên kết với học sinh. Vui lòng gỡ liên kết hoặc xử lý học sinh liên quan trước.',
             ]);
@@ -126,6 +132,10 @@ class ParentController extends Controller
         $parentId = (string) $parent->getKey();
 
         DB::transaction(function () use ($parent) {
+            if (\Illuminate\Support\Facades\Schema::hasTable('parent_student')) {
+                DB::table('parent_student')->where('parent_id', $parent->getKey())->delete();
+            }
+
             $parent->user?->delete();
             $parent->delete();
         });
@@ -168,19 +178,20 @@ class ParentController extends Controller
     private function validatedData(Request $request, ?ParentProfile $parent = null): array
     {
         return $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', new BusinessText('Ho ten phu huynh')],
             'relation' => ['required', Rule::in(array_keys(ParentProfile::relationLabels()))],
             'phone' => [
                 'required',
                 'string',
                 'max:50',
+                new PhoneNumber(),
                 function (string $attribute, mixed $value, \Closure $fail) use ($parent) {
                     if ($this->userPhoneConflictForParent((string) $value, $parent)) {
                         $fail('Thông tin này đã tồn tại trong hệ thống, vui lòng kiểm tra lại!');
                     }
                 },
             ],
-            'address' => ['nullable', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255', new BusinessText('Dia chi')],
             'student_ids' => ['nullable', 'array'],
             'student_ids.*' => [\Illuminate\Validation\Rule::exists('users', 'id')->where('role_type', 'student')],
         ]);
@@ -333,6 +344,34 @@ class ParentController extends Controller
                     });
             })
             ->exists();
+    }
+
+    private function parentDependencyLabels(ParentProfile $parent): array
+    {
+        $parentId = (string) $parent->getKey();
+        $dependencies = [];
+
+        if ($this->tableHasRows('parent_leave_requests', 'parent_id', $parentId)) {
+            $dependencies[] = 'đơn xin nghỉ';
+        }
+
+        if ($this->tableHasRows('messages', 'sender_user_id', $parentId)
+            || $this->tableHasRows('messages', 'receiver_user_id', $parentId)) {
+            $dependencies[] = 'tin nhắn';
+        }
+
+        if ($this->tableHasRows('chatbot_messages', 'user_id', $parentId)) {
+            $dependencies[] = 'lịch sử chatbot';
+        }
+
+        return array_values(array_unique($dependencies));
+    }
+
+    private function tableHasRows(string $table, string $column, string $value): bool
+    {
+        return \Illuminate\Support\Facades\Schema::hasTable($table)
+            && \Illuminate\Support\Facades\Schema::hasColumn($table, $column)
+            && DB::table($table)->where($column, $value)->exists();
     }
 
     private function generateParentCode(): string

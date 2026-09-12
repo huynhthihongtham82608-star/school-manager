@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Room;
 use App\Models\SchoolClass;
+use App\Rules\BusinessText;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -123,9 +124,9 @@ class RoomController extends Controller
         ]);
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255', Rule::unique('rooms', 'name')->ignore($room?->getKey())],
+            'name' => ['required', 'string', 'max:255', new BusinessText('Ten phong'), Rule::unique('rooms', 'name')->ignore($room?->getKey())],
             'type' => ['required', Rule::in(array_keys(Room::TYPES))],
-            'custom_type' => ['nullable', 'string', 'max:255', Rule::requiredIf($request->input('type') === Room::TYPE_OTHER)],
+            'custom_type' => ['nullable', 'string', 'max:255', new BusinessText('Loai phong'), Rule::requiredIf($request->input('type') === Room::TYPE_OTHER)],
             'capacity' => ['required', 'integer', 'min:1', 'max:100'],
             'fixed_class_id' => [
                 'nullable',

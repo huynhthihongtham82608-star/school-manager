@@ -5,6 +5,18 @@
 @php
     $isScoreAdmin = auth()->user()->isAdmin() || auth()->user()->isStaff();
     $usesPassFailAssessment = $subject->usesPassFailAssessment();
+    $entryAssignments = $entryAssignments ?? collect();
+    $teacherScoreAssignments = $entryAssignments->map(fn ($assignment) => [
+        'id' => (string) $assignment->getKey(),
+        'class_id' => (string) $assignment->class_id,
+        'class_name' => $assignment->classRoom?->name ?? 'Không rõ lớp',
+        'subject_id' => (string) $assignment->subject_id,
+        'subject_name' => $assignment->subject?->name ?? 'Không rõ môn',
+        'semester_id' => (string) $assignment->semester_id,
+        'semester_name' => $assignment->semester?->normalizedName() ?? 'Không rõ học kỳ',
+        'school_year_id' => (string) $assignment->school_year_id,
+        'school_year_name' => $assignment->schoolYear?->name ?? '',
+    ])->values();
     $renderRetestBadge = function ($detail) {
         if (! $detail?->is_retest || $detail->original_value === null) {
             return '';
@@ -36,9 +48,45 @@
 
 <style>
     .score-entry-header,
+    .score-entry-context-filter,
     .score-sheet {
         font-family: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         color: #374151;
+    }
+
+    .score-entry-context-filter {
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border: 1px solid #fed7aa;
+        border-radius: 12px;
+        background: #fffaf5;
+    }
+
+    .score-entry-context-filter form {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: .75rem;
+        align-items: end;
+    }
+
+    .score-entry-context-filter label {
+        display: block;
+        margin-bottom: .35rem;
+        color: #7c2d12;
+        font-size: .875rem;
+        font-weight: 400;
+    }
+
+    .score-entry-context-filter .form-select,
+    .score-entry-context-filter .btn {
+        min-height: 42px;
+        font-size: .92rem;
+    }
+
+    @media (max-width: 991.98px) {
+        .score-entry-context-filter form {
+            grid-template-columns: 1fr;
+        }
     }
 
     .score-sheet .form-control:disabled,
@@ -305,6 +353,35 @@
     }
 </style>
 
+@if(! $isScoreAdmin)
+    <div class="score-entry-context-filter">
+        <form method="GET" action="{{ route('scores.entry') }}" data-score-entry-context-form>
+            <input type="hidden" name="class_id" data-score-class-id value="{{ $class->id }}">
+            <input type="hidden" name="subject_id" data-score-subject-id value="{{ $subject->id }}">
+            <input type="hidden" name="semester_id" data-score-semester-id value="{{ $semester->id }}">
+            <script type="application/json" data-score-teacher-assignments>
+                {!! $teacherScoreAssignments->toJson() !!}
+            </script>
+            <div>
+                <label>Lớp</label>
+                <select class="form-select" data-score-assignment-class @disabled($teacherScoreAssignments->isEmpty())></select>
+            </div>
+            <div>
+                <label>Môn</label>
+                <select class="form-select" data-score-assignment-subject @disabled($teacherScoreAssignments->isEmpty())></select>
+            </div>
+            <div>
+                <label>Học kỳ</label>
+                <select class="form-select" data-score-assignment-semester @disabled($teacherScoreAssignments->isEmpty())></select>
+            </div>
+            <button class="btn btn-warning text-white" @disabled($teacherScoreAssignments->isEmpty())>
+                <i class="bi bi-funnel me-1"></i>
+                Lọc lại
+            </button>
+        </form>
+    </div>
+@endif
+
 <div class="score-entry-header">
     <div class="min-w-0">
         <h5 class="score-entry-title">
@@ -522,6 +599,100 @@
         @endif
     </div>
 </form>
+
+@if(! $isScoreAdmin)
+    <script>
+        document.querySelectorAll('[data-score-entry-context-form]').forEach((form) => {
+            const classInput = form.querySelector('[data-score-class-id]');
+            const subjectInput = form.querySelector('[data-score-subject-id]');
+            const semesterInput = form.querySelector('[data-score-semester-id]');
+            const classSelect = form.querySelector('[data-score-assignment-class]');
+            const subjectSelect = form.querySelector('[data-score-assignment-subject]');
+            const semesterSelect = form.querySelector('[data-score-assignment-semester]');
+            const payload = form.querySelector('[data-score-teacher-assignments]')?.textContent || '[]';
+            const assignments = JSON.parse(payload);
+            const uniqueBy = (items, keyFactory) => {
+                const seen = new Set();
+                return items.filter((item) => {
+                    const key = keyFactory(item);
+                    if (!key || seen.has(key)) {
+                        return false;
+                    }
+
+                    seen.add(key);
+                    return true;
+                });
+            };
+            const resetSelect = (select, label) => {
+                select.innerHTML = '';
+                select.append(new Option(label, ''));
+            };
+            const selectValue = (select, preferred) => {
+                select.value = Array.from(select.options).some((option) => option.value === preferred)
+                    ? preferred
+                    : (select.options[1]?.value || '');
+            };
+            const renderClasses = () => {
+                resetSelect(classSelect, 'Chọn lớp');
+                uniqueBy(assignments, (assignment) => assignment.class_id)
+                    .forEach((assignment) => classSelect.append(new Option(assignment.class_name, assignment.class_id)));
+                selectValue(classSelect, classInput.value);
+            };
+            const renderSubjects = () => {
+                resetSelect(subjectSelect, 'Chọn môn');
+                uniqueBy(assignments.filter((assignment) => assignment.class_id === classSelect.value), (assignment) => assignment.subject_id)
+                    .forEach((assignment) => subjectSelect.append(new Option(assignment.subject_name, assignment.subject_id)));
+                selectValue(subjectSelect, subjectInput.value);
+            };
+            const renderSemesters = () => {
+                resetSelect(semesterSelect, 'Chọn học kỳ');
+                uniqueBy(assignments.filter((assignment) => (
+                    assignment.class_id === classSelect.value
+                    && assignment.subject_id === subjectSelect.value
+                )), (assignment) => assignment.semester_id)
+                    .forEach((assignment) => {
+                        const label = assignment.school_year_name
+                            ? `${assignment.semester_name} - ${assignment.school_year_name}`
+                            : assignment.semester_name;
+                        semesterSelect.append(new Option(label, assignment.semester_id));
+                    });
+                selectValue(semesterSelect, semesterInput.value);
+            };
+            const syncHiddenInputs = () => {
+                classInput.value = classSelect.value || '';
+                subjectInput.value = subjectSelect.value || '';
+                semesterInput.value = semesterSelect.value || '';
+            };
+
+            renderClasses();
+            renderSubjects();
+            renderSemesters();
+            syncHiddenInputs();
+
+            classSelect.addEventListener('change', () => {
+                classInput.value = classSelect.value || '';
+                subjectInput.value = '';
+                semesterInput.value = '';
+                renderSubjects();
+                renderSemesters();
+                syncHiddenInputs();
+            });
+            subjectSelect.addEventListener('change', () => {
+                subjectInput.value = subjectSelect.value || '';
+                semesterInput.value = '';
+                renderSemesters();
+                syncHiddenInputs();
+            });
+            semesterSelect.addEventListener('change', syncHiddenInputs);
+            form.addEventListener('submit', (event) => {
+                syncHiddenInputs();
+                if (!classInput.value || !subjectInput.value || !semesterInput.value) {
+                    event.preventDefault();
+                }
+            });
+        });
+    </script>
+@endif
 
 <script>
     document.querySelectorAll('[data-score-entry-form]').forEach((form) => {

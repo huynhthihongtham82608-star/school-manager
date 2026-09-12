@@ -14,6 +14,7 @@ use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\TeachingAssignment;
+use App\Rules\BusinessText;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -335,7 +336,7 @@ class ExamScheduleController extends Controller
     {
         return [
             'type' => ['required', Rule::in(array_keys(ExamSchedule::EXAM_TYPES))],
-            'custom_display_name' => ['nullable', 'string', 'max:255', Rule::requiredIf(request('type') === ExamSchedule::TYPE_CUSTOM)],
+            'custom_display_name' => ['nullable', 'string', 'max:255', new BusinessText('Loai kiem tra'), Rule::requiredIf(request('type') === ExamSchedule::TYPE_CUSTOM)],
             'school_year_id' => ['required', 'string', 'max:50', 'exists:school_years,id'],
             'class_id' => ['required', 'string', 'max:50', 'exists:classes,id'],
             'subject_id' => ['required', 'string', 'max:50', 'exists:subjects,id'],
